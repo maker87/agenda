@@ -1,26 +1,20 @@
 import { Routes } from '@angular/router';
-import { AuthComponent } from './auth/auth.component';
-import { DashboardComponent } from './dashboard/dashboard.component';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { getCurrentUser } from 'aws-amplify/auth';
+import { AuthComponent } from './auth/auth.component';
+import { DashboardComponent } from './dashboard/dashboard.component';
+import { MockAuthService } from './services/mock-auth.service';
 
-async function authGuard() {
-  try {
-    await getCurrentUser();
-    return true;
-  } catch {
-    return inject(Router).createUrlTree(['/']);
-  }
+function authGuard() {
+  const auth = inject(MockAuthService);
+  const router = inject(Router);
+  return auth.isLoggedIn() ? true : router.createUrlTree(['/']);
 }
 
-async function guestGuard() {
-  try {
-    await getCurrentUser();
-    return inject(Router).createUrlTree(['/dashboard']);
-  } catch {
-    return true;
-  }
+function guestGuard() {
+  const auth = inject(MockAuthService);
+  const router = inject(Router);
+  return auth.isLoggedIn() ? router.createUrlTree(['/dashboard']) : true;
 }
 
 export const routes: Routes = [

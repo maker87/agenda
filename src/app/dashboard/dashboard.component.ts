@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { signOut, getCurrentUser } from 'aws-amplify/auth';
+import { MockAuthService } from '../services/mock-auth.service';
 
 interface CalendarEvent {
   id: string;
@@ -72,25 +72,24 @@ export class DashboardComponent implements OnInit {
   eventColors = ['#6c63ff', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#ec4899'];
   selectedColor = '#6c63ff';
 
-  constructor(private router: Router) {}
+  constructor(private router: Router, private mockAuth: MockAuthService) {}
 
-  async ngOnInit() {
-    try {
-      const user = await getCurrentUser();
-      this.userEmail = user.signInDetails?.loginId || user.username || 'User';
-    } catch {
+  ngOnInit() {
+    const user = this.mockAuth.getCurrentUser();
+    if (!user) {
       this.router.navigate(['/']);
+      return;
     }
+    this.userEmail = user.email;
   }
 
-  async logout() {
-    await signOut();
+  logout() {
+    this.mockAuth.logout();
     this.router.navigate(['/']);
   }
 
   linkGoogleCalendar() {
     this.linkingGoogle = true;
-    // Simulate OAuth flow — in production, redirect to Google OAuth
     setTimeout(() => {
       this.googleCalendarLinked = true;
       this.linkingGoogle = false;
@@ -143,8 +142,8 @@ export class DashboardComponent implements OnInit {
       color: this.selectedColor,
     };
 
-    this.events = [...this.events, newEvent].sort((a, b) =>
-      a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)
+    this.events = [...this.events, newEvent].sort(
+      (a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)
     );
 
     this.scheduleSuccess = true;

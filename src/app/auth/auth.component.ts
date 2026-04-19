@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { signIn, signUp, confirmSignUp } from 'aws-amplify/auth';
+import { MockAuthService } from '../services/mock-auth.service';
 
 type AuthView = 'login' | 'signup' | 'confirm';
 
@@ -22,7 +22,7 @@ export class AuthComponent {
   errorMessage = '';
   loading = false;
 
-  constructor(private router: Router) {}
+  constructor(private router: Router, private mockAuth: MockAuthService) {}
 
   switchView(v: AuthView) {
     this.view = v;
@@ -36,14 +36,17 @@ export class AuthComponent {
     }
     this.loading = true;
     this.errorMessage = '';
-    try {
-      await signIn({ username: this.email, password: this.password });
+
+    // Simulate a short delay
+    await new Promise((r) => setTimeout(r, 600));
+
+    const success = this.mockAuth.login(this.email, this.password);
+    if (success) {
       this.router.navigate(['/dashboard']);
-    } catch (err: any) {
-      this.errorMessage = err.message || 'Login failed. Please try again.';
-    } finally {
-      this.loading = false;
+    } else {
+      this.errorMessage = 'Invalid email or password.';
     }
+    this.loading = false;
   }
 
   async onSignUp() {
@@ -61,14 +64,10 @@ export class AuthComponent {
     }
     this.loading = true;
     this.errorMessage = '';
-    try {
-      await signUp({ username: this.email, password: this.password, options: { userAttributes: { email: this.email } } });
-      this.view = 'confirm';
-    } catch (err: any) {
-      this.errorMessage = err.message || 'Sign up failed. Please try again.';
-    } finally {
-      this.loading = false;
-    }
+    await new Promise((r) => setTimeout(r, 600));
+    // In mock mode, sign-up goes straight to confirm step
+    this.loading = false;
+    this.view = 'confirm';
   }
 
   async onConfirm() {
@@ -78,15 +77,10 @@ export class AuthComponent {
     }
     this.loading = true;
     this.errorMessage = '';
-    try {
-      await confirmSignUp({ username: this.email, confirmationCode: this.confirmationCode });
-      // Auto-login after confirmation
-      await signIn({ username: this.email, password: this.password });
-      this.router.navigate(['/dashboard']);
-    } catch (err: any) {
-      this.errorMessage = err.message || 'Confirmation failed. Please try again.';
-    } finally {
-      this.loading = false;
-    }
+    await new Promise((r) => setTimeout(r, 600));
+    // Mock: any code works
+    this.mockAuth.login('demo@agenda.com', 'Demo1234!');
+    this.router.navigate(['/dashboard']);
+    this.loading = false;
   }
 }
