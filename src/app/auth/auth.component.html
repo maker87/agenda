@@ -1,0 +1,142 @@
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <!-- Logo / Brand -->
+    <div class="brand">
+      <div class="brand-icon">📅</div>
+      <h1 class="brand-name">Agenda</h1>
+      <p class="brand-tagline">Your smart scheduling assistant</p>
+    </div>
+
+    <!-- Login Form -->
+    <form *ngIf="view === 'login'" (ngSubmit)="onLogin()" class="auth-form">
+      <h2>Welcome back</h2>
+      <p class="form-subtitle">Sign in to your account</p>
+
+      <div class="field">
+        <label for="login-email">Email</label>
+        <input
+          id="login-email"
+          type="email"
+          [(ngModel)]="email"
+          name="email"
+          placeholder="you@example.com"
+          autocomplete="email"
+          required
+        />
+      </div>
+
+      <div class="field">
+        <label for="login-password">Password</label>
+        <input
+          id="login-password"
+          type="password"
+          [(ngModel)]="password"
+          name="password"
+          placeholder="••••••••"
+          autocomplete="current-password"
+          required
+        />
+      </div>
+
+      <div class="error-msg" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+      <button type="submit" class="btn-primary" [disabled]="loading">
+        <span *ngIf="!loading">Sign In</span>
+        <span *ngIf="loading" class="spinner"></span>
+      </button>
+
+      <p class="switch-link">
+        Don't have an account?
+        <button type="button" class="link-btn" (click)="switchView('signup')">Sign up</button>
+      </p>
+    </form>
+
+    <!-- Sign Up Form -->
+    <form *ngIf="view === 'signup'" (ngSubmit)="onSignUp()" class="auth-form">
+      <h2>Create account</h2>
+      <p class="form-subtitle">Get started for free</p>
+
+      <div class="field">
+        <label for="signup-email">Email</label>
+        <input
+          id="signup-email"
+          type="email"
+          [(ngModel)]="email"
+          name="email"
+          placeholder="you@example.com"
+          autocomplete="email"
+          required
+        />
+      </div>
+
+      <div class="field">
+        <label for="signup-password">Password</label>
+        <input
+          id="signup-password"
+          type="password"
+          [(ngModel)]="password"
+          name="password"
+          placeholder="Min. 8 characters"
+          autocomplete="new-password"
+          required
+        />
+      </div>
+
+      <div class="field">
+        <label for="confirm-password">Confirm Password</label>
+        <input
+          id="confirm-password"
+          type="password"
+          [(ngModel)]="confirmPassword"
+          name="confirmPassword"
+          placeholder="Repeat your password"
+          autocomplete="new-password"
+          required
+        />
+      </div>
+
+      <div class="error-msg" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+      <button type="submit" class="btn-primary" [disabled]="loading">
+        <span *ngIf="!loading">Create Account</span>
+        <span *ngIf="loading" class="spinner"></span>
+      </button>
+
+      <p class="switch-link">
+        Already have an account?
+        <button type="button" class="link-btn" (click)="switchView('login')">Sign in</button>
+      </p>
+    </form>
+
+    <!-- Confirm Sign Up Form -->
+    <form *ngIf="view === 'confirm'" (ngSubmit)="onConfirm()" class="auth-form">
+      <h2>Verify your email</h2>
+      <p class="form-subtitle">We sent a code to <strong>{{ email }}</strong></p>
+
+      <div class="field">
+        <label for="confirm-code">Confirmation Code</label>
+        <input
+          id="confirm-code"
+          type="text"
+          [(ngModel)]="confirmationCode"
+          name="confirmationCode"
+          placeholder="Enter 6-digit code"
+          autocomplete="one-time-code"
+          required
+        />
+      </div>
+
+      <div class="error-msg" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+      <button type="submit" class="btn-primary" [disabled]="loading">
+        <span *ngIf="!loading">Verify &amp; Sign In</span>
+        <span *ngIf="loading" class="spinner"></span>
+      </button>
+
+      <p class="switch-link">
+        Wrong email?
+        <button type="button" class="link-btn" (click)="switchView('signup')">Go back</button>
+      </p>
+    </form>
+  </div>
+</div>

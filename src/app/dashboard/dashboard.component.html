@@ -1,0 +1,317 @@
+<div class="app-shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="sidebar-icon">📅</span>
+      <span class="sidebar-title">Agenda</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button
+        class="nav-item"
+        [class.active]="activeTab === 'schedule'"
+        (click)="activeTab = 'schedule'"
+      >
+        <span class="nav-icon">✦</span>
+        Schedule
+      </button>
+      <button
+        class="nav-item"
+        [class.active]="activeTab === 'agenda'"
+        (click)="activeTab = 'agenda'"
+      >
+        <span class="nav-icon">☰</span>
+        My Agenda
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar">{{ userInitial }}</div>
+        <div class="user-details">
+          <span class="user-email">{{ userEmail }}</span>
+        </div>
+      </div>
+      <button class="logout-btn" (click)="logout()" title="Sign out">
+        <span>⎋</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- ── SCHEDULE TAB ── -->
+    <div *ngIf="activeTab === 'schedule'" class="tab-content">
+      <header class="page-header">
+        <div>
+          <h2 class="page-title">Schedule an Event</h2>
+          <p class="page-subtitle">Plan your day and stay on top of your agenda</p>
+        </div>
+        <button class="btn-primary" (click)="openScheduleModal()">
+          + New Event
+        </button>
+      </header>
+
+      <!-- Google Calendar Banner -->
+      <div class="gcal-card" [class.linked]="googleCalendarLinked">
+        <div class="gcal-left">
+          <div class="gcal-logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="3" width="18" height="18" rx="2" fill="#fff" stroke="#e0e0e0"/>
+              <rect x="3" y="7" width="18" height="2" fill="#4285F4"/>
+              <rect x="7" y="3" width="2" height="4" rx="1" fill="#4285F4"/>
+              <rect x="15" y="3" width="2" height="4" rx="1" fill="#4285F4"/>
+              <text x="12" y="17" text-anchor="middle" font-size="7" font-weight="bold" fill="#4285F4">G</text>
+            </svg>
+          </div>
+          <div>
+            <p class="gcal-title">Google Calendar</p>
+            <p class="gcal-status" *ngIf="!googleCalendarLinked">Connect to sync your events automatically</p>
+            <p class="gcal-status linked-text" *ngIf="googleCalendarLinked">✓ Connected — events are syncing</p>
+          </div>
+        </div>
+        <div class="gcal-right">
+          <button
+            *ngIf="!googleCalendarLinked"
+            class="btn-gcal"
+            (click)="linkGoogleCalendar()"
+            [disabled]="linkingGoogle"
+          >
+            <span *ngIf="!linkingGoogle">Link Google Calendar</span>
+            <span *ngIf="linkingGoogle" class="spinner-dark"></span>
+          </button>
+          <button
+            *ngIf="googleCalendarLinked"
+            class="btn-gcal-unlink"
+            (click)="unlinkGoogleCalendar()"
+          >
+            Disconnect
+          </button>
+        </div>
+      </div>
+
+      <!-- Today's Events -->
+      <section class="events-section">
+        <h3 class="section-label">Today · {{ formatDate(today) }}</h3>
+        <div *ngIf="todayEvents.length === 0" class="empty-state">
+          <span class="empty-icon">🗓️</span>
+          <p>No events today. Click <strong>+ New Event</strong> to add one.</p>
+        </div>
+        <div class="events-list">
+          <div class="event-card" *ngFor="let event of todayEvents">
+            <div class="event-color-bar" [style.background]="event.color"></div>
+            <div class="event-body">
+              <div class="event-header">
+                <span class="event-title">{{ event.title }}</span>
+                <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+              </div>
+              <div class="event-time">
+                🕐 {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
+              </div>
+              <div class="event-desc" *ngIf="event.description">{{ event.description }}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Upcoming Events -->
+      <section class="events-section" *ngIf="upcomingEvents.length > 0">
+        <h3 class="section-label">Upcoming</h3>
+        <div class="events-list">
+          <div class="event-card" *ngFor="let event of upcomingEvents">
+            <div class="event-color-bar" [style.background]="event.color"></div>
+            <div class="event-body">
+              <div class="event-header">
+                <span class="event-title">{{ event.title }}</span>
+                <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+              </div>
+              <div class="event-time">
+                📅 {{ formatDate(event.date) }} · {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
+              </div>
+              <div class="event-desc" *ngIf="event.description">{{ event.description }}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ── AGENDA TAB ── -->
+    <div *ngIf="activeTab === 'agenda'" class="tab-content">
+      <header class="page-header">
+        <div>
+          <h2 class="page-title">My Agenda</h2>
+          <p class="page-subtitle">All your scheduled events in one place</p>
+        </div>
+        <button class="btn-primary" (click)="openScheduleModal()">
+          + New Event
+        </button>
+      </header>
+
+      <div *ngIf="events.length === 0" class="empty-state large">
+        <span class="empty-icon">📋</span>
+        <p>Your agenda is empty. Start by scheduling your first event!</p>
+        <button class="btn-primary" (click)="openScheduleModal()">Schedule Now</button>
+      </div>
+
+      <!-- Past -->
+      <section class="events-section" *ngIf="pastEvents.length > 0">
+        <h3 class="section-label muted">Past</h3>
+        <div class="events-list">
+          <div class="event-card past" *ngFor="let event of pastEvents">
+            <div class="event-color-bar" [style.background]="event.color"></div>
+            <div class="event-body">
+              <div class="event-header">
+                <span class="event-title">{{ event.title }}</span>
+                <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+              </div>
+              <div class="event-time">
+                📅 {{ formatDate(event.date) }} · {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Today -->
+      <section class="events-section" *ngIf="todayEvents.length > 0">
+        <h3 class="section-label">Today · {{ formatDate(today) }}</h3>
+        <div class="events-list">
+          <div class="event-card" *ngFor="let event of todayEvents">
+            <div class="event-color-bar" [style.background]="event.color"></div>
+            <div class="event-body">
+              <div class="event-header">
+                <span class="event-title">{{ event.title }}</span>
+                <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+              </div>
+              <div class="event-time">
+                🕐 {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
+              </div>
+              <div class="event-desc" *ngIf="event.description">{{ event.description }}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Upcoming -->
+      <section class="events-section" *ngIf="upcomingEvents.length > 0">
+        <h3 class="section-label">Upcoming</h3>
+        <div class="events-list">
+          <div class="event-card" *ngFor="let event of upcomingEvents">
+            <div class="event-color-bar" [style.background]="event.color"></div>
+            <div class="event-body">
+              <div class="event-header">
+                <span class="event-title">{{ event.title }}</span>
+                <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+              </div>
+              <div class="event-time">
+                📅 {{ formatDate(event.date) }} · {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
+              </div>
+              <div class="event-desc" *ngIf="event.description">{{ event.description }}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── SCHEDULE MODAL ── -->
+<div class="modal-overlay" *ngIf="showScheduleModal" (click)="closeModal()">
+  <div class="modal" (click)="$event.stopPropagation()">
+
+    <div class="modal-header">
+      <h3>New Event</h3>
+      <button class="modal-close" (click)="closeModal()">✕</button>
+    </div>
+
+    <div *ngIf="scheduleSuccess" class="success-banner">
+      ✓ Event scheduled successfully!
+    </div>
+
+    <form (ngSubmit)="submitSchedule()" class="modal-form" *ngIf="!scheduleSuccess">
+
+      <div class="field">
+        <label for="event-title">Event Title *</label>
+        <input
+          id="event-title"
+          type="text"
+          [(ngModel)]="form.title"
+          name="title"
+          placeholder="e.g. Team Meeting"
+          required
+        />
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="event-date">Date *</label>
+          <input
+            id="event-date"
+            type="date"
+            [(ngModel)]="form.date"
+            name="date"
+            required
+          />
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="start-time">Start Time *</label>
+          <input
+            id="start-time"
+            type="time"
+            [(ngModel)]="form.startTime"
+            name="startTime"
+            required
+          />
+        </div>
+        <div class="field">
+          <label for="end-time">End Time *</label>
+          <input
+            id="end-time"
+            type="time"
+            [(ngModel)]="form.endTime"
+            name="endTime"
+            required
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="event-desc">Description</label>
+        <textarea
+          id="event-desc"
+          [(ngModel)]="form.description"
+          name="description"
+          placeholder="Optional notes about this event..."
+          rows="3"
+        ></textarea>
+      </div>
+
+      <div class="field">
+        <label>Color</label>
+        <div class="color-picker">
+          <button
+            type="button"
+            class="color-swatch"
+            *ngFor="let c of eventColors"
+            [style.background]="c"
+            [class.selected]="selectedColor === c"
+            (click)="selectedColor = c"
+          ></button>
+        </div>
+      </div>
+
+      <div class="error-msg" *ngIf="scheduleError">{{ scheduleError }}</div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" (click)="closeModal()">Cancel</button>
+        <button type="submit" class="btn-primary">Schedule Event</button>
+      </div>
+    </form>
+  </div>
+</div>
