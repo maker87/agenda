@@ -11,7 +11,7 @@
       <button
         class="nav-item"
         [class.active]="activeTab === 'schedule'"
-        (click)="activeTab = 'schedule'"
+        (click)="switchTab('schedule')"
       >
         <span class="nav-icon">✦</span>
         Schedule
@@ -19,10 +19,26 @@
       <button
         class="nav-item"
         [class.active]="activeTab === 'agenda'"
-        (click)="activeTab = 'agenda'"
+        (click)="switchTab('agenda')"
       >
         <span class="nav-icon">☰</span>
         My Agenda
+      </button>
+      <button
+        class="nav-item"
+        [class.active]="activeTab === 'calendar'"
+        (click)="switchTab('calendar')"
+      >
+        <span class="nav-icon">🗓</span>
+        Calendar
+      </button>
+      <button
+        class="nav-item"
+        [class.active]="activeTab === 'history'"
+        (click)="switchTab('history')"
+      >
+        <span class="nav-icon">🕓</span>
+        History
       </button>
     </nav>
 
@@ -46,19 +62,18 @@
     <div *ngIf="activeTab === 'schedule'" class="tab-content">
       <header class="page-header">
         <div>
-          <h2 class="page-title">Schedule an Event</h2>
-          <p class="page-subtitle">Plan your day and stay on top of your agenda</p>
+          <h2 class="page-title">Schedule</h2>
+          <p class="page-subtitle">Manage your calendar and events</p>
         </div>
-        <button class="btn-primary" (click)="openScheduleModal()">
-          + New Event
-        </button>
       </header>
 
-      <!-- Google Calendar Banner -->
-      <div class="gcal-card" [class.linked]="googleCalendarLinked">
-        <div class="gcal-left">
-          <div class="gcal-logo">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- 4 Action Cards -->
+      <div class="action-grid">
+
+        <!-- 1. Link Google Calendar -->
+        <div class="action-card" [class.action-card-linked]="googleCalendarLinked">
+          <div class="action-icon" style="background:#e8f0fe">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
               <rect x="3" y="3" width="18" height="18" rx="2" fill="#fff" stroke="#e0e0e0"/>
               <rect x="3" y="7" width="18" height="2" fill="#4285F4"/>
               <rect x="7" y="3" width="2" height="4" rx="1" fill="#4285F4"/>
@@ -66,75 +81,55 @@
               <text x="12" y="17" text-anchor="middle" font-size="7" font-weight="bold" fill="#4285F4">G</text>
             </svg>
           </div>
-          <div>
-            <p class="gcal-title">Google Calendar</p>
-            <p class="gcal-status" *ngIf="!googleCalendarLinked">Connect to sync your events automatically</p>
-            <p class="gcal-status linked-text" *ngIf="googleCalendarLinked">✓ Connected — events are syncing</p>
+          <div class="action-body">
+            <h3 class="action-title">Google Calendar</h3>
+            <p class="action-desc" *ngIf="!googleCalendarLinked">Sync your events with Google Calendar</p>
+            <p class="action-desc linked-text" *ngIf="googleCalendarLinked">✓ Connected and syncing</p>
           </div>
-        </div>
-        <div class="gcal-right">
-          <button
-            *ngIf="!googleCalendarLinked"
-            class="btn-gcal"
-            (click)="linkGoogleCalendar()"
-            [disabled]="linkingGoogle"
-          >
-            <span *ngIf="!linkingGoogle">Link Google Calendar</span>
+          <button class="action-btn gcal-btn" *ngIf="!googleCalendarLinked" (click)="linkGoogleCalendar()" [disabled]="linkingGoogle">
+            <span *ngIf="!linkingGoogle">Link</span>
             <span *ngIf="linkingGoogle" class="spinner-dark"></span>
           </button>
-          <button
-            *ngIf="googleCalendarLinked"
-            class="btn-gcal-unlink"
-            (click)="unlinkGoogleCalendar()"
-          >
-            Disconnect
-          </button>
+          <button class="action-btn unlink-btn" *ngIf="googleCalendarLinked" (click)="unlinkGoogleCalendar()">Unlink</button>
         </div>
+
+        <!-- 2. Add New Event -->
+        <div class="action-card" (click)="openScheduleModal()" style="cursor:pointer">
+          <div class="action-icon" style="background:#ede9fe">
+            <span style="font-size:24px">➕</span>
+          </div>
+          <div class="action-body">
+            <h3 class="action-title">Add New Event</h3>
+            <p class="action-desc">Schedule a new event on your calendar</p>
+          </div>
+          <button class="action-btn primary-btn" (click)="openScheduleModal()">Add</button>
+        </div>
+
+        <!-- 3. Delete Event -->
+        <div class="action-card" (click)="openDeleteModal()" style="cursor:pointer">
+          <div class="action-icon" style="background:#fee2e2">
+            <span style="font-size:24px">🗑️</span>
+          </div>
+          <div class="action-body">
+            <h3 class="action-title">Delete Event</h3>
+            <p class="action-desc">Search and remove an event from your calendar</p>
+          </div>
+          <button class="action-btn danger-btn" (click)="openDeleteModal()">Delete</button>
+        </div>
+
+        <!-- 4. Change Event -->
+        <div class="action-card" (click)="openChangeModal()" style="cursor:pointer">
+          <div class="action-icon" style="background:#fef3c7">
+            <span style="font-size:24px">✏️</span>
+          </div>
+          <div class="action-body">
+            <h3 class="action-title">Change Event</h3>
+            <p class="action-desc">Search an event and update its date or time</p>
+          </div>
+          <button class="action-btn warning-btn" (click)="openChangeModal()">Change</button>
+        </div>
+
       </div>
-
-      <!-- Today's Events -->
-      <section class="events-section">
-        <h3 class="section-label">Today · {{ formatDate(today) }}</h3>
-        <div *ngIf="todayEvents.length === 0" class="empty-state">
-          <span class="empty-icon">🗓️</span>
-          <p>No events today. Click <strong>+ New Event</strong> to add one.</p>
-        </div>
-        <div class="events-list">
-          <div class="event-card" *ngFor="let event of todayEvents">
-            <div class="event-color-bar" [style.background]="event.color"></div>
-            <div class="event-body">
-              <div class="event-header">
-                <span class="event-title">{{ event.title }}</span>
-                <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
-              </div>
-              <div class="event-time">
-                🕐 {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
-              </div>
-              <div class="event-desc" *ngIf="event.description">{{ event.description }}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Upcoming Events -->
-      <section class="events-section" *ngIf="upcomingEvents.length > 0">
-        <h3 class="section-label">Upcoming</h3>
-        <div class="events-list">
-          <div class="event-card" *ngFor="let event of upcomingEvents">
-            <div class="event-color-bar" [style.background]="event.color"></div>
-            <div class="event-body">
-              <div class="event-header">
-                <span class="event-title">{{ event.title }}</span>
-                <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
-              </div>
-              <div class="event-time">
-                📅 {{ formatDate(event.date) }} · {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
-              </div>
-              <div class="event-desc" *ngIf="event.description">{{ event.description }}</div>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
 
     <!-- ── AGENDA TAB ── -->
@@ -148,6 +143,14 @@
           + New Event
         </button>
       </header>
+
+      <!-- DB loading state -->
+      <div *ngIf="dbLoading" class="db-status-banner db-loading">
+        <span class="db-spinner"></span> Syncing with database…
+      </div>
+      <div *ngIf="dbError && !dbLoading" class="db-status-banner db-error">
+        ⚠️ {{ dbError }}
+      </div>
 
       <div *ngIf="events.length === 0" class="empty-state large">
         <span class="empty-icon">📋</span>
@@ -215,12 +218,709 @@
       </section>
     </div>
 
+    <!-- ── CALENDAR TAB ── -->
+    <div *ngIf="activeTab === 'calendar'" class="tab-content calendar-tab">
+      <header class="page-header">
+        <div>
+          <h2 class="page-title">Calendar {{ currentYear }}</h2>
+          <p class="page-subtitle">Browse your events by year, month, week, or day</p>
+        </div>
+        <button class="btn-primary" (click)="openScheduleModal()">+ New Event</button>
+      </header>
+
+      <!-- View controls -->
+      <div class="cal-controls">
+        <select class="cal-view-select" [(ngModel)]="calendarView" name="calendarView">
+          <option value="year">Year</option>
+          <option value="month">Month</option>
+          <option value="week">Week</option>
+          <option value="day">Day</option>
+        </select>
+
+        <!-- Year jump dropdown -->
+        <div class="cal-input-group" *ngIf="calendarView === 'year'">
+          <label class="cal-input-label">Jump to</label>
+          <select class="cal-text-input" (change)="scrollToYearMonth(+$any($event.target).value)" name="yearJump">
+            <option value="" disabled selected>Month…</option>
+            <option *ngFor="let m of calendarMonths; let i = index" [value]="i">{{ m.name }}</option>
+          </select>
+        </div>
+
+        <!-- Week input -->
+        <div class="cal-input-group" *ngIf="calendarView === 'week'">
+          <label class="cal-input-label">Any date in week</label>
+          <input
+            class="cal-text-input"
+            type="date"
+            [(ngModel)]="viewWeekDateInput"
+            name="viewWeek"
+          />
+        </div>
+
+        <!-- Day input -->
+        <div class="cal-input-group" *ngIf="calendarView === 'day'">
+          <label class="cal-input-label">Date</label>
+          <input
+            class="cal-text-input"
+            type="date"
+            [(ngModel)]="viewDayInput"
+            name="viewDay"
+          />
+        </div>
+      </div>
+
+      <!-- ── YEAR VIEW — scrollable all months ── -->
+      <div *ngIf="calendarView === 'year'" class="all-months-scroll" (click)="closeEventPopup()">
+        <div
+          class="month-block"
+          *ngFor="let month of calendarMonths"
+          [class.current-month]="month.isCurrent"
+          [attr.id]="'year-month-' + month.monthIdx"
+        >
+          <div class="month-header">
+            <span class="month-name">{{ month.name }} {{ currentYear }}</span>
+            <span class="month-year-badge" *ngIf="month.isCurrent">This month</span>
+          </div>
+          <div class="cal-grid">
+            <div class="cal-day-label" *ngFor="let d of dayLabels">{{ d }}</div>
+            <ng-container *ngFor="let week of month.weeks">
+              <ng-container *ngFor="let cell of week">
+                <div
+                  class="cal-cell"
+                  [class.empty]="!cell"
+                  [class.today]="cell?.isToday"
+                  [class.past-day]="cell?.isPast"
+                  [class.has-events]="cell && cell.events.length > 0"
+                  [class.clickable-cell]="!!cell"
+                  (click)="cell && openDayPanel(cell.dateStr, $event)"
+                >
+                  <span class="past-cross" *ngIf="cell?.isPast">✕</span>
+                  <span class="cal-day-num" *ngIf="cell">{{ cell.day }}</span>
+                  <div class="cal-dots" *ngIf="cell && cell.events.length > 0">
+                    <span
+                      class="cal-dot"
+                      *ngFor="let ev of cell.events.slice(0, 3)"
+                      [style.background]="ev.color"
+                      [title]="ev.title"
+                      (click)="openEventPopup(ev, $event)"
+                    ></span>
+                  </div>
+                </div>
+              </ng-container>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MONTH VIEW — Slideshow ── -->
+      <div *ngIf="calendarView === 'month'" class="year-slideshow">
+
+        <!-- Top bar: prev / month name + jump dropdown / next -->
+        <div class="slide-topbar">
+          <button class="slide-arrow" (click)="prevSlideMonth()" [disabled]="slideAnimating" aria-label="Previous month">&#8592;</button>
+
+          <div class="slide-title-group">
+            <span class="slide-month-title">{{ monthNames[slideMonthIndex] }} {{ currentYear }}</span>
+            <span class="slide-current-badge" *ngIf="slideMonthIndex === currentMonthIndex">This month</span>
+
+            <!-- Jump dropdown -->
+            <select
+              class="slide-jump-select"
+              [ngModel]="slideMonthIndex"
+              (ngModelChange)="goToSlideMonth($event)"
+              name="slideJump"
+            >
+              <option *ngFor="let m of calendarMonths; let i = index" [value]="i">
+                {{ m.name }}
+              </option>
+            </select>
+          </div>
+
+          <button class="slide-arrow" (click)="nextSlideMonth()" [disabled]="slideAnimating" aria-label="Next month">&#8594;</button>
+        </div>
+
+        <!-- Slide panel -->
+        <div class="slide-panel" [class.slide-out-left]="slideAnimating && slideDirection === 'left'" [class.slide-out-right]="slideAnimating && slideDirection === 'right'">
+          <div class="slide-cal-grid">
+            <!-- Day labels -->
+            <div class="slide-day-label" *ngFor="let d of dayLabels">{{ d }}</div>
+
+            <!-- Day cells -->
+            <ng-container *ngFor="let week of slideMonthWeeks">
+              <ng-container *ngFor="let cell of week">
+                <div
+                  class="slide-cell"
+                  [class.empty]="!cell"
+                  [class.today]="cell?.isToday"
+                  [class.past-day]="cell?.isPast"
+                  [class.has-events]="cell && cell.events.length > 0"
+                  [class.clickable-cell]="!!cell"
+                  (click)="cell && openDayPanel(cell.dateStr, $event)"
+                >
+                  <span class="past-cross slide-past-cross" *ngIf="cell?.isPast">✕</span>
+                  <span class="slide-day-num" *ngIf="cell">{{ cell.day }}</span>
+                  <div class="slide-cell-events" *ngIf="cell && cell.events.length > 0">
+                    <div
+                      class="slide-event-pill"
+                      *ngFor="let ev of cell.events.slice(0, 3)"
+                      [style.background]="ev.color"
+                      [title]="ev.title"
+                    >{{ ev.title }}</div>
+                    <div class="slide-event-more" *ngIf="cell.events.length > 3">+{{ cell.events.length - 3 }} more</div>
+                  </div>
+                </div>
+              </ng-container>
+            </ng-container>
+          </div>
+        </div>
+
+        <!-- Dot indicators -->
+        <div class="slide-dots">
+          <button
+            class="slide-dot"
+            *ngFor="let m of calendarMonths; let i = index"
+            [class.active]="i === slideMonthIndex"
+            (click)="goToSlideMonth(i)"
+            [title]="m.name"
+          ></button>
+        </div>
+      </div>
+
+      <!-- ── WEEK VIEW ── -->
+      <div *ngIf="calendarView === 'week'" class="week-view">
+        <div class="week-view-title">
+          Week of {{ viewWeekDays[0].label }} – {{ viewWeekDays[6].label }}
+        </div>
+        <div class="week-columns">
+          <div
+            class="week-day-col"
+            *ngFor="let day of viewWeekDays"
+            [class.today-col]="day.isToday"
+            (click)="openDayPanel(day.dateStr)"
+            style="cursor:pointer"
+          >
+            <div class="week-day-header">
+              <span class="week-day-name">{{ day.label.split(',')[0] }}</span>
+              <span class="week-day-date">{{ day.label.split(',')[1] }}</span>
+              <span class="today-dot" *ngIf="day.isToday"></span>
+            </div>
+            <div class="week-day-events">
+              <div *ngIf="day.events.length === 0" class="week-no-events">—</div>
+              <div
+                class="week-event-pill"
+                *ngFor="let ev of day.events"
+                [style.border-left-color]="ev.color"
+              >
+                <span class="week-event-title">{{ ev.title }}</span>
+                <span class="week-event-time">{{ formatTime(ev.startTime) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── DAY VIEW ── -->
+      <div *ngIf="calendarView === 'day'" class="day-view">
+        <div class="day-view-title" [class.today-title]="viewDayInput === today">
+          {{ viewDayLabel }}
+          <span class="today-badge" *ngIf="viewDayInput === today">Today</span>
+        </div>
+        <div *ngIf="viewDayEvents.length === 0" class="empty-state">
+          <span class="empty-icon">📭</span>
+          <p>No events on this day.</p>
+        </div>
+        <div class="day-timeline">
+          <div class="day-event-row" *ngFor="let ev of viewDayEvents">
+            <div class="day-event-time">
+              <span>{{ formatTime(ev.startTime) }}</span>
+              <span class="day-event-end">{{ formatTime(ev.endTime) }}</span>
+            </div>
+            <div class="day-event-card" [style.border-left-color]="ev.color">
+              <div class="day-event-title">{{ ev.title }}</div>
+              <div class="day-event-desc" *ngIf="ev.description">{{ ev.description }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── HISTORY TAB ── -->
+    <div *ngIf="activeTab === 'history'" class="tab-content">
+      <header class="page-header">
+        <div>
+          <h2 class="page-title">History</h2>
+          <p class="page-subtitle">Events you added, changed, or deleted — all history is automatically cleared after 7 days</p>
+        </div>
+        <button class="btn-danger" *ngIf="history.length > 0" (click)="clearHistory()" style="font-size:13px;padding:8px 16px">
+          Clear All
+        </button>
+      </header>
+
+      <!-- Restore success banner -->
+      <div class="history-restore-banner" *ngIf="historyRestoreMsg">
+        ✓ {{ historyRestoreMsg }}
+      </div>
+
+      <!-- Filter pills -->
+      <div class="history-filters" *ngIf="history.length > 0">
+        <button class="history-filter-pill" [class.active]="historyFilter === 'all'" (click)="historyFilter = 'all'">All</button>
+        <button class="history-filter-pill added" [class.active]="historyFilter === 'added'" (click)="historyFilter = 'added'">Added</button>
+        <button class="history-filter-pill changed" [class.active]="historyFilter === 'changed'" (click)="historyFilter = 'changed'">Changed</button>
+        <button class="history-filter-pill deleted" [class.active]="historyFilter === 'deleted'" (click)="historyFilter = 'deleted'">Deleted</button>
+      </div>
+
+      <!-- Search bar -->
+      <div class="history-search-wrap" *ngIf="history.length > 0">
+        <span class="history-search-icon">🔍</span>
+        <input
+          class="history-search-input"
+          type="text"
+          [(ngModel)]="historySearch"
+          name="historySearch"
+          placeholder="Search history by event name…"
+        />
+        <button
+          class="history-search-clear"
+          *ngIf="historySearch"
+          (click)="historySearch = ''"
+          title="Clear search"
+        >✕</button>
+      </div>
+
+      <!-- Empty state -->
+      <div *ngIf="filteredHistory.length === 0" class="empty-state large">
+        <span class="empty-icon">🕓</span>
+        <p *ngIf="history.length === 0">No history yet. Changes you make to events will appear here.</p>
+        <p *ngIf="history.length > 0 && !historySearch">No entries match this filter.</p>
+        <p *ngIf="history.length > 0 && historySearch">No entries match "{{ historySearch }}".</p>
+      </div>
+
+      <!-- History list -->
+      <div class="history-list" *ngIf="filteredHistory.length > 0">
+        <div class="history-entry" *ngFor="let entry of filteredHistory">
+          <div class="history-action-badge" [style.background]="historyActionColor(entry.action)">
+            {{ historyActionLabel(entry.action) }}
+          </div>
+          <div class="history-event-color" [style.background]="entry.snapshot.color"></div>
+          <div class="history-body">
+            <div class="history-title">{{ entry.snapshot.title }}</div>
+            <div class="history-meta">
+              <span *ngIf="entry.action !== 'changed'">
+                📅 {{ formatDate(entry.snapshot.date) }} · {{ formatTime(entry.snapshot.startTime) }} – {{ formatTime(entry.snapshot.endTime) }}
+              </span>
+              <span *ngIf="entry.action === 'changed' && entry.previousSnapshot">
+                <span class="history-before">{{ formatDate(entry.previousSnapshot.date) }} {{ formatTime(entry.previousSnapshot.startTime) }}–{{ formatTime(entry.previousSnapshot.endTime) }}</span>
+                <span class="history-arrow">→</span>
+                <span class="history-after">{{ formatDate(entry.snapshot.date) }} {{ formatTime(entry.snapshot.startTime) }}–{{ formatTime(entry.snapshot.endTime) }}</span>
+              </span>
+            </div>
+            <div class="history-timestamp">{{ formatHistoryTime(entry.timestamp) }}</div>
+          </div>
+          <div class="history-restore-col">
+            <button
+              class="history-restore-btn"
+              (click)="restoreEvent(entry)"
+              [title]="entry.action === 'deleted' ? 'Restore event' : entry.action === 'changed' ? 'Revert change' : 'Undo add'"
+            >
+              <span *ngIf="entry.action === 'deleted'">↩ Restore</span>
+              <span *ngIf="entry.action === 'changed'">↩ Revert</span>
+              <span *ngIf="entry.action === 'added'">↩ Undo</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
-<!-- ── SCHEDULE MODAL ── -->
-<div class="modal-overlay" *ngIf="showScheduleModal" (click)="closeModal()">
+<!-- ── DELETE EVENT MODAL ── -->
+<div class="modal-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
   <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Delete Event</h3>
+      <button class="modal-close" (click)="closeDeleteModal()">✕</button>
+    </div>
+    <div class="modal-form">
+      <div class="field">
+        <label>Search event name</label>
+        <input type="text" [(ngModel)]="searchQuery" name="deleteSearch" placeholder="e.g. Standup" (ngModelChange)="onSearchChange()" class="search-input" autofocus />
+      </div>
+      <div class="search-results" *ngIf="searchResults.length > 0">
+        <div
+          class="search-result-item"
+          *ngFor="let ev of searchResults"
+          [class.selected]="selectedEventId === ev.id"
+          (click)="selectEvent(ev.id)"
+        >
+          <span class="result-dot" [style.background]="ev.color"></span>
+          <div class="result-info">
+            <span class="result-title">{{ ev.title }}</span>
+            <span class="result-meta">{{ formatDate(ev.date) }} · {{ formatTime(ev.startTime) }}</span>
+          </div>
+          <span class="result-check" *ngIf="selectedEventId === ev.id">✓</span>
+        </div>
+      </div>
+      <div class="search-empty" *ngIf="searchQuery && searchResults.length === 0">No events found matching "{{ searchQuery }}"</div>
+      <div class="error-msg" *ngIf="deleteError">{{ deleteError }}</div>
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="closeDeleteModal()">Cancel</button>
+        <button class="btn-danger" (click)="confirmDelete()" [disabled]="!selectedEventId">Delete Event</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CHANGE EVENT MODAL ── -->
+<div class="modal-overlay" *ngIf="showChangeModal" (click)="closeChangeModal()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>{{ changeStep === 'search' ? 'Change Event' : 'Update Event' }}</h3>
+      <button class="modal-close" (click)="closeChangeModal()">✕</button>
+    </div>
+    <div class="modal-form">
+
+      <!-- Step 1: search -->
+      <ng-container *ngIf="changeStep === 'search'">
+        <div class="field">
+          <label>Search event name</label>
+          <input type="text" [(ngModel)]="searchQuery" name="changeSearch" placeholder="e.g. Design Review" (ngModelChange)="onSearchChange()" class="search-input" autofocus />
+        </div>
+        <div class="search-results" *ngIf="searchResults.length > 0">
+          <div
+            class="search-result-item"
+            *ngFor="let ev of searchResults"
+            [class.selected]="selectedEventId === ev.id"
+            (click)="selectEvent(ev.id)"
+          >
+            <span class="result-dot" [style.background]="ev.color"></span>
+            <div class="result-info">
+              <span class="result-title">{{ ev.title }}</span>
+              <span class="result-meta">{{ formatDate(ev.date) }} · {{ formatTime(ev.startTime) }}</span>
+            </div>
+            <span class="result-check" *ngIf="selectedEventId === ev.id">✓</span>
+          </div>
+        </div>
+        <div class="search-empty" *ngIf="searchQuery && searchResults.length === 0">No events found matching "{{ searchQuery }}"</div>
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="closeChangeModal()">Cancel</button>
+          <button class="btn-warning" (click)="proceedToChange()" [disabled]="!selectedEventId">Next →</button>
+        </div>
+      </ng-container>
+
+      <!-- Step 2: edit date/time -->
+      <ng-container *ngIf="changeStep === 'edit'">
+        <div class="change-event-preview" *ngIf="selectedEvent">
+          <span class="result-dot" [style.background]="selectedEvent.color"></span>
+          <strong>{{ selectedEvent.title }}</strong>
+        </div>
+        <div class="field">
+          <label>New Date *</label>
+          <input type="date" [(ngModel)]="changeForm.date" name="changeDate" />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Start Time</label>
+            <input type="time" [(ngModel)]="changeForm.startTime" name="changeStart" />
+          </div>
+          <div class="field">
+            <label>End Time</label>
+            <input type="time" [(ngModel)]="changeForm.endTime" name="changeEnd" />
+          </div>
+        </div>
+        <div class="error-msg" *ngIf="changeError">{{ changeError }}</div>
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="changeStep = 'search'">← Back</button>
+          <button class="btn-warning" (click)="confirmChange()">Save Changes</button>
+        </div>
+      </ng-container>
+
+      <!-- Step 3: success -->
+      <div *ngIf="changeStep === 'done'" class="success-banner" style="padding:32px 24px;text-align:center">
+        ✓ Event updated successfully!
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── YEAR VIEW EVENT POPUP ── -->
+<div
+  class="event-popup"
+  *ngIf="popupEvent"
+  [style.left.px]="popupX"
+  [style.top.px]="popupY"
+  (click)="$event.stopPropagation()"
+>
+  <div class="event-popup-header">
+    <span class="event-popup-dot" [style.background]="popupEvent.color"></span>
+    <span class="event-popup-title">{{ popupEvent.title }}</span>
+    <button class="event-popup-close" (click)="closeEventPopup()">✕</button>
+  </div>
+  <div class="event-popup-time">
+    📅 {{ formatDate(popupEvent.date) }}<br>
+    🕐 {{ formatTime(popupEvent.startTime) }} – {{ formatTime(popupEvent.endTime) }}
+  </div>
+  <div class="event-popup-desc" *ngIf="popupEvent.description">{{ popupEvent.description }}</div>
+</div>
+
+<!-- ── DAY DETAIL PANEL ── -->
+<div class="modal-overlay" *ngIf="showDayPanel" (click)="closeDayPanel()">
+  <div class="modal day-panel-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h3>{{ dayPanelLabel }}</h3>
+        <span class="today-badge" *ngIf="dayPanelDate === today" style="font-size:11px">Today</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn-primary" style="padding:7px 14px;font-size:13px" (click)="addEventOnDate(dayPanelDate); closeDayPanel()">+ Add Event</button>
+        <button class="modal-close" (click)="closeDayPanel()">✕</button>
+      </div>
+    </div>
+    <div class="modal-form" style="max-height:60vh;overflow-y:auto">
+      <div *ngIf="dayPanelEvents.length === 0" class="empty-state" style="margin:0">
+        <span class="empty-icon">📭</span>
+        <p>No events on this day.</p>
+        <button class="btn-primary" (click)="addEventOnDate(dayPanelDate); closeDayPanel()">Add Event</button>
+      </div>
+      <div class="day-panel-list" *ngIf="dayPanelEvents.length > 0">
+        <div class="day-panel-event" *ngFor="let ev of dayPanelEvents">
+          <div class="day-panel-color-bar" [style.background]="ev.color"></div>
+          <div class="day-panel-body">
+            <div class="day-panel-title">{{ ev.title }}</div>
+            <div class="day-panel-time">🕐 {{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</div>
+            <div class="day-panel-desc" *ngIf="ev.description">{{ ev.description }}</div>
+          </div>
+          <div class="day-panel-actions">
+            <button class="day-panel-edit-btn" (click)="editEventFromPanel(ev); closeDayPanel()" title="Edit event">✏️</button>
+            <button class="day-panel-delete-btn" (click)="deleteEvent(ev.id)" title="Delete event">🗑️</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── OVERLAP DETECTION MODAL ── -->
+<div class="modal-overlay" *ngIf="showOverlapModal" (click)="closeOverlapModal()">
+  <div class="modal overlap-modal" (click)="$event.stopPropagation()">
+
+    <!-- Step: ask -->
+    <ng-container *ngIf="overlapStep === 'ask'">
+      <div class="modal-header">
+        <h3>⚠️ Scheduling Conflict</h3>
+        <button class="modal-close" (click)="closeOverlapModal()">✕</button>
+      </div>
+      <div class="modal-form">
+        <p class="overlap-desc">
+          You have <strong>{{ overlapConflicts.length + 1 }} events</strong> that overlap on this date and time:
+        </p>
+        <div class="overlap-event-list">
+          <div class="overlap-event-item" *ngIf="pendingNewEvent">
+            <span class="result-dot" [style.background]="pendingNewEvent.color"></span>
+            <div class="result-info">
+              <span class="result-title">{{ pendingNewEvent.title }} <span class="overlap-new-badge">New</span></span>
+              <span class="result-meta">{{ formatTime(pendingNewEvent.startTime) }} – {{ formatTime(pendingNewEvent.endTime) }}</span>
+            </div>
+          </div>
+          <div class="overlap-event-item" *ngFor="let ev of overlapConflicts">
+            <span class="result-dot" [style.background]="ev.color"></span>
+            <div class="result-info">
+              <span class="result-title">{{ ev.title }}</span>
+              <span class="result-meta">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
+            </div>
+          </div>
+        </div>
+        <p class="overlap-question">Would you like to find an alternate date for one of these events?</p>
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="overlapDecline()">No, keep as-is</button>
+          <button class="btn-primary" (click)="overlapAccept()">Yes, find alternate date</button>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Step: pick which event to move -->
+    <ng-container *ngIf="overlapStep === 'pick'">
+      <div class="modal-header">
+        <h3>Which event to reschedule?</h3>
+        <button class="modal-close" (click)="closeOverlapModal()">✕</button>
+      </div>
+      <div class="modal-form">
+        <p class="overlap-desc">Choose the event you'd like to move to a different date:</p>
+        <div class="search-results overlap-pick-list">
+          <div
+            class="search-result-item"
+            *ngIf="pendingNewEvent"
+            [class.selected]="overlapSelectedEventId === pendingNewEvent.id"
+            (click)="overlapPickEvent(pendingNewEvent.id)"
+          >
+            <span class="result-dot" [style.background]="pendingNewEvent.color"></span>
+            <div class="result-info">
+              <span class="result-title">{{ pendingNewEvent.title }} <span class="overlap-new-badge">New</span></span>
+              <span class="result-meta">{{ formatTime(pendingNewEvent.startTime) }} – {{ formatTime(pendingNewEvent.endTime) }}</span>
+            </div>
+            <span class="result-check" *ngIf="overlapSelectedEventId === pendingNewEvent.id">✓</span>
+          </div>
+          <div
+            class="search-result-item"
+            *ngFor="let ev of overlapConflicts"
+            [class.selected]="overlapSelectedEventId === ev.id"
+            (click)="overlapPickEvent(ev.id)"
+          >
+            <span class="result-dot" [style.background]="ev.color"></span>
+            <div class="result-info">
+              <span class="result-title">{{ ev.title }}</span>
+              <span class="result-meta">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
+            </div>
+            <span class="result-check" *ngIf="overlapSelectedEventId === ev.id">✓</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="overlapStep = 'ask'">← Back</button>
+          <button class="btn-primary" (click)="overlapProceedToMode()" [disabled]="!overlapSelectedEventId">Next →</button>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Step: choose mode -->
+    <ng-container *ngIf="overlapStep === 'mode'">
+      <div class="modal-header">
+        <h3>How would you like to reschedule?</h3>
+        <button class="modal-close" (click)="closeOverlapModal()">✕</button>
+      </div>
+      <div class="modal-form">
+        <div class="overlap-suggest-card" *ngIf="overlapSelectedEvent">
+          <span class="result-dot" [style.background]="overlapSelectedEvent.color"></span>
+          <strong>{{ overlapSelectedEvent.title }}</strong>
+        </div>
+        <p class="overlap-desc" style="margin-top:14px">Pick how you want to find a new date:</p>
+        <div class="overlap-mode-cards">
+          <button class="overlap-mode-card" (click)="overlapChooseComputer()">
+            <span class="overlap-mode-icon">🤖</span>
+            <span class="overlap-mode-title">Computer chooses</span>
+            <span class="overlap-mode-desc">Automatically find the closest available date before or after</span>
+          </button>
+          <button class="overlap-mode-card" (click)="overlapChooseManual()">
+            <span class="overlap-mode-icon">✏️</span>
+            <span class="overlap-mode-title">I'll pick the date</span>
+            <span class="overlap-mode-desc">Choose a specific date yourself</span>
+          </button>
+        </div>
+        <div class="modal-actions" style="margin-top:8px">
+          <button class="btn-secondary" (click)="overlapStep = 'pick'">← Back</button>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Step: manual date pick -->
+    <ng-container *ngIf="overlapStep === 'manual'">
+      <div class="modal-header">
+        <h3>Pick a Date</h3>
+        <button class="modal-close" (click)="closeOverlapModal()">✕</button>
+      </div>
+      <div class="modal-form">
+        <div class="overlap-suggest-card" *ngIf="overlapSelectedEvent">
+          <span class="result-dot" [style.background]="overlapSelectedEvent.color"></span>
+          <strong>{{ overlapSelectedEvent.title }}</strong>
+        </div>
+        <div class="field" style="margin-top:16px">
+          <label>New Date *</label>
+          <input type="date" [(ngModel)]="overlapManualDate" name="overlapManualDate" />
+        </div>
+        <div class="error-msg" *ngIf="overlapManualError">{{ overlapManualError }}</div>
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="overlapStep = 'mode'">← Back</button>
+          <button class="btn-primary" (click)="overlapConfirmManual()" [disabled]="!overlapManualDate">Confirm Date</button>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Step: suggest a date -->
+    <ng-container *ngIf="overlapStep === 'suggest'">
+      <div class="modal-header">
+        <h3>Suggested Date</h3>
+        <button class="modal-close" (click)="closeOverlapModal()">✕</button>
+      </div>
+      <div class="modal-form">
+        <ng-container *ngIf="overlapSuggestedDate; else noDateFound">
+          <div class="overlap-suggest-card" *ngIf="overlapSelectedEvent">
+            <span class="result-dot" [style.background]="overlapSelectedEvent.color"></span>
+            <strong>{{ overlapSelectedEvent.title }}</strong>
+          </div>
+          <p class="overlap-desc">
+            The closest available date with no conflicts is:
+          </p>
+          <div class="overlap-date-badge">
+            📅 {{ formatDate(overlapSuggestedDate) }}
+          </div>
+          <p class="overlap-question">Are you OK with this date?</p>
+          <div class="modal-actions">
+            <button class="btn-secondary" (click)="overlapRejectSuggest()">No, try another</button>
+            <button class="btn-primary" (click)="overlapConfirmSuggest()">Yes, use this date</button>
+          </div>
+        </ng-container>
+        <ng-template #noDateFound>
+          <p class="overlap-desc">No available date found within the next year. Please reschedule manually.</p>
+          <div class="modal-actions">
+            <button class="btn-secondary" (click)="overlapStep = 'pick'">← Back</button>
+          </div>
+        </ng-template>
+      </div>
+    </ng-container>
+
+    <!-- Step: time pick (date has other events, offer time adjustment) -->
+    <ng-container *ngIf="overlapStep === 'timepick'">
+      <div class="modal-header">
+        <h3>Adjust Time?</h3>
+        <button class="modal-close" (click)="closeOverlapModal()">✕</button>
+      </div>
+      <div class="modal-form">
+        <div class="overlap-suggest-card" *ngIf="overlapSelectedEvent">
+          <span class="result-dot" [style.background]="overlapSelectedEvent.color"></span>
+          <strong>{{ overlapSelectedEvent.title }}</strong>
+          <span class="overlap-date-inline">→ {{ formatDate(overlapFinalDate) }}</span>
+        </div>
+
+        <p class="overlap-desc" style="margin-top:14px">
+          This date already has <strong>{{ eventsOnDate(overlapFinalDate).length }} event{{ eventsOnDate(overlapFinalDate).length > 1 ? 's' : '' }}</strong> scheduled. Would you like to adjust the time to fit?
+        </p>
+
+        <!-- Booked slots on that day -->
+        <div class="timepick-booked-list">
+          <div class="timepick-booked-item" *ngFor="let ev of eventsOnDate(overlapFinalDate)">
+            <span class="timepick-booked-bar" [style.background]="ev.color"></span>
+            <span class="timepick-booked-title">{{ ev.title }}</span>
+            <span class="timepick-booked-time">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
+          </div>
+        </div>
+
+        <!-- Time inputs -->
+        <div class="field-row" style="margin-top:14px">
+          <div class="field">
+            <label>Start Time</label>
+            <input type="time" [(ngModel)]="overlapTimeStart" name="overlapTimeStart" />
+          </div>
+          <div class="field">
+            <label>End Time</label>
+            <input type="time" [(ngModel)]="overlapTimeEnd" name="overlapTimeEnd" />
+          </div>
+        </div>
+
+        <div class="error-msg" *ngIf="overlapTimeError">{{ overlapTimeError }}</div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="overlapSkipTime()">Keep original time</button>
+          <button class="btn-primary" (click)="overlapConfirmTime()">Use this time</button>
+        </div>
+      </div>
+    </ng-container>
+
+  </div>
+</div>
+
+<!-- ── SCHEDULE EVENT MODAL ── -->
+<div class="modal-overlay" *ngIf="showScheduleModal" (click)="closeModal()">  <div class="modal" (click)="$event.stopPropagation()">
 
     <div class="modal-header">
       <h3>New Event</h3>
