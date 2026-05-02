@@ -10,6 +10,8 @@ export interface CalendarEvent {
   endTime: string;
   description: string;
   color: string;
+  category: string;       // e.g. "AP Calculus BC", "Soccer", "Personal"
+  sharedWith: string[];   // emails this event (and its category siblings) are shared with
 }
 
 // Amplify client — typed against our schema
@@ -45,6 +47,8 @@ export class EventsService {
       endTime:     event.endTime,
       description: event.description,
       color:       event.color,
+      category:    event.category || undefined,
+      sharedWith:  event.sharedWith?.length ? event.sharedWith : undefined,
       ownerEmail,
     });
 
@@ -67,6 +71,8 @@ export class EventsService {
       endTime:     event.endTime,
       description: event.description,
       color:       event.color,
+      category:    event.category || undefined,
+      sharedWith:  event.sharedWith?.length ? event.sharedWith : undefined,
     });
 
     if (errors?.length) {
@@ -118,6 +124,8 @@ export class EventsService {
       endTime:     record.endTime ?? '',
       description: record.description ?? '',
       color:       record.color ?? '#6c63ff',
+      category:    record.category ?? '',
+      sharedWith:  (record.sharedWith ?? []).filter((e): e is string => e !== null),
     };
   }
 }

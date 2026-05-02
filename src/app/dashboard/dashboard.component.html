@@ -1,5 +1,77 @@
 <div class="app-shell">
 
+  <!-- ── Top-right notification bar ── -->
+  <div class="topbar">
+    <div class="topbar-right">
+      <button
+        class="topbar-notif-btn"
+        (click)="toggleNotifPanel()"
+        [class.active]="showNotifPanel"
+        title="Notifications"
+        aria-label="Notifications"
+      >
+        <span class="topbar-bell">🔔</span>
+        <span class="topbar-badge" *ngIf="unreadCount > 0">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Notification slide-down panel ── -->
+  <div class="notif-panel" *ngIf="showNotifPanel" (click)="$event.stopPropagation()">
+    <div class="notif-panel-header">
+      <span class="notif-panel-title">Notifications</span>
+      <div class="notif-panel-actions">
+        <button class="notif-panel-mark-all" *ngIf="unreadCount > 0" (click)="markAllNotifsRead()">Mark all read</button>
+        <button class="notif-panel-close" (click)="showNotifPanel = false" title="Close">✕</button>
+      </div>
+    </div>
+
+    <!-- Filter pills -->
+    <div class="notif-panel-filters">
+      <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'all'"      (click)="notifPanelFilter = 'all'">All</button>
+      <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'share'"    (click)="notifPanelFilter = 'share'">Shared</button>
+      <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'reminder'" (click)="notifPanelFilter = 'reminder'">Reminders</button>
+    </div>
+
+    <!-- Empty state -->
+    <div class="notif-panel-empty" *ngIf="panelNotifications.length === 0">
+      <span class="notif-panel-empty-icon">🔔</span>
+      <p>No notifications yet.</p>
+    </div>
+
+    <!-- Notification list -->
+    <div class="notif-panel-list" *ngIf="panelNotifications.length > 0">
+      <div
+        class="notif-panel-item"
+        *ngFor="let n of panelNotifications"
+        [class.unread]="!n.read"
+        (click)="markNotifRead(n)"
+      >
+        <div class="notif-panel-item-icon" [class.share]="n.type === 'share'" [class.reminder]="n.type === 'reminder'">
+          <span *ngIf="n.type === 'share'">↗</span>
+          <span *ngIf="n.type === 'reminder'">🔔</span>
+        </div>
+        <div class="notif-panel-item-body">
+          <div class="notif-panel-item-title">{{ n.title }}</div>
+          <div class="notif-panel-item-sub" *ngIf="n.body">{{ n.body }}</div>
+          <div class="notif-panel-item-time" *ngIf="n.createdAt">{{ formatNotifTime(n.createdAt) }}</div>
+        </div>
+        <div class="notif-panel-item-unread-dot" *ngIf="!n.read"></div>
+        <button class="notif-panel-item-delete" (click)="$event.stopPropagation(); deleteNotif(n)" title="Dismiss">✕</button>
+      </div>
+    </div>
+
+    <!-- Footer: view all -->
+    <div class="notif-panel-footer">
+      <button class="notif-panel-view-all" (click)="showNotifPanel = false; switchTab('notifications')">
+        View all in Notifications tab →
+      </button>
+    </div>
+  </div>
+
+  <!-- Click-outside backdrop -->
+  <div class="notif-panel-backdrop" *ngIf="showNotifPanel" (click)="showNotifPanel = false"></div>
+
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="sidebar-brand">
@@ -39,6 +111,15 @@
       >
         <span class="nav-icon">🕓</span>
         History
+      </button>
+      <button
+        class="nav-item notif-nav-item"
+        [class.active]="activeTab === 'notifications'"
+        (click)="switchTab('notifications')"
+      >
+        <span class="nav-icon">🔔</span>
+        Notifications
+        <span class="notif-badge" *ngIf="unreadCount > 0">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
       </button>
     </nav>
 
@@ -158,6 +239,21 @@
         <button class="btn-primary" (click)="openScheduleModal()">Schedule Now</button>
       </div>
 
+      <!-- Category filter pills -->
+      <div class="category-filter-bar" *ngIf="allCategories.length > 0">
+        <button
+          class="cat-pill"
+          [class.active]="activeCategoryFilter === ''"
+          (click)="setCategoryFilter('')"
+        >All</button>
+        <button
+          class="cat-pill"
+          *ngFor="let cat of allCategories"
+          [class.active]="activeCategoryFilter === cat"
+          (click)="setCategoryFilter(cat)"
+        >{{ cat }}</button>
+      </div>
+
       <!-- Past -->
       <section class="events-section" *ngIf="pastEvents.length > 0">
         <h3 class="section-label muted">Past</h3>
@@ -166,11 +262,21 @@
             <div class="event-color-bar" [style.background]="event.color"></div>
             <div class="event-body">
               <div class="event-header">
-                <span class="event-title">{{ event.title }}</span>
-                <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+                <div class="event-title-group">
+                  <span class="event-title">{{ event.title }}</span>
+                  <span class="event-cat-badge" *ngIf="event.category">{{ event.category }}</span>
+                </div>
+                <div class="event-actions">
+                  <button class="reminder-btn" (click)="openReminderModal(event)" title="Set reminder">🔔</button>
+                  <button class="share-btn" (click)="openShareModal(event)" title="Share event">↗</button>
+                  <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+                </div>
               </div>
               <div class="event-time">
                 📅 {{ formatDate(event.date) }} · {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
+              </div>
+              <div class="event-shared" *ngIf="event.sharedWith.length > 0">
+                👥 Shared with {{ event.sharedWith.join(', ') }}
               </div>
             </div>
           </div>
@@ -185,13 +291,23 @@
             <div class="event-color-bar" [style.background]="event.color"></div>
             <div class="event-body">
               <div class="event-header">
-                <span class="event-title">{{ event.title }}</span>
-                <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+                <div class="event-title-group">
+                  <span class="event-title">{{ event.title }}</span>
+                  <span class="event-cat-badge" *ngIf="event.category">{{ event.category }}</span>
+                </div>
+                <div class="event-actions">
+                  <button class="reminder-btn" (click)="openReminderModal(event)" title="Set reminder">🔔</button>
+                  <button class="share-btn" (click)="openShareModal(event)" title="Share event">↗</button>
+                  <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+                </div>
               </div>
               <div class="event-time">
                 🕐 {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
               </div>
               <div class="event-desc" *ngIf="event.description">{{ event.description }}</div>
+              <div class="event-shared" *ngIf="event.sharedWith.length > 0">
+                👥 Shared with {{ event.sharedWith.join(', ') }}
+              </div>
             </div>
           </div>
         </div>
@@ -205,13 +321,23 @@
             <div class="event-color-bar" [style.background]="event.color"></div>
             <div class="event-body">
               <div class="event-header">
-                <span class="event-title">{{ event.title }}</span>
-                <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+                <div class="event-title-group">
+                  <span class="event-title">{{ event.title }}</span>
+                  <span class="event-cat-badge" *ngIf="event.category">{{ event.category }}</span>
+                </div>
+                <div class="event-actions">
+                  <button class="reminder-btn" (click)="openReminderModal(event)" title="Set reminder">🔔</button>
+                  <button class="share-btn" (click)="openShareModal(event)" title="Share event">↗</button>
+                  <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+                </div>
               </div>
               <div class="event-time">
                 📅 {{ formatDate(event.date) }} · {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
               </div>
               <div class="event-desc" *ngIf="event.description">{{ event.description }}</div>
+              <div class="event-shared" *ngIf="event.sharedWith.length > 0">
+                👥 Shared with {{ event.sharedWith.join(', ') }}
+              </div>
             </div>
           </div>
         </div>
@@ -528,6 +654,81 @@
               <span *ngIf="entry.action === 'added'">↩ Undo</span>
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── NOTIFICATIONS TAB ── -->
+    <div *ngIf="activeTab === 'notifications'" class="tab-content">
+      <header class="page-header">
+        <div>
+          <h2 class="page-title">Notifications</h2>
+          <p class="page-subtitle">Shares and reminders for your events</p>
+        </div>
+        <button class="btn-danger" *ngIf="notifications.length > 0" (click)="clearAllNotifs()" style="font-size:13px;padding:8px 16px">
+          Clear All
+        </button>
+      </header>
+
+      <!-- Mark all read -->
+      <div class="notif-topbar" *ngIf="unreadCount > 0">
+        <span class="notif-unread-label">{{ unreadCount }} unread</span>
+        <button class="notif-mark-all-btn" (click)="markAllNotifsRead()">Mark all as read</button>
+      </div>
+
+      <!-- Filter pills -->
+      <div class="history-filters" *ngIf="notifications.length > 0">
+        <button class="history-filter-pill" [class.active]="notifFilter === 'all'"      (click)="notifFilter = 'all'">All</button>
+        <button class="history-filter-pill" [class.active]="notifFilter === 'share'"    (click)="notifFilter = 'share'">Shared with me</button>
+        <button class="history-filter-pill" [class.active]="notifFilter === 'reminder'" (click)="notifFilter = 'reminder'">Reminders</button>
+      </div>
+
+      <!-- Search -->
+      <div class="history-search-wrap" *ngIf="notifications.length > 0">
+        <span class="history-search-icon">🔍</span>
+        <input
+          class="history-search-input"
+          type="text"
+          [(ngModel)]="notifSearch"
+          name="notifSearch"
+          placeholder="Search notifications…"
+        />
+        <button class="history-search-clear" *ngIf="notifSearch" (click)="notifSearch = ''" title="Clear">✕</button>
+      </div>
+
+      <!-- Empty state -->
+      <div *ngIf="filteredNotifications.length === 0" class="empty-state large">
+        <span class="empty-icon">🔔</span>
+        <p *ngIf="notifications.length === 0">No notifications yet. Share an event or set a reminder to get started.</p>
+        <p *ngIf="notifications.length > 0">No notifications match this filter.</p>
+      </div>
+
+      <!-- Notification list -->
+      <div class="notif-list" *ngIf="filteredNotifications.length > 0">
+        <div
+          class="notif-entry"
+          *ngFor="let n of filteredNotifications"
+          [class.notif-unread]="!n.read"
+          (click)="markNotifRead(n)"
+        >
+          <!-- Type icon -->
+          <div class="notif-icon" [class.notif-icon-share]="n.type === 'share'" [class.notif-icon-reminder]="n.type === 'reminder'">
+            <span *ngIf="n.type === 'share'">↗</span>
+            <span *ngIf="n.type === 'reminder'">🔔</span>
+          </div>
+
+          <!-- Content -->
+          <div class="notif-body">
+            <div class="notif-title">{{ n.title }}</div>
+            <div class="notif-sub" *ngIf="n.body">{{ n.body }}</div>
+            <div class="notif-time" *ngIf="n.createdAt">{{ formatNotifTime(n.createdAt) }}</div>
+          </div>
+
+          <!-- Unread dot -->
+          <div class="notif-unread-dot" *ngIf="!n.read"></div>
+
+          <!-- Delete -->
+          <button class="notif-delete-btn" (click)="$event.stopPropagation(); deleteNotif(n)" title="Dismiss">✕</button>
         </div>
       </div>
     </div>
@@ -869,10 +1070,10 @@
       </div>
     </ng-container>
 
-    <!-- Step: time pick (date has other events, offer time adjustment) -->
+    <!-- Step: time pick -->
     <ng-container *ngIf="overlapStep === 'timepick'">
       <div class="modal-header">
-        <h3>Adjust Time?</h3>
+        <h3>Set Time on New Date</h3>
         <button class="modal-close" (click)="closeOverlapModal()">✕</button>
       </div>
       <div class="modal-form">
@@ -882,18 +1083,24 @@
           <span class="overlap-date-inline">→ {{ formatDate(overlapFinalDate) }}</span>
         </div>
 
-        <p class="overlap-desc" style="margin-top:14px">
-          This date already has <strong>{{ eventsOnDate(overlapFinalDate).length }} event{{ eventsOnDate(overlapFinalDate).length > 1 ? 's' : '' }}</strong> scheduled. Would you like to adjust the time to fit?
-        </p>
-
-        <!-- Booked slots on that day -->
-        <div class="timepick-booked-list">
-          <div class="timepick-booked-item" *ngFor="let ev of eventsOnDate(overlapFinalDate)">
-            <span class="timepick-booked-bar" [style.background]="ev.color"></span>
-            <span class="timepick-booked-title">{{ ev.title }}</span>
-            <span class="timepick-booked-time">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
+        <!-- Show existing events on that day if any -->
+        <ng-container *ngIf="eventsOnDate(overlapFinalDate).length > 0">
+          <p class="overlap-desc" style="margin-top:14px">
+            This date already has <strong>{{ eventsOnDate(overlapFinalDate).length }} event{{ eventsOnDate(overlapFinalDate).length > 1 ? 's' : '' }}</strong> — adjust the time to avoid conflicts:
+          </p>
+          <div class="timepick-booked-list">
+            <div class="timepick-booked-item" *ngFor="let ev of eventsOnDate(overlapFinalDate)">
+              <span class="timepick-booked-bar" [style.background]="ev.color"></span>
+              <span class="timepick-booked-title">{{ ev.title }}</span>
+              <span class="timepick-booked-time">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
+            </div>
           </div>
-        </div>
+        </ng-container>
+        <ng-container *ngIf="eventsOnDate(overlapFinalDate).length === 0">
+          <p class="overlap-desc" style="margin-top:14px">
+            This date is free. You can keep the original time or set a new one:
+          </p>
+        </ng-container>
 
         <!-- Time inputs -->
         <div class="field-row" style="margin-top:14px">
@@ -993,6 +1200,108 @@
       </div>
 
       <div class="field">
+        <label for="event-category">Category</label>
+        <div class="category-picker-field">
+          <div class="category-picker-display" (click)="openCategoryPicker()">
+            <span *ngIf="!form.category" class="category-picker-placeholder">e.g. School › Clubs › Chess</span>
+            <span *ngIf="form.category" class="category-picker-value">
+              <span *ngFor="let seg of form.category.split(' > '); let i = index; let last = last">
+                <span class="cat-breadcrumb-seg">{{ seg }}</span>
+                <span *ngIf="!last" class="cat-breadcrumb-sep"> › </span>
+              </span>
+            </span>
+            <button type="button" class="category-picker-clear" *ngIf="form.category" (click)="$event.stopPropagation(); clearCategory()" title="Clear">✕</button>
+            <span class="category-picker-arrow">▾</span>
+          </div>
+
+          <!-- Tree picker dropdown -->
+          <div class="category-picker-dropdown" *ngIf="showCategoryPicker" (click)="$event.stopPropagation()">
+
+            <!-- Breadcrumb nav -->
+            <div class="cat-picker-breadcrumb" *ngIf="categoryPickerPath.length > 0">
+              <button type="button" class="cat-picker-back" (click)="categoryPickerGoUp()">← Back</button>
+              <span class="cat-picker-path">
+                <span *ngFor="let seg of categoryPickerPath; let i = index; let last = last">
+                  <span class="cat-bc-seg">{{ seg }}</span>
+                  <span *ngIf="!last" class="cat-bc-arrow"> › </span>
+                </span>
+              </span>
+            </div>
+
+            <!-- "Use this level" button (only when drilled in) -->
+            <button
+              type="button"
+              class="cat-picker-use-current"
+              *ngIf="categoryPickerPath.length > 0"
+              (click)="categoryPickerSelect()"
+            >
+              ✓ Use "{{ categoryPickerFullPath }}"
+            </button>
+
+            <!-- Children at current level -->
+            <div class="cat-picker-list">
+              <div
+                class="cat-picker-item"
+                *ngFor="let node of categoryPickerLevel"
+              >
+                <button type="button" class="cat-picker-select-btn" (click)="categoryPickerSelectNode(node)" title="Use this category">
+                  ✓
+                </button>
+                <span class="cat-picker-name">{{ node.name }}</span>
+                <button
+                  type="button"
+                  class="cat-picker-drill-btn"
+                  *ngIf="node.children.length > 0"
+                  (click)="categoryPickerDrillDown(node)"
+                  title="Browse sub-categories"
+                >
+                  {{ node.children.length }} sub › 
+                </button>
+                <button
+                  type="button"
+                  class="cat-picker-drill-btn"
+                  *ngIf="node.children.length === 0"
+                  (click)="categoryPickerDrillDown(node)"
+                  title="Add sub-category"
+                >
+                  + sub
+                </button>
+              </div>
+
+              <div class="cat-picker-empty" *ngIf="categoryPickerLevel.length === 0 && !showNewCategoryInput">
+                <span *ngIf="categoryPickerPath.length === 0">No categories yet.</span>
+                <span *ngIf="categoryPickerPath.length > 0">No sub-categories yet.</span>
+              </div>
+            </div>
+
+            <!-- Add new category at this level -->
+            <div class="cat-picker-add-row" *ngIf="!showNewCategoryInput">
+              <button type="button" class="cat-picker-add-btn" (click)="showNewCategoryInput = true">
+                + New {{ categoryPickerPath.length > 0 ? 'sub-' : '' }}category
+              </button>
+            </div>
+            <div class="cat-picker-new-input" *ngIf="showNewCategoryInput">
+              <input
+                type="text"
+                [(ngModel)]="newCategoryName"
+                name="newCategoryName"
+                placeholder="Category name…"
+                class="cat-picker-text-input"
+                (keydown.enter)="categoryPickerAddNew()"
+                autofocus
+              />
+              <button type="button" class="cat-picker-confirm-btn" (click)="categoryPickerAddNew()" [disabled]="!newCategoryName.trim()">Add</button>
+              <button type="button" class="cat-picker-cancel-btn" (click)="showNewCategoryInput = false; newCategoryName = ''">✕</button>
+            </div>
+
+            <div class="cat-picker-footer">
+              <button type="button" class="cat-picker-close-btn" (click)="closeCategoryPicker()">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
         <label>Color</label>
         <div class="color-picker">
           <button
@@ -1006,6 +1315,58 @@
         </div>
       </div>
 
+      <!-- ── Share with ── -->
+      <div class="field form-share-field">
+        <label>Share with</label>
+
+        <!-- Chips for already-added recipients -->
+        <div class="form-share-chips" *ngIf="form.sharedWith.length > 0">
+          <span class="form-share-chip" *ngFor="let email of form.sharedWith">
+            <span class="form-share-chip-avatar">{{ email[0].toUpperCase() }}</span>
+            {{ email }}
+            <button type="button" class="form-share-chip-remove" (click)="removeFormShareEmail(email)" title="Remove">✕</button>
+          </span>
+        </div>
+
+        <!-- Input + suggestions -->
+        <div class="form-share-input-wrap">
+          <input
+            type="email"
+            class="form-share-input"
+            [(ngModel)]="formShareInput"
+            name="formShareInput"
+            placeholder="Type an email and press Enter…"
+            (ngModelChange)="onFormShareInput()"
+            (keydown)="onFormShareKeydown($event)"
+            autocomplete="off"
+          />
+          <button
+            type="button"
+            class="form-share-add-btn"
+            (click)="addFormShareEmail()"
+            [disabled]="!formShareInput.trim().includes('@')"
+            title="Add"
+          >Add</button>
+        </div>
+
+        <!-- Suggestion dropdown -->
+        <div class="form-share-suggestions" *ngIf="formShareSuggestions.length > 0">
+          <button
+            type="button"
+            class="form-share-suggestion"
+            *ngFor="let s of formShareSuggestions"
+            (click)="addFormShareEmail(s)"
+          >
+            <span class="form-share-sug-avatar">{{ s[0].toUpperCase() }}</span>
+            {{ s }}
+          </button>
+        </div>
+
+        <p class="form-share-hint" *ngIf="form.sharedWith.length === 0 && !formShareInput">
+          Optional — they'll get a notification when the event is created.
+        </p>
+      </div>
+
       <div class="error-msg" *ngIf="scheduleError">{{ scheduleError }}</div>
 
       <div class="modal-actions">
@@ -1013,5 +1374,113 @@
         <button type="submit" class="btn-primary">Schedule Event</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ── SHARE EVENT MODAL ── -->
+<div class="modal-overlay" *ngIf="showShareModal" (click)="closeShareModal()">
+  <div class="modal share-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Share Event</h3>
+      <button class="modal-close" (click)="closeShareModal()">✕</button>
+    </div>
+
+    <div class="modal-form" *ngIf="shareTargetEvent">
+
+      <!-- Event preview -->
+      <div class="share-event-preview">
+        <span class="result-dot" [style.background]="shareTargetEvent.color"></span>
+        <div>
+          <div class="share-event-title">{{ shareTargetEvent.title }}</div>
+          <div class="share-event-meta">{{ formatDate(shareTargetEvent.date) }} · {{ formatTime(shareTargetEvent.startTime) }} – {{ formatTime(shareTargetEvent.endTime) }}</div>
+        </div>
+      </div>
+
+      <!-- Category share toggle (only shown if event has a category) -->
+      <div class="share-scope-toggle" *ngIf="shareTargetEvent.category">
+        <label class="share-scope-label">
+          <input type="checkbox" [(ngModel)]="shareCategoryOnly" name="shareCategoryOnly" />
+          Share all <strong>{{ shareTargetEvent.category }}</strong> events
+          ({{ events | categoryCount: shareTargetEvent.category }} events)
+        </label>
+        <p class="share-scope-hint" *ngIf="shareCategoryOnly">
+          The recipient will see every event in this category.
+        </p>
+      </div>
+
+      <!-- Email input -->
+      <div class="field">
+        <label>Recipient email *</label>
+        <input
+          type="email"
+          [(ngModel)]="shareEmail"
+          name="shareEmail"
+          placeholder="friend@example.com"
+          class="search-input"
+          autofocus
+        />
+      </div>
+
+      <!-- Already shared with -->
+      <div class="share-existing" *ngIf="shareTargetEvent.sharedWith.length > 0">
+        <span class="share-existing-label">Already shared with:</span>
+        <span
+          class="share-existing-chip"
+          *ngFor="let email of shareTargetEvent.sharedWith"
+        >
+          {{ email }}
+          <button class="share-chip-remove" (click)="removeShare(shareTargetEvent!, email)" title="Remove">✕</button>
+        </span>
+      </div>
+
+      <div class="error-msg" *ngIf="shareError">{{ shareError }}</div>
+      <div class="success-banner" *ngIf="shareSuccess">✓ {{ shareSuccess }}</div>
+
+      <div class="modal-actions" *ngIf="!shareSuccess">
+        <button class="btn-secondary" (click)="closeShareModal()">Cancel</button>
+        <button class="btn-primary" (click)="confirmShare()">Share</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SET REMINDER MODAL ── -->
+<div class="modal-overlay" *ngIf="showReminderModal" (click)="closeReminderModal()">
+  <div class="modal reminder-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Set Reminder</h3>
+      <button class="modal-close" (click)="closeReminderModal()">✕</button>
+    </div>
+    <div class="modal-form" *ngIf="reminderTargetEvent">
+
+      <!-- Event preview -->
+      <div class="share-event-preview">
+        <span class="result-dot" [style.background]="reminderTargetEvent.color"></span>
+        <div>
+          <div class="share-event-title">{{ reminderTargetEvent.title }}</div>
+          <div class="share-event-meta">{{ formatDate(reminderTargetEvent.date) }} · {{ formatTime(reminderTargetEvent.startTime) }}</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Remind me</label>
+        <div class="reminder-options">
+          <button
+            type="button"
+            class="reminder-option-btn"
+            *ngFor="let opt of reminderOptions"
+            [class.active]="reminderMinutes === opt.value"
+            (click)="reminderMinutes = opt.value"
+          >{{ opt.label }}</button>
+        </div>
+      </div>
+
+      <div class="success-banner" *ngIf="reminderSuccess">✓ {{ reminderSuccess }}</div>
+
+      <div class="modal-actions" *ngIf="!reminderSuccess">
+        <button class="btn-secondary" (click)="closeReminderModal()">Cancel</button>
+        <button class="btn-primary" (click)="confirmReminder()">Set Reminder</button>
+      </div>
+    </div>
   </div>
 </div>

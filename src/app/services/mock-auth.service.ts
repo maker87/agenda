@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 const MOCK_USERS = [
   { email: 'demo@agenda.com', password: 'Demo1234!' },
   { email: 'alex.student@school.edu', password: 'Student1234!' },
+  { email: 'jordan.coach@fitlife.com', password: 'Coach1234!' },
 ];
 
 const SESSION_KEY = 'agenda_mock_session';
