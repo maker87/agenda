@@ -123,6 +123,7 @@
         />
       </div>
 
+      <div class="success-msg" *ngIf="successMessage">{{ successMessage }}</div>
       <div class="error-msg" *ngIf="errorMessage">{{ errorMessage }}</div>
 
       <button type="submit" class="btn-primary" [disabled]="loading">
@@ -139,7 +140,9 @@
     <!-- Confirm Sign Up Form -->
     <form *ngIf="view === 'confirm'" (ngSubmit)="onConfirm()" class="auth-form">
       <h2>Verify your email</h2>
-      <p class="form-subtitle">We sent a code to <strong>{{ email }}</strong></p>
+      <p class="form-subtitle">We sent a 6-digit code to <strong>{{ email }}</strong></p>
+
+      <div class="success-msg" *ngIf="successMessage">{{ successMessage }}</div>
 
       <div class="field">
         <label for="confirm-code">Confirmation Code</label>
@@ -150,6 +153,7 @@
           name="confirmationCode"
           placeholder="Enter 6-digit code"
           autocomplete="one-time-code"
+          maxlength="6"
           required
         />
       </div>
@@ -160,6 +164,13 @@
         <span *ngIf="!loading">Verify &amp; Sign In</span>
         <span *ngIf="loading" class="spinner"></span>
       </button>
+
+      <p class="switch-link">
+        Didn't get the code?
+        <button type="button" class="link-btn" (click)="resendCode()" [disabled]="resending">
+          {{ resending ? 'Sending...' : 'Resend code' }}
+        </button>
+      </p>
 
       <p class="switch-link">
         Wrong email?

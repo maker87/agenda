@@ -97,6 +97,16 @@
   margin-bottom: 16px;
 }
 
+.success-msg {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
 .btn-primary {
   width: 100%;
   padding: 13px;
