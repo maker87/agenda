@@ -3,15 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MockAuthService } from '../services/mock-auth.service';
+import { signUp, confirmSignUp, signIn, resendSignUpCode } from 'aws-amplify/auth';
 
 type AuthView = 'login' | 'signup' | 'confirm';
-
-/** Simple in-memory store for pending sign-ups (simulates Cognito) */
-const PENDING_SIGNUPS: Map<string, { password: string; code: string }> = new Map();
-
-function generateCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000)); // 6-digit code
-}
 
 @Component({
   selector: 'app-auth',
@@ -53,9 +47,7 @@ export class AuthComponent {
     this.loading = true;
     this.errorMessage = '';
 
-    await new Promise((r) => setTimeout(r, 600));
-
-    // Check demo accounts
+    // Check demo accounts first (instant, no network)
     const isDemoLogin = this.mockAuth.login(this.email, this.password);
     if (isDemoLogin) {
       this.router.navigate(['/dashboard']);
@@ -63,24 +55,30 @@ export class AuthComponent {
       return;
     }
 
-    // Check if this email was registered via sign-up
-    const stored = localStorage.getItem('agenda_registered_' + this.email);
-    if (stored) {
-      const user = JSON.parse(stored);
-      if (user.password === this.password && user.verified) {
+    // Real Amplify sign-in
+    try {
+      const result = await signIn({ username: this.email, password: this.password });
+      if (result.isSignedIn) {
         sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email: this.email }));
         this.router.navigate(['/dashboard']);
-        this.loading = false;
-        return;
-      } else if (!user.verified) {
-        this.errorMessage = 'Please verify your email first. Check your inbox for the code.';
+      } else if (result.nextStep?.signInStep === 'CONFIRM_SIGN_UP') {
         this.view = 'confirm';
-        this.loading = false;
-        return;
+        this.errorMessage = 'Please verify your email first.';
+      } else {
+        this.errorMessage = 'Additional steps required. Please try again.';
+      }
+    } catch (err: any) {
+      if (err?.name === 'UserNotConfirmedException') {
+        this.view = 'confirm';
+        this.errorMessage = 'Your email is not verified. Enter the code we sent.';
+      } else if (err?.name === 'NotAuthorizedException') {
+        this.errorMessage = 'Invalid email or password.';
+      } else if (err?.name === 'UserNotFoundException') {
+        this.errorMessage = 'No account found with this email.';
+      } else {
+        this.errorMessage = err?.message || 'Sign-in failed. Please try again.';
       }
     }
-
-    this.errorMessage = 'Invalid email or password.';
     this.loading = false;
   }
 
@@ -97,43 +95,37 @@ export class AuthComponent {
       this.errorMessage = 'Password must be at least 8 characters.';
       return;
     }
-
-    // Check if already registered
-    const existing = localStorage.getItem('agenda_registered_' + this.email);
-    if (existing) {
-      const user = JSON.parse(existing);
-      if (user.verified) {
-        this.errorMessage = 'An account with this email already exists. Try signing in.';
-        this.loading = false;
-        return;
-      }
-    }
-
     this.loading = true;
     this.errorMessage = '';
+    this.successMessage = '';
 
-    await new Promise((r) => setTimeout(r, 800));
+    try {
+      const { nextStep } = await signUp({
+        username: this.email,
+        password: this.password,
+        options: {
+          userAttributes: { email: this.email },
+        },
+      });
 
-    // Generate verification code and store pending sign-up
-    const code = generateCode();
-    PENDING_SIGNUPS.set(this.email, { password: this.password, code });
-
-    // Store in localStorage (unverified)
-    localStorage.setItem('agenda_registered_' + this.email, JSON.stringify({
-      email: this.email,
-      password: this.password,
-      verified: false,
-    }));
-
-    // "Send" the code — log to console and show in a browser alert for demo purposes
-    console.log(`[Agenda] Verification code for ${this.email}: ${code}`);
-
-    // Use the Notification API if available, otherwise alert
-    this.sendVerificationEmail(this.email, code);
-
+      if (nextStep.signUpStep === 'CONFIRM_SIGN_UP') {
+        this.view = 'confirm';
+        this.successMessage = `Verification code sent to ${this.email}. Check your inbox (and spam folder)!`;
+      } else if (nextStep.signUpStep === 'DONE') {
+        // Auto-confirmed — sign in directly
+        sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email: this.email }));
+        this.router.navigate(['/dashboard']);
+      }
+    } catch (err: any) {
+      if (err?.name === 'UsernameExistsException') {
+        this.errorMessage = 'An account with this email already exists. Try signing in.';
+      } else if (err?.message?.toLowerCase().includes('password')) {
+        this.errorMessage = 'Password must include uppercase, lowercase, numbers, and a special character.';
+      } else {
+        this.errorMessage = err?.message || 'Sign-up failed. Please try again.';
+      }
+    }
     this.loading = false;
-    this.view = 'confirm';
-    this.successMessage = `Verification code sent to ${this.email}. Check your email!`;
   }
 
   async onConfirm() {
@@ -143,33 +135,39 @@ export class AuthComponent {
     }
     this.loading = true;
     this.errorMessage = '';
+    this.successMessage = '';
 
-    await new Promise((r) => setTimeout(r, 600));
+    try {
+      const { nextStep } = await confirmSignUp({
+        username: this.email,
+        confirmationCode: this.confirmationCode,
+      });
 
-    const pending = PENDING_SIGNUPS.get(this.email);
-    if (!pending) {
-      this.errorMessage = 'No pending verification for this email. Please sign up again.';
-      this.loading = false;
-      return;
+      if (nextStep.signUpStep === 'DONE') {
+        // Sign in after verification
+        try {
+          const signInResult = await signIn({ username: this.email, password: this.password });
+          if (signInResult.isSignedIn) {
+            sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email: this.email }));
+            this.router.navigate(['/dashboard']);
+            this.loading = false;
+            return;
+          }
+        } catch {
+          // If auto sign-in fails, send to login
+        }
+        this.successMessage = 'Email verified! You can now sign in.';
+        this.view = 'login';
+      }
+    } catch (err: any) {
+      if (err?.name === 'CodeMismatchException') {
+        this.errorMessage = 'Invalid code. Please check and try again.';
+      } else if (err?.name === 'ExpiredCodeException') {
+        this.errorMessage = 'Code expired. Click "Resend code" to get a new one.';
+      } else {
+        this.errorMessage = err?.message || 'Verification failed. Please try again.';
+      }
     }
-
-    if (this.confirmationCode !== pending.code) {
-      this.errorMessage = 'Invalid code. Please check and try again.';
-      this.loading = false;
-      return;
-    }
-
-    // Mark as verified
-    localStorage.setItem('agenda_registered_' + this.email, JSON.stringify({
-      email: this.email,
-      password: pending.password,
-      verified: true,
-    }));
-    PENDING_SIGNUPS.delete(this.email);
-
-    // Auto sign-in
-    sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email: this.email }));
-    this.router.navigate(['/dashboard']);
     this.loading = false;
   }
 
@@ -178,54 +176,12 @@ export class AuthComponent {
     this.errorMessage = '';
     this.successMessage = '';
 
-    await new Promise((r) => setTimeout(r, 500));
-
-    const code = generateCode();
-    const pending = PENDING_SIGNUPS.get(this.email);
-    if (pending) {
-      pending.code = code;
-    } else {
-      // Re-create pending entry from localStorage
-      const stored = localStorage.getItem('agenda_registered_' + this.email);
-      if (stored) {
-        const user = JSON.parse(stored);
-        PENDING_SIGNUPS.set(this.email, { password: user.password, code });
-      }
+    try {
+      await resendSignUpCode({ username: this.email });
+      this.successMessage = `New code sent to ${this.email}!`;
+    } catch (err: any) {
+      this.errorMessage = err?.message || 'Could not resend code. Please try again.';
     }
-
-    console.log(`[Agenda] New verification code for ${this.email}: ${code}`);
-    this.sendVerificationEmail(this.email, code);
-
-    this.successMessage = `New code sent to ${this.email}!`;
     this.resending = false;
-  }
-
-  /**
-   * Simulates sending a verification email.
-   * In production this would be handled by Cognito.
-   * For demo: shows a browser notification + logs to console.
-   */
-  private sendVerificationEmail(email: string, code: string) {
-    // Try browser Notification API
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('Agenda - Verification Code', {
-        body: `Your code for ${email} is: ${code}`,
-        icon: '📅',
-      });
-    } else if ('Notification' in window && Notification.permission !== 'denied') {
-      Notification.requestPermission().then(perm => {
-        if (perm === 'granted') {
-          new Notification('Agenda - Verification Code', {
-            body: `Your code for ${email} is: ${code}`,
-            icon: '📅',
-          });
-        }
-      });
-    }
-
-    // Always show an alert as fallback so the user can see the code
-    setTimeout(() => {
-      alert(`📧 Verification code for ${email}:\n\n${code}\n\n(In production, this would be sent to your email via AWS Cognito)`);
-    }, 300);
   }
 }
