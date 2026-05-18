@@ -1,8 +1,33 @@
-<div class="app-shell">
+<div class="app-shell" [attr.data-theme]="isDarkMode ? 'dark' : 'light'">
 
   <!-- ── Top-right notification bar ── -->
   <div class="topbar">
+
+  <!-- ── AI Login Banner ── -->
+  <div class="ai-login-banner" *ngIf="showLoginBanner" role="alert">
+    <div class="ai-login-banner-inner">
+      <span class="ai-login-banner-icon">✨</span>
+      <div class="ai-login-banner-content">
+        <span class="ai-login-banner-heading">AI Reminders for you</span>
+        <ul class="ai-login-banner-list">
+          <li *ngFor="let item of loginBannerItems">
+            <strong>{{ item.title }}</strong> — {{ item.body }}
+          </li>
+        </ul>
+      </div>
+      <button class="ai-login-banner-close" (click)="dismissLoginBanner()" aria-label="Dismiss">✕</button>
+    </div>
+  </div>
     <div class="topbar-right">
+      <button
+        class="topbar-theme-btn"
+        (click)="toggleTheme()"
+        [title]="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+        [attr.aria-label]="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+      >
+        <span *ngIf="!isDarkMode">🌙</span>
+        <span *ngIf="isDarkMode">☀️</span>
+      </button>
       <button
         class="topbar-notif-btn"
         (click)="toggleNotifPanel()"
@@ -121,12 +146,24 @@
         Notifications
         <span class="notif-badge" *ngIf="unreadCount > 0">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
       </button>
+      <button
+        class="nav-item"
+        [class.active]="activeTab === 'categories'"
+        (click)="switchTab('categories')"
+      >
+        <span class="nav-icon">🏷️</span>
+        Categories
+      </button>
     </nav>
 
     <div class="sidebar-footer">
-      <div class="user-info">
-        <div class="user-avatar">{{ userInitial }}</div>
+      <div class="user-info" (click)="openProfileTab()" style="cursor:pointer" title="View profile">
+        <div class="user-avatar">
+          <img *ngIf="profile.avatarUrl" [src]="profile.avatarUrl" alt="avatar" class="user-avatar-img" />
+          <span *ngIf="!profile.avatarUrl">{{ userInitial }}</span>
+        </div>
         <div class="user-details">
+          <span class="user-name" *ngIf="profile.username">{{ profile.username }}</span>
           <span class="user-email">{{ userEmail }}</span>
         </div>
       </div>
@@ -164,8 +201,10 @@
           </div>
           <div class="action-body">
             <h3 class="action-title">Google Calendar</h3>
-            <p class="action-desc" *ngIf="!googleCalendarLinked">Sync your events with Google Calendar</p>
-            <p class="action-desc linked-text" *ngIf="googleCalendarLinked">✓ Connected and syncing</p>
+            <p class="action-desc" *ngIf="!googleCalendarLinked && !linkingGoogle">Sync your events with Google Calendar</p>
+            <p class="action-desc" *ngIf="linkingGoogle" style="color:var(--accent)">Connecting to Google…</p>
+            <p class="action-desc linked-text" *ngIf="googleCalendarLinked">✓ Connected — events imported</p>
+            <p class="action-desc" *ngIf="googleSyncError" style="color:#ef4444;font-size:12px;margin-top:4px">{{ googleSyncError }}</p>
           </div>
           <button class="action-btn gcal-btn" *ngIf="!googleCalendarLinked" (click)="linkGoogleCalendar()" [disabled]="linkingGoogle">
             <span *ngIf="!linkingGoogle">Link</span>
@@ -663,77 +702,642 @@
       <header class="page-header">
         <div>
           <h2 class="page-title">Notifications</h2>
-          <p class="page-subtitle">Shares and reminders for your events</p>
+          <p class="page-subtitle">Shares, reminders, and friends</p>
         </div>
-        <button class="btn-danger" *ngIf="notifications.length > 0" (click)="clearAllNotifs()" style="font-size:13px;padding:8px 16px">
+        <button class="btn-danger" *ngIf="notifSubTab === 'notifications' && notifications.length > 0" (click)="clearAllNotifs()" style="font-size:13px;padding:8px 16px">
           Clear All
         </button>
       </header>
 
-      <!-- Mark all read -->
-      <div class="notif-topbar" *ngIf="unreadCount > 0">
-        <span class="notif-unread-label">{{ unreadCount }} unread</span>
-        <button class="notif-mark-all-btn" (click)="markAllNotifsRead()">Mark all as read</button>
+      <!-- Sub-tab switcher -->
+      <div class="notif-subtab-bar">
+        <button
+          class="notif-subtab-btn"
+          [class.active]="notifSubTab === 'notifications'"
+          (click)="notifSubTab = 'notifications'"
+        >🔔 Notifications</button>
+        <button
+          class="notif-subtab-btn"
+          [class.active]="notifSubTab === 'friends'"
+          (click)="notifSubTab = 'friends'"
+        >👥 Add Friend</button>
+        <button
+          class="notif-subtab-btn"
+          [class.active]="notifSubTab === 'share'"
+          (click)="notifSubTab = 'share'"
+        >↗ Share</button>
       </div>
 
-      <!-- Filter pills -->
-      <div class="history-filters" *ngIf="notifications.length > 0">
-        <button class="history-filter-pill" [class.active]="notifFilter === 'all'"      (click)="notifFilter = 'all'">All</button>
-        <button class="history-filter-pill" [class.active]="notifFilter === 'share'"    (click)="notifFilter = 'share'">Shared with me</button>
-        <button class="history-filter-pill" [class.active]="notifFilter === 'reminder'" (click)="notifFilter = 'reminder'">Reminders</button>
-      </div>
+      <!-- ── Notifications sub-tab ── -->
+      <ng-container *ngIf="notifSubTab === 'notifications'">
 
-      <!-- Search -->
-      <div class="history-search-wrap" *ngIf="notifications.length > 0">
-        <span class="history-search-icon">🔍</span>
-        <input
-          class="history-search-input"
-          type="text"
-          [(ngModel)]="notifSearch"
-          name="notifSearch"
-          placeholder="Search notifications…"
-        />
-        <button class="history-search-clear" *ngIf="notifSearch" (click)="notifSearch = ''" title="Clear">✕</button>
-      </div>
+        <!-- Mark all read -->
+        <div class="notif-topbar" *ngIf="unreadCount > 0">
+          <span class="notif-unread-label">{{ unreadCount }} unread</span>
+          <button class="notif-mark-all-btn" (click)="markAllNotifsRead()">Mark all as read</button>
+        </div>
 
-      <!-- Empty state -->
-      <div *ngIf="filteredNotifications.length === 0" class="empty-state large">
-        <span class="empty-icon">🔔</span>
-        <p *ngIf="notifications.length === 0">No notifications yet. Share an event or set a reminder to get started.</p>
-        <p *ngIf="notifications.length > 0">No notifications match this filter.</p>
-      </div>
+        <!-- Filter pills -->
+        <div class="history-filters" *ngIf="notifications.length > 0">
+          <button class="history-filter-pill" [class.active]="notifFilter === 'all'"      (click)="notifFilter = 'all'">All</button>
+          <button class="history-filter-pill" [class.active]="notifFilter === 'share'"    (click)="notifFilter = 'share'">Shared with me</button>
+          <button class="history-filter-pill" [class.active]="notifFilter === 'reminder'" (click)="notifFilter = 'reminder'">Reminders</button>
+        </div>
 
-      <!-- Notification list -->
-      <div class="notif-list" *ngIf="filteredNotifications.length > 0">
-        <div
-          class="notif-entry"
-          *ngFor="let n of filteredNotifications"
-          [class.notif-unread]="!n.read"
-          (click)="markNotifRead(n)"
-        >
-          <!-- Type icon -->
-          <div class="notif-icon" [class.notif-icon-share]="n.type === 'share'" [class.notif-icon-reminder]="n.type === 'reminder'">
-            <span *ngIf="n.type === 'share'">↗</span>
-            <span *ngIf="n.type === 'reminder'">🔔</span>
+        <!-- Search -->
+        <div class="history-search-wrap" *ngIf="notifications.length > 0">
+          <span class="history-search-icon">🔍</span>
+          <input
+            class="history-search-input"
+            type="text"
+            [(ngModel)]="notifSearch"
+            name="notifSearch"
+            placeholder="Search notifications…"
+          />
+          <button class="history-search-clear" *ngIf="notifSearch" (click)="notifSearch = ''" title="Clear">✕</button>
+        </div>
+
+        <!-- Empty state -->
+        <div *ngIf="filteredNotifications.length === 0" class="empty-state large">
+          <span class="empty-icon">🔔</span>
+          <p *ngIf="notifications.length === 0">No notifications yet. Share an event or set a reminder to get started.</p>
+          <p *ngIf="notifications.length > 0">No notifications match this filter.</p>
+        </div>
+
+        <!-- Notification list -->
+        <div class="notif-list" *ngIf="filteredNotifications.length > 0">
+          <div
+            class="notif-entry"
+            *ngFor="let n of filteredNotifications"
+            [class.notif-unread]="!n.read"
+            (click)="markNotifRead(n)"
+          >
+            <!-- Type icon -->
+            <div class="notif-icon" [class.notif-icon-share]="n.type === 'share'" [class.notif-icon-reminder]="n.type === 'reminder'">
+              <span *ngIf="n.type === 'share'">↗</span>
+              <span *ngIf="n.type === 'reminder'">🔔</span>
+            </div>
+
+            <!-- Content -->
+            <div class="notif-body">
+              <div class="notif-title">{{ n.title }}</div>
+              <div class="notif-sub" *ngIf="n.body">{{ n.body }}</div>
+              <div class="notif-time" *ngIf="n.createdAt">{{ formatNotifTime(n.createdAt) }}</div>
+            </div>
+
+            <!-- Unread dot -->
+            <div class="notif-unread-dot" *ngIf="!n.read"></div>
+
+            <!-- Delete -->
+            <button class="notif-delete-btn" (click)="$event.stopPropagation(); deleteNotif(n)" title="Dismiss">✕</button>
+          </div>
+        </div>
+
+      </ng-container>
+
+      <!-- ── Add Friend sub-tab ── -->
+      <ng-container *ngIf="notifSubTab === 'friends'">
+
+        <!-- Search bar -->
+        <div class="friend-search-section">
+          <p class="friend-search-hint">Search by username or display name to add friends.</p>
+          <div class="friend-search-wrap">
+            <span class="history-search-icon">🔍</span>
+            <input
+              class="history-search-input"
+              type="text"
+              [(ngModel)]="friendSearch"
+              name="friendSearch"
+              placeholder="Search username…"
+              (ngModelChange)="searchFriends()"
+            />
+            <button class="history-search-clear" *ngIf="friendSearch" (click)="friendSearch = ''; friendSearchResults = []" title="Clear">✕</button>
           </div>
 
-          <!-- Content -->
-          <div class="notif-body">
-            <div class="notif-title">{{ n.title }}</div>
-            <div class="notif-sub" *ngIf="n.body">{{ n.body }}</div>
-            <div class="notif-time" *ngIf="n.createdAt">{{ formatNotifTime(n.createdAt) }}</div>
+          <!-- Loading -->
+          <div class="friend-search-loading" *ngIf="friendSearchLoading">
+            <span class="db-spinner"></span> Searching…
           </div>
 
-          <!-- Unread dot -->
-          <div class="notif-unread-dot" *ngIf="!n.read"></div>
+          <!-- Results -->
+          <div class="friend-results" *ngIf="!friendSearchLoading && friendSearchResults.length > 0">
+            <div class="friend-result-item" *ngFor="let user of friendSearchResults">
+              <div class="friend-avatar">{{ user.displayName[0] }}</div>
+              <div class="friend-info">
+                <span class="friend-display-name">{{ user.displayName }}</span>
+                <span class="friend-username">&#64;{{ user.username }}</span>
+                <span class="friend-mutual" *ngIf="user.mutual > 0">{{ user.mutual }} mutual friend{{ user.mutual > 1 ? 's' : '' }}</span>
+              </div>
+              <button
+                class="friend-add-btn"
+                *ngIf="!friendRequestsSent.has(user.username)"
+                (click)="sendFriendRequest(user.username)"
+              >+ Add</button>
+              <button
+                class="friend-pending-btn"
+                *ngIf="friendRequestsSent.has(user.username)"
+                disabled
+              >✓ Requested</button>
+            </div>
+          </div>
 
-          <!-- Delete -->
-          <button class="notif-delete-btn" (click)="$event.stopPropagation(); deleteNotif(n)" title="Dismiss">✕</button>
+          <!-- No results -->
+          <div class="friend-no-results" *ngIf="!friendSearchLoading && friendSearch && friendSearchResults.length === 0">
+            No users found matching "{{ friendSearch }}"
+          </div>
+        </div>
+
+        <!-- Friends list -->
+        <div class="friend-list-section" *ngIf="friends.length > 0">
+          <h3 class="section-label">Your Friends ({{ friends.length }})</h3>
+          <div class="friend-results">
+            <div class="friend-result-item" *ngFor="let f of friends">
+              <div class="friend-avatar friend-avatar-added">{{ f.displayName[0] }}</div>
+              <div class="friend-info">
+                <span class="friend-display-name">{{ f.displayName }}</span>
+                <span class="friend-username">&#64;{{ f.username }}</span>
+              </div>
+              <button class="friend-remove-btn" (click)="removeFriend(f.username)" title="Remove friend">Remove</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty friends state -->
+        <div *ngIf="friends.length === 0 && !friendSearch" class="empty-state large" style="margin-top:24px">
+          <span class="empty-icon">👥</span>
+          <p>No friends added yet. Search for someone above to get started.</p>
+        </div>
+
+      </ng-container>
+
+      <!-- ── Share sub-tab ── -->
+      <ng-container *ngIf="notifSubTab === 'share'">
+
+        <div class="share-subtab-section">
+          <p class="friend-search-hint">Send a share request by entering a username and selecting a share type.</p>
+
+          <div class="field" style="margin-bottom:16px">
+            <label class="share-field-label">Username</label>
+            <div class="friend-search-wrap">
+              <span class="history-search-icon">👤</span>
+              <input
+                class="history-search-input"
+                type="text"
+                [(ngModel)]="shareUsername"
+                name="shareUsername"
+                placeholder="Enter username…"
+              />
+              <button
+                class="history-search-clear"
+                *ngIf="shareUsername"
+                (click)="shareUsername = ''"
+                title="Clear"
+              >✕</button>
+            </div>
+          </div>
+
+          <div class="field" style="margin-bottom:20px">
+            <label class="share-field-label">Share Type</label>
+            <div class="share-type-pills">
+              <button
+                class="share-type-pill"
+                [class.active]="shareType === 'calendar'"
+                (click)="shareType = 'calendar'; onShareTypeChange()"
+              >🗓 Entire Calendar</button>
+              <button
+                class="share-type-pill"
+                [class.active]="shareType === 'category'"
+                (click)="shareType = 'category'; onShareTypeChange()"
+              >📂 Category</button>
+              <button
+                class="share-type-pill"
+                [class.active]="shareType === 'subcategory'"
+                (click)="shareType = 'subcategory'; onShareTypeChange()"
+              >📁 Subcategory</button>
+              <button
+                class="share-type-pill"
+                [class.active]="shareType === 'friend'"
+                (click)="shareType = 'friend'; onShareTypeChange()"
+              >👥 Friend Request</button>
+            </div>
+          </div>
+
+          <!-- Category picker (shown when shareType is 'category') -->
+          <div class="field" *ngIf="shareType === 'category'" style="margin-bottom:20px">
+            <label class="share-field-label">Select Category</label>
+            <div *ngIf="shareTopLevelCategories.length === 0" class="share-empty-hint">
+              No categories found. Add events with categories first.
+            </div>
+            <div class="share-category-list" *ngIf="shareTopLevelCategories.length > 0">
+              <button
+                *ngFor="let cat of shareTopLevelCategories"
+                class="share-category-pill"
+                [class.active]="shareSelectedCategory === cat"
+                (click)="shareSelectedCategory = cat"
+              >
+                <span class="share-cat-icon">📂</span>
+                {{ cat }}
+                <span class="share-cat-count">({{ countEventsUnder(cat) }})</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Subcategory picker (shown when shareType is 'subcategory') -->
+          <div class="field" *ngIf="shareType === 'subcategory'" style="margin-bottom:20px">
+            <label class="share-field-label">Select Subcategory</label>
+
+            <!-- Step 1: pick parent category first -->
+            <div *ngIf="shareTopLevelCategories.length === 0" class="share-empty-hint">
+              No categories found. Add events with categories first.
+            </div>
+            <div *ngIf="shareTopLevelCategories.length > 0">
+              <p class="share-step-hint" *ngIf="!shareSelectedCategory || !shareSelectedCategory.includes(' > ')">
+                First pick a parent category:
+              </p>
+              <div class="share-category-list">
+                <button
+                  *ngFor="let cat of shareTopLevelCategories"
+                  class="share-category-pill"
+                  [class.active]="shareSelectedCategory.startsWith(cat)"
+                  (click)="shareSelectedCategory = cat"
+                >
+                  <span class="share-cat-icon">📂</span>
+                  {{ cat }}
+                </button>
+              </div>
+
+              <!-- Step 2: pick subcategory -->
+              <ng-container *ngIf="shareSelectedCategory && shareSubcategories.length > 0">
+                <p class="share-step-hint" style="margin-top:12px">Now pick a subcategory:</p>
+                <div class="share-category-list">
+                  <button
+                    *ngFor="let sub of shareSubcategories"
+                    class="share-category-pill"
+                    [class.active]="shareSelectedCategory === sub"
+                    (click)="shareSelectedCategory = sub"
+                  >
+                    <span class="share-cat-icon">📁</span>
+                    {{ sub.split(' > ').slice(1).join(' › ') }}
+                    <span class="share-cat-count">({{ countEventsUnder(sub) }})</span>
+                  </button>
+                </div>
+              </ng-container>
+
+              <div
+                *ngIf="shareSelectedCategory && !shareSelectedCategory.includes(' > ') && shareSubcategories.length === 0"
+                class="share-empty-hint"
+                style="margin-top:8px"
+              >
+                No subcategories under "{{ shareSelectedCategory }}".
+              </div>
+            </div>
+          </div>
+
+          <!-- Calendar share summary -->
+          <div class="share-summary" *ngIf="shareType === 'calendar'">
+            <span class="share-summary-icon">🗓</span>
+            <span>Sharing your entire calendar ({{ events.length }} event{{ events.length !== 1 ? 's' : '' }})</span>
+          </div>
+
+          <!-- Error / success feedback -->
+          <div class="error-msg" *ngIf="shareSubTabError">{{ shareSubTabError }}</div>
+          <div class="success-banner" *ngIf="shareSubTabSuccess" style="margin-bottom:16px">
+            ✓ {{ shareSubTabSuccess }}
+          </div>
+
+          <button
+            class="btn-primary"
+            style="width:100%;padding:12px"
+            (click)="submitShareSubTab()"
+            [disabled]="!shareUsername.trim() || !shareType || ((shareType === 'category' || shareType === 'subcategory') && !shareSelectedCategory)"
+          >
+            Send Share Request
+          </button>
+        </div>
+
+        <!-- Sent share requests log -->
+        <div class="friend-list-section" *ngIf="sentShareRequests.length > 0" style="margin-top:24px">
+          <h3 class="section-label">Sent Requests ({{ sentShareRequests.length }})</h3>
+          <div class="friend-results">
+            <div class="friend-result-item" *ngFor="let req of sentShareRequests">
+              <div class="friend-avatar" style="background:#ede9fe;color:#6c63ff">↗</div>
+              <div class="friend-info">
+                <span class="friend-display-name">&#64;{{ req.username }}</span>
+                <span class="friend-username">
+                  {{ req.type === 'calendar'    ? '🗓 Entire Calendar' :
+                     req.type === 'category'    ? '📂 Category: ' + req.label :
+                     req.type === 'subcategory' ? '📁 Subcategory: ' + req.label :
+                     req.type === 'friend'      ? '👥 Friend Request' :
+                                                  '📅 Event' }}
+                </span>
+              </div>
+              <span class="friend-pending-btn" style="cursor:default">✓ Sent</span>
+            </div>
+          </div>
+        </div>
+
+      </ng-container>
+
+    </div>
+
+    <!-- ── CATEGORIES TAB ── -->
+    <div *ngIf="activeTab === 'categories'" class="tab-content">
+      <header class="page-header">
+        <div>
+          <h2 class="page-title">Categories</h2>
+          <p class="page-subtitle">Organize your events with categories and subcategories</p>
+        </div>
+      </header>
+
+      <!-- Create category form -->
+      <div class="cat-create-card">
+        <h3 class="cat-create-title">
+          <span class="cat-create-icon">🏷️</span>
+          {{ catForm.parentPath ? 'Add Subcategory' : 'Create Category' }}
+        </h3>
+
+        <!-- Parent breadcrumb -->
+        <div class="cat-parent-row" *ngIf="catForm.parentPath">
+          <span class="cat-parent-label">Under:</span>
+          <span class="cat-parent-path">{{ catForm.parentPath }}</span>
+          <button class="cat-parent-clear" (click)="startAddTopLevel()" title="Switch to top-level">✕</button>
+        </div>
+
+        <div class="cat-form-row">
+          <input
+            class="cat-name-input"
+            type="text"
+            [(ngModel)]="catForm.name"
+            name="catFormName"
+            [placeholder]="catForm.parentPath ? 'Subcategory name…' : 'Category name…'"
+            (keyup.enter)="submitCatForm()"
+          />
+          <button class="btn-primary cat-submit-btn" (click)="submitCatForm()">
+            + {{ catForm.parentPath ? 'Add Subcategory' : 'Create' }}
+          </button>
+        </div>
+
+        <div class="error-msg" *ngIf="catFormError" style="margin-top:10px">{{ catFormError }}</div>
+        <div class="cat-success-msg" *ngIf="catFormSuccess">✓ {{ catFormSuccess }}</div>
+      </div>
+
+      <!-- Category tree -->
+      <div class="cat-tree-section">
+        <div class="cat-tree-header">
+          <h3 class="cat-tree-title">All Categories</h3>
+          <span class="cat-tree-count">{{ allCategoryPaths.length }} total</span>
+        </div>
+
+        <div *ngIf="categoryTabTree.length === 0" class="empty-state large">
+          <span class="empty-icon">🏷️</span>
+          <p>No categories yet. Create your first one above.</p>
+        </div>
+
+        <div class="cat-tree" *ngIf="categoryTabTree.length > 0">
+          <ng-container *ngFor="let node of categoryTabTree">
+            <ng-container *ngTemplateOutlet="catNodeTpl; context: { node: node, depth: 0 }"></ng-container>
+          </ng-container>
         </div>
       </div>
     </div>
 
+    <!-- ── PROFILE TAB ── -->
+    <div *ngIf="activeTab === 'profile'" class="tab-content profile-tab">
+
+      <header class="page-header">
+        <div>
+          <h2 class="page-title">Profile</h2>
+          <p class="page-subtitle">Manage your account settings</p>
+        </div>
+      </header>
+
+      <div class="profile-tab-body">
+
+        <!-- ── Avatar card ── -->
+        <div class="profile-card">
+          <div class="profile-card-header">
+            <span class="profile-card-icon">🖼️</span>
+            <h3 class="profile-card-title">Avatar</h3>
+          </div>
+          <div class="profile-avatar-area">
+            <div class="profile-avatar-circle">
+              <img *ngIf="profileAvatarPreview" [src]="profileAvatarPreview" alt="Your avatar" class="profile-avatar-img" />
+              <span *ngIf="!profileAvatarPreview" class="profile-avatar-initial">{{ userInitial }}</span>
+            </div>
+            <div class="profile-avatar-actions">
+              <button class="btn-secondary" (click)="showAnimalPicker = !showAnimalPicker">
+                🐾 {{ showAnimalPicker ? 'Hide Animals' : 'Choose Animal' }}
+              </button>
+              <label class="btn-secondary profile-avatar-upload-btn" for="avatarFileInput">
+                {{ profileAvatarPreview ? 'Upload Image' : 'Upload Image' }}
+              </label>
+              <input
+                id="avatarFileInput"
+                type="file"
+                accept="image/*"
+                style="display:none"
+                (change)="onAvatarFileChange($event)"
+              />
+              <button *ngIf="profileAvatarPreview" class="btn-ghost-danger" (click)="removeAvatar()">Remove</button>
+            </div>
+          </div>
+
+          <!-- Animal picker grid -->
+          <div class="animal-picker" *ngIf="showAnimalPicker">
+            <p class="animal-picker-label">Pick an animal avatar</p>
+            <div class="animal-picker-grid">
+              <button
+                *ngFor="let animal of ANIMAL_AVATARS"
+                class="animal-option"
+                [title]="animal.label"
+                (click)="selectAnimalAvatar(animal.emoji)"
+              >
+                {{ animal.emoji }}
+              </button>
+            </div>
+          </div>
+
+          <p class="profile-field-success" *ngIf="profileAvatarMsg">✓ {{ profileAvatarMsg }}</p>
+        </div>
+
+        <!-- ── Account info card ── -->
+        <div class="profile-card">
+          <div class="profile-card-header">
+            <span class="profile-card-icon">👤</span>
+            <h3 class="profile-card-title">Account Info</h3>
+          </div>
+
+          <!-- Email -->
+          <div class="profile-field-group">
+            <label class="profile-label">Email</label>
+            <div class="profile-email-display">{{ userEmail }}</div>
+          </div>
+
+          <!-- Username -->
+          <div class="profile-field-group">
+            <label class="profile-label" for="profileUsername">Username</label>
+            <div class="profile-field-row">
+              <input
+                id="profileUsername"
+                class="profile-input"
+                type="text"
+                [(ngModel)]="profileUsernameInput"
+                placeholder="Enter username"
+                maxlength="32"
+              />
+              <button class="btn-primary profile-save-btn" (click)="saveUsername()">Save</button>
+            </div>
+            <p class="profile-field-success" *ngIf="profileUsernameMsg">✓ {{ profileUsernameMsg }}</p>
+            <p class="profile-field-error" *ngIf="profileUsernameError">{{ profileUsernameError }}</p>
+          </div>
+        </div>
+
+        <!-- ── Change Password card ── -->
+        <div class="profile-card">
+          <div class="profile-card-header">
+            <span class="profile-card-icon">🔒</span>
+            <h3 class="profile-card-title">Change Password</h3>
+          </div>
+          <div class="profile-field-stack">
+            <div class="profile-field-group">
+              <label class="profile-label">Current Password</label>
+              <input
+                class="profile-input"
+                type="password"
+                [(ngModel)]="profileOldPassword"
+                placeholder="Enter current password"
+                autocomplete="current-password"
+              />
+            </div>
+            <div class="profile-field-group">
+              <label class="profile-label">New Password</label>
+              <input
+                class="profile-input"
+                type="password"
+                [(ngModel)]="profileNewPassword"
+                placeholder="At least 8 characters"
+                autocomplete="new-password"
+              />
+            </div>
+            <div class="profile-field-group">
+              <label class="profile-label">Confirm New Password</label>
+              <input
+                class="profile-input"
+                type="password"
+                [(ngModel)]="profileConfirmPassword"
+                placeholder="Repeat new password"
+                autocomplete="new-password"
+              />
+            </div>
+            <p class="profile-field-success" *ngIf="profilePasswordMsg">✓ {{ profilePasswordMsg }}</p>
+            <p class="profile-field-error" *ngIf="profilePasswordError">{{ profilePasswordError }}</p>
+            <button class="btn-primary" style="align-self:flex-start" (click)="savePassword()">Update Password</button>
+          </div>
+        </div>
+
+        <!-- ── Language card ── -->
+        <div class="profile-card">
+          <div class="profile-card-header">
+            <span class="profile-card-icon">🌐</span>
+            <h3 class="profile-card-title">Language</h3>
+          </div>
+          <div class="profile-field-group">
+            <label class="profile-label" for="profileLanguage">Display Language</label>
+            <select
+              id="profileLanguage"
+              class="profile-input profile-select"
+              [(ngModel)]="profileLanguage"
+              (change)="saveLanguage()"
+            >
+              <option *ngFor="let lang of LANGUAGES" [value]="lang.code">{{ lang.label }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- ── Sign Out card ── -->
+        <div class="profile-card profile-card-signout">
+          <button class="btn-secondary profile-signout-btn" (click)="logout()">
+            <span>⎋</span> Sign Out
+          </button>
+        </div>
+
+        <!-- ── Delete Account card ── -->
+        <div class="profile-card profile-card-danger">
+          <div class="profile-card-header">
+            <span class="profile-card-icon">⚠️</span>
+            <h3 class="profile-card-title profile-danger-title">Delete Account</h3>
+          </div>
+          <div *ngIf="!profileDeleteConfirm">
+            <p class="profile-field-hint">This will permanently delete your account and all your data. This action cannot be undone.</p>
+            <button class="btn-danger" (click)="confirmDeleteAccount()">Delete My Account</button>
+          </div>
+          <div *ngIf="profileDeleteConfirm" class="profile-delete-confirm">
+            <p class="profile-delete-warning">Enter your password to confirm deletion.</p>
+            <input
+              class="profile-input"
+              type="password"
+              [(ngModel)]="profileDeletePassword"
+              placeholder="Your password"
+              autocomplete="current-password"
+            />
+            <p class="profile-field-error" *ngIf="profileDeleteError">{{ profileDeleteError }}</p>
+            <div class="profile-delete-actions">
+              <button class="btn-secondary" (click)="cancelDeleteAccount()">Cancel</button>
+              <button class="btn-danger" (click)="executeDeleteAccount()">Yes, Delete My Account</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </main>
+
+  <!-- Category node template (recursive) -->
+  <ng-template #catNodeTpl let-node="node" let-depth="depth">
+    <div class="cat-node" [style.padding-left.px]="depth * 20">
+      <div class="cat-node-row">
+        <!-- Expand/collapse toggle -->
+        <button
+          class="cat-node-toggle"
+          *ngIf="node.children.length > 0"
+          (click)="toggleCatNode(node.fullPath)"
+          [attr.aria-label]="isCatNodeExpanded(node.fullPath) ? 'Collapse' : 'Expand'"
+        >{{ isCatNodeExpanded(node.fullPath) ? '▾' : '▸' }}</button>
+        <span class="cat-node-toggle-spacer" *ngIf="node.children.length === 0"></span>
+
+        <!-- Name -->
+        <span class="cat-node-name">{{ node.name }}</span>
+
+        <!-- Event count badge -->
+        <span class="cat-node-count" *ngIf="countEventsUnder(node.fullPath) > 0">
+          {{ countEventsUnder(node.fullPath) }} event{{ countEventsUnder(node.fullPath) !== 1 ? 's' : '' }}
+        </span>
+
+        <!-- Actions -->
+        <div class="cat-node-actions">
+          <button
+            class="cat-node-btn cat-node-add"
+            (click)="startAddSubcategory(node.fullPath); expandedCatNodes.add(node.fullPath)"
+            title="Add subcategory"
+          >+ Sub</button>
+          <button
+            class="cat-node-btn cat-node-delete"
+            (click)="deleteSavedCategory(node.fullPath)"
+            title="Delete category"
+            *ngIf="countEventsUnder(node.fullPath) === 0"
+          >✕</button>
+        </div>
+      </div>
+
+      <!-- Children -->
+      <ng-container *ngIf="isCatNodeExpanded(node.fullPath) && node.children.length > 0">
+        <ng-container *ngFor="let child of node.children">
+          <ng-container *ngTemplateOutlet="catNodeTpl; context: { node: child, depth: depth + 1 }"></ng-container>
+        </ng-container>
+      </ng-container>
+    </div>
+  </ng-template>
 </div>
 
 <!-- ── DELETE EVENT MODAL ── -->
@@ -780,7 +1384,7 @@
       <h3>{{ changeStep === 'search' ? 'Change Event' : 'Update Event' }}</h3>
       <button class="modal-close" (click)="closeChangeModal()">✕</button>
     </div>
-    <div class="modal-form">
+    <div class="modal-form" [class.picker-open]="showChangeCategoryPicker">
 
       <!-- Step 1: search -->
       <ng-container *ngIf="changeStep === 'search'">
@@ -810,7 +1414,7 @@
         </div>
       </ng-container>
 
-      <!-- Step 2: edit date/time -->
+      <!-- Step 2: edit date/time/category -->
       <ng-container *ngIf="changeStep === 'edit'">
         <div class="change-event-preview" *ngIf="selectedEvent">
           <span class="result-dot" [style.background]="selectedEvent.color"></span>
@@ -830,9 +1434,97 @@
             <input type="time" [(ngModel)]="changeForm.endTime" name="changeEnd" />
           </div>
         </div>
+
+        <!-- Category picker -->
+        <div class="field">
+          <label>Category</label>
+          <div class="category-picker-field">
+            <div class="category-picker-display" (click)="openChangeCategoryPicker()">
+              <span class="category-picker-icon">📂</span>
+              <span *ngIf="!changeForm.category" class="category-picker-placeholder">Select or create a category…</span>
+              <span *ngIf="changeForm.category" class="category-picker-value">
+                <span *ngFor="let seg of changeForm.category.split(' > '); let last = last">
+                  <span class="cat-breadcrumb-seg">{{ seg }}</span>
+                  <span *ngIf="!last" class="cat-breadcrumb-sep"> › </span>
+                </span>
+              </span>
+              <button type="button" class="category-picker-clear" *ngIf="changeForm.category" (click)="$event.stopPropagation(); clearChangeCategory()" title="Clear">✕</button>
+              <span class="category-picker-arrow" [class.open]="showChangeCategoryPicker">▾</span>
+            </div>
+
+            <div class="category-picker-dropdown" *ngIf="showChangeCategoryPicker" (click)="$event.stopPropagation()">
+              <div class="cat-picker-breadcrumb" *ngIf="changeCategoryPickerPath.length > 0">
+                <button type="button" class="cat-picker-back-btn" (click)="changeCategoryPickerGoUp()">‹ Back</button>
+                <span class="cat-picker-breadcrumb-path">
+                  <span *ngFor="let seg of changeCategoryPickerPath; let last = last">
+                    <span>{{ seg }}</span><span *ngIf="!last"> › </span>
+                  </span>
+                </span>
+                <button type="button" class="cat-picker-use-btn" (click)="changeCategoryPickerSelect()">
+                  Use "{{ changeCategoryPickerPath[changeCategoryPickerPath.length - 1] }}"
+                </button>
+              </div>
+
+              <div class="cat-picker-search-wrap">
+                <span class="cat-picker-search-icon">🔍</span>
+                <input
+                  type="text"
+                  class="cat-picker-search-input"
+                  [(ngModel)]="changeCategoryPickerSearch"
+                  name="changeCategoryPickerSearch"
+                  [placeholder]="changeCategoryPickerPath.length > 0 ? 'Search subcategories…' : 'Search categories…'"
+                />
+                <button type="button" class="cat-picker-search-clear" *ngIf="changeCategoryPickerSearch" (click)="changeCategoryPickerSearch = ''">✕</button>
+              </div>
+
+              <div class="cat-picker-list">
+                <div class="cat-picker-item" *ngFor="let node of changeCategoryPickerFiltered">
+                  <button type="button" class="cat-picker-item-name" (click)="changeCategoryPickerSelectNode(node)">
+                    <span class="cat-picker-item-icon">{{ node.children.length > 0 ? '📂' : '🏷️' }}</span>
+                    <span>{{ node.name }}</span>
+                  </button>
+                  <button type="button" class="cat-picker-item-sub-btn" *ngIf="node.children.length > 0" (click)="changeCategoryPickerDrillDown(node)" title="View subcategories">
+                    {{ node.children.length }} sub ›
+                  </button>
+                  <button type="button" class="cat-picker-item-sub-btn cat-picker-item-add-sub" *ngIf="node.children.length === 0" (click)="changeCategoryPickerDrillDown(node)" title="Add a subcategory">
+                    + sub
+                  </button>
+                </div>
+                <div class="cat-picker-empty" *ngIf="changeCategoryPickerFiltered.length === 0 && changeCategoryPickerSearch">
+                  No matches for "{{ changeCategoryPickerSearch }}"
+                </div>
+                <div class="cat-picker-empty" *ngIf="changeCategoryPickerLevel.length === 0 && !changeCategoryPickerSearch && !showChangeNewCategoryInput">
+                  <span *ngIf="changeCategoryPickerPath.length === 0">No categories yet — create one below.</span>
+                  <span *ngIf="changeCategoryPickerPath.length > 0">No subcategories yet — add one below.</span>
+                </div>
+              </div>
+
+              <div class="cat-picker-footer">
+                <div class="cat-picker-add-row" *ngIf="!showChangeNewCategoryInput">
+                  <button type="button" class="cat-picker-add-btn" (click)="showChangeNewCategoryInput = true; changeNewCategoryName = changeCategoryPickerSearch">
+                    + Create {{ changeCategoryPickerPath.length > 0 ? 'subcategory' : 'category' }}<span *ngIf="changeCategoryPickerSearch"> "{{ changeCategoryPickerSearch }}"</span>
+                  </button>
+                </div>
+                <div class="cat-picker-new-input-row" *ngIf="showChangeNewCategoryInput">
+                  <input
+                    type="text"
+                    [(ngModel)]="changeNewCategoryName"
+                    name="changeNewCategoryName"
+                    [placeholder]="changeCategoryPickerPath.length > 0 ? 'Subcategory name…' : 'Category name…'"
+                    class="cat-picker-new-input"
+                    (keydown.enter)="changeCategoryPickerAddNew()"
+                  />
+                  <button type="button" class="cat-picker-confirm-btn" (click)="changeCategoryPickerAddNew()" [disabled]="!changeNewCategoryName.trim()">Add</button>
+                  <button type="button" class="cat-picker-cancel-btn" (click)="showChangeNewCategoryInput = false; changeNewCategoryName = ''">✕</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="error-msg" *ngIf="changeError">{{ changeError }}</div>
         <div class="modal-actions">
-          <button class="btn-secondary" (click)="changeStep = 'search'">← Back</button>
+          <button class="btn-secondary" (click)="changeStep = 'search'; closeChangeCategoryPicker()">← Back</button>
           <button class="btn-warning" (click)="confirmChange()">Save Changes</button>
         </div>
       </ng-container>
@@ -1138,7 +1830,7 @@
       ✓ Event scheduled successfully!
     </div>
 
-    <form (ngSubmit)="submitSchedule()" class="modal-form" *ngIf="!scheduleSuccess">
+    <form (ngSubmit)="submitSchedule()" class="modal-form" [class.picker-open]="showCategoryPicker" *ngIf="!scheduleSuccess">
 
       <div class="field">
         <label for="event-title">Event Title *</label>
@@ -1202,101 +1894,120 @@
       <div class="field">
         <label for="event-category">Category</label>
         <div class="category-picker-field">
+
+          <!-- Trigger button -->
           <div class="category-picker-display" (click)="openCategoryPicker()">
-            <span *ngIf="!form.category" class="category-picker-placeholder">e.g. School › Clubs › Chess</span>
+            <span class="category-picker-icon">📂</span>
+            <span *ngIf="!form.category" class="category-picker-placeholder">Select or create a category…</span>
             <span *ngIf="form.category" class="category-picker-value">
-              <span *ngFor="let seg of form.category.split(' > '); let i = index; let last = last">
+              <span *ngFor="let seg of form.category.split(' > '); let last = last">
                 <span class="cat-breadcrumb-seg">{{ seg }}</span>
                 <span *ngIf="!last" class="cat-breadcrumb-sep"> › </span>
               </span>
             </span>
             <button type="button" class="category-picker-clear" *ngIf="form.category" (click)="$event.stopPropagation(); clearCategory()" title="Clear">✕</button>
-            <span class="category-picker-arrow">▾</span>
+            <span class="category-picker-arrow" [class.open]="showCategoryPicker">▾</span>
           </div>
 
-          <!-- Tree picker dropdown -->
+          <!-- Dropdown -->
           <div class="category-picker-dropdown" *ngIf="showCategoryPicker" (click)="$event.stopPropagation()">
 
-            <!-- Breadcrumb nav -->
+            <!-- Breadcrumb nav when drilled into a category -->
             <div class="cat-picker-breadcrumb" *ngIf="categoryPickerPath.length > 0">
-              <button type="button" class="cat-picker-back" (click)="categoryPickerGoUp()">← Back</button>
-              <span class="cat-picker-path">
-                <span *ngFor="let seg of categoryPickerPath; let i = index; let last = last">
-                  <span class="cat-bc-seg">{{ seg }}</span>
-                  <span *ngIf="!last" class="cat-bc-arrow"> › </span>
+              <button type="button" class="cat-picker-back-btn" (click)="categoryPickerGoUp()">
+                ‹ Back
+              </button>
+              <span class="cat-picker-breadcrumb-path">
+                <span *ngFor="let seg of categoryPickerPath; let last = last">
+                  <span>{{ seg }}</span><span *ngIf="!last"> › </span>
                 </span>
               </span>
+              <button type="button" class="cat-picker-use-btn" (click)="categoryPickerSelect()">
+                Use "{{ categoryPickerPath[categoryPickerPath.length - 1] }}"
+              </button>
             </div>
 
-            <!-- "Use this level" button (only when drilled in) -->
-            <button
-              type="button"
-              class="cat-picker-use-current"
-              *ngIf="categoryPickerPath.length > 0"
-              (click)="categoryPickerSelect()"
-            >
-              ✓ Use "{{ categoryPickerFullPath }}"
-            </button>
+            <!-- Search input -->
+            <div class="cat-picker-search-wrap">
+              <span class="cat-picker-search-icon">🔍</span>
+              <input
+                type="text"
+                class="cat-picker-search-input"
+                [(ngModel)]="categoryPickerSearch"
+                name="categoryPickerSearch"
+                [placeholder]="categoryPickerPath.length > 0 ? 'Search subcategories…' : 'Search categories…'"
+                autofocus
+              />
+              <button type="button" class="cat-picker-search-clear" *ngIf="categoryPickerSearch" (click)="categoryPickerSearch = ''">✕</button>
+            </div>
 
-            <!-- Children at current level -->
+            <!-- Category list -->
             <div class="cat-picker-list">
+
               <div
                 class="cat-picker-item"
-                *ngFor="let node of categoryPickerLevel"
+                *ngFor="let node of categoryPickerFiltered"
               >
-                <button type="button" class="cat-picker-select-btn" (click)="categoryPickerSelectNode(node)" title="Use this category">
-                  ✓
+                <!-- Click the name to select it as the category -->
+                <button type="button" class="cat-picker-item-name" (click)="categoryPickerSelectNode(node)">
+                  <span class="cat-picker-item-icon">{{ node.children.length > 0 ? '📂' : '🏷️' }}</span>
+                  <span>{{ node.name }}</span>
                 </button>
-                <span class="cat-picker-name">{{ node.name }}</span>
+                <!-- Drill into subcategories -->
                 <button
                   type="button"
-                  class="cat-picker-drill-btn"
+                  class="cat-picker-item-sub-btn"
                   *ngIf="node.children.length > 0"
                   (click)="categoryPickerDrillDown(node)"
-                  title="Browse sub-categories"
+                  title="View subcategories"
                 >
-                  {{ node.children.length }} sub › 
+                  {{ node.children.length }} sub ›
                 </button>
                 <button
                   type="button"
-                  class="cat-picker-drill-btn"
+                  class="cat-picker-item-sub-btn cat-picker-item-add-sub"
                   *ngIf="node.children.length === 0"
                   (click)="categoryPickerDrillDown(node)"
-                  title="Add sub-category"
+                  title="Add a subcategory"
                 >
                   + sub
                 </button>
               </div>
 
-              <div class="cat-picker-empty" *ngIf="categoryPickerLevel.length === 0 && !showNewCategoryInput">
-                <span *ngIf="categoryPickerPath.length === 0">No categories yet.</span>
-                <span *ngIf="categoryPickerPath.length > 0">No sub-categories yet.</span>
+              <!-- No results from search -->
+              <div class="cat-picker-empty" *ngIf="categoryPickerFiltered.length === 0 && categoryPickerSearch">
+                No matches for "{{ categoryPickerSearch }}"
+              </div>
+
+              <!-- Truly empty level -->
+              <div class="cat-picker-empty" *ngIf="categoryPickerLevel.length === 0 && !categoryPickerSearch && !showNewCategoryInput">
+                <span *ngIf="categoryPickerPath.length === 0">No categories yet — create one below.</span>
+                <span *ngIf="categoryPickerPath.length > 0">No subcategories yet — add one below.</span>
               </div>
             </div>
 
-            <!-- Add new category at this level -->
-            <div class="cat-picker-add-row" *ngIf="!showNewCategoryInput">
-              <button type="button" class="cat-picker-add-btn" (click)="showNewCategoryInput = true">
-                + New {{ categoryPickerPath.length > 0 ? 'sub-' : '' }}category
-              </button>
-            </div>
-            <div class="cat-picker-new-input" *ngIf="showNewCategoryInput">
-              <input
-                type="text"
-                [(ngModel)]="newCategoryName"
-                name="newCategoryName"
-                placeholder="Category name…"
-                class="cat-picker-text-input"
-                (keydown.enter)="categoryPickerAddNew()"
-                autofocus
-              />
-              <button type="button" class="cat-picker-confirm-btn" (click)="categoryPickerAddNew()" [disabled]="!newCategoryName.trim()">Add</button>
-              <button type="button" class="cat-picker-cancel-btn" (click)="showNewCategoryInput = false; newCategoryName = ''">✕</button>
+            <!-- Footer: add new category / subcategory -->
+            <div class="cat-picker-footer">
+              <div class="cat-picker-add-row" *ngIf="!showNewCategoryInput">
+                <button type="button" class="cat-picker-add-btn" (click)="showNewCategoryInput = true; newCategoryName = categoryPickerSearch">
+                  + Create {{ categoryPickerPath.length > 0 ? 'subcategory' : 'category' }}<span *ngIf="categoryPickerSearch"> "{{ categoryPickerSearch }}"</span>
+                </button>
+              </div>
+              <div class="cat-picker-new-input-row" *ngIf="showNewCategoryInput">
+                <input
+                  type="text"
+                  [(ngModel)]="newCategoryName"
+                  name="newCategoryName"
+                  [placeholder]="categoryPickerPath.length > 0 ? 'Subcategory name…' : 'Category name…'"
+                  class="cat-picker-new-input"
+                  (keydown.enter)="categoryPickerAddNew()"
+                  autofocus
+                />
+                <button type="button" class="cat-picker-confirm-btn" (click)="categoryPickerAddNew()" [disabled]="!newCategoryName.trim()">Add</button>
+                <button type="button" class="cat-picker-cancel-btn" (click)="showNewCategoryInput = false; newCategoryName = ''">✕</button>
+              </div>
             </div>
 
-            <div class="cat-picker-footer">
-              <button type="button" class="cat-picker-close-btn" (click)="closeCategoryPicker()">Close</button>
-            </div>
           </div>
         </div>
       </div>
@@ -1369,11 +2080,132 @@
 
       <div class="error-msg" *ngIf="scheduleError">{{ scheduleError }}</div>
 
+      <!-- ── AI Scheduling Assistant ── -->
+      <div class="ai-scheduler-section">
+        <button
+          type="button"
+          class="ai-suggest-btn"
+          (click)="toggleAiPanel()"
+          [class.ai-suggest-btn-active]="showAiPanel"
+        >
+          <span class="ai-suggest-icon">✨</span>
+          Ask AI for best time
+          <span class="ai-suggest-chevron" [class.open]="showAiPanel">▾</span>
+        </button>
+
+        <div class="ai-panel" *ngIf="showAiPanel">
+
+          <!-- Controls -->
+          <div class="ai-controls">
+            <div class="ai-duration-row">
+              <label class="ai-duration-label">Duration</label>
+              <select class="ai-duration-select" [(ngModel)]="aiDurationMin" name="aiDurationMin">
+                <option [value]="30">30 min</option>
+                <option [value]="60">1 hour</option>
+                <option [value]="90">1.5 hours</option>
+                <option [value]="120">2 hours</option>
+                <option [value]="180">3 hours</option>
+              </select>
+              <button
+                type="button"
+                class="ai-analyze-btn"
+                (click)="requestAiSuggestions()"
+                [disabled]="aiLoading"
+              >
+                <span *ngIf="!aiLoading">Refresh</span>
+                <span *ngIf="aiLoading" class="ai-spinner"></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Loading state -->
+          <div class="ai-loading-state" *ngIf="aiLoading">
+            <span class="ai-spinner"></span>
+            <span>Analyzing your calendar…</span>
+          </div>
+
+          <!-- Error state -->
+          <div class="ai-error" *ngIf="aiError && !aiLoading">
+            ⚠️ {{ aiError }}
+            <button type="button" class="ai-retry-btn" (click)="requestAiSuggestions()">Retry</button>
+          </div>
+
+          <!-- Suggestions -->
+          <div class="ai-suggestions" *ngIf="aiSuggestions.length > 0 && !aiLoading">
+            <p class="ai-suggestions-label">Suggested time slots — click one to apply:</p>
+            <div
+              class="ai-suggestion-card"
+              *ngFor="let s of aiSuggestions; let i = index"
+              (click)="applyAiSuggestion(s)"
+              role="button"
+              tabindex="0"
+              (keydown.enter)="applyAiSuggestion(s)"
+            >
+              <div class="ai-suggestion-num">{{ i + 1 }}</div>
+              <div class="ai-suggestion-body">
+                <div class="ai-suggestion-time">
+                  📅 {{ s.date | date:'EEE, MMM d' }} &nbsp;·&nbsp; {{ s.startTime }} – {{ s.endTime }}
+                </div>
+                <div class="ai-suggestion-reason">{{ s.reason }}</div>
+              </div>
+              <span class="ai-suggestion-apply">Apply →</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
       <div class="modal-actions">
         <button type="button" class="btn-secondary" (click)="closeModal()">Cancel</button>
         <button type="submit" class="btn-primary">Schedule Event</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ── GOOGLE CALENDAR PICKER MODAL ── -->
+<div class="modal-overlay" *ngIf="showGcalPicker" (click)="closeGcalPicker()">
+  <div class="modal gcal-picker-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Choose Calendars to Import</h3>
+      <button class="modal-close" (click)="closeGcalPicker()">✕</button>
+    </div>
+
+    <div class="modal-form">
+      <p class="gcal-picker-hint">Select which Google Calendars to import events from.</p>
+
+      <!-- Loading state -->
+      <div *ngIf="gcalPickerLoading" class="gcal-picker-loading">
+        <span class="db-spinner"></span> Loading your calendars…
+      </div>
+
+      <!-- Calendar list -->
+      <div class="gcal-cal-list" *ngIf="!gcalPickerLoading">
+        <label
+          class="gcal-cal-item"
+          *ngFor="let cal of gcalCalendars"
+        >
+          <input type="checkbox" [(ngModel)]="cal.selected" [name]="'gcal_' + cal.id" />
+          <span class="gcal-cal-dot" [style.background]="cal.color"></span>
+          <span class="gcal-cal-name">{{ cal.name }}</span>
+          <span class="gcal-cal-primary" *ngIf="cal.primary">Primary</span>
+        </label>
+
+        <div *ngIf="gcalCalendars.length === 0" class="gcal-picker-empty">
+          No calendars found in your Google account.
+        </div>
+      </div>
+
+      <div class="error-msg" *ngIf="googleSyncError">{{ googleSyncError }}</div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="closeGcalPicker()" [disabled]="gcalImporting">Cancel</button>
+        <button class="btn-primary" (click)="importFromPicker()" [disabled]="gcalImporting || gcalPickerLoading">
+          <span *ngIf="!gcalImporting">Import Events</span>
+          <span *ngIf="gcalImporting" class="spinner-dark"></span>
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1484,3 +2316,115 @@
     </div>
   </div>
 </div>
+
+<!-- ── FLOATING AI CHAT ── -->
+
+<!-- Backdrop (closes panel on outside click) -->
+<div class="float-chat-backdrop" *ngIf="showFloatingChat" (click)="showFloatingChat = false"></div>
+
+<!-- Floating panel -->
+<div class="float-chat-panel" [class.float-chat-open]="showFloatingChat">
+
+  <!-- Header -->
+  <div class="float-chat-header">
+    <div class="float-chat-header-left">
+      <span class="float-chat-avatar">✨</span>
+      <div>
+        <div class="float-chat-title">AI Assistant</div>
+        <div class="float-chat-subtitle" *ngIf="!chatEventDraft">Reminders, drafts & schedule help</div>
+        <div class="float-chat-subtitle float-chat-wizard-badge" *ngIf="chatEventDraft">📌 Adding event…</div>
+      </div>
+    </div>
+    <div class="float-chat-header-actions">
+      <button class="float-chat-clear" *ngIf="chatEventDraft" (click)="cancelEventCreation()" title="Cancel event creation">✕ Cancel</button>
+      <button class="float-chat-clear" *ngIf="!chatEventDraft && chatMessages.length > 1" (click)="chatMessages = []" title="Clear chat">🗑</button>
+      <button class="float-chat-close" (click)="showFloatingChat = false" title="Close" aria-label="Close chat">✕</button>
+    </div>
+  </div>
+
+  <!-- Messages -->
+  <div class="float-chat-messages" #floatChatMessages>
+    <div
+      *ngFor="let msg of chatMessages"
+      class="chat-message-row"
+      [class.user-row]="msg.role === 'user'"
+      [class.assistant-row]="msg.role === 'assistant'"
+    >
+      <div class="chat-avatar" *ngIf="msg.role === 'assistant'">✨</div>
+      <div class="chat-bubble"
+        [class.user-bubble]="msg.role === 'user'"
+        [class.assistant-bubble]="msg.role === 'assistant'"
+      >
+        <div class="chat-bubble-text" [innerHTML]="renderChatMarkdown(msg.text)"></div>
+        <div class="chat-actions" *ngIf="msg.actions && msg.actions.length > 0">
+          <button
+            class="chat-action-btn"
+            *ngFor="let action of msg.actions"
+            (click)="handleChatAction(action)"
+          >{{ action.label }} →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Typing indicator -->
+    <div class="chat-message-row assistant-row" *ngIf="chatTyping">
+      <div class="chat-avatar">✨</div>
+      <div class="chat-bubble assistant-bubble chat-typing-bubble">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Suggestion chips (only on first open) -->
+  <div class="chat-suggestions float-suggestions" *ngIf="chatMessages.length <= 1">
+    <button class="chat-chip" (click)="chatInput = 'Add a new event'; sendChatMessage()">➕ Add event</button>
+    <button class="chat-chip" (click)="chatInput = 'What\'s on today?'; sendChatMessage()">Today</button>
+    <button class="chat-chip" (click)="chatInput = 'Show me this week'; sendChatMessage()">This week</button>
+    <button class="chat-chip" (click)="chatInput = 'When am I free?'; sendChatMessage()">Free time</button>
+    <button class="chat-chip" (click)="chatInput = 'What\'s my next event?'; sendChatMessage()">Next event</button>
+    <button class="chat-chip" (click)="chatInput = 'When should I start studying for my test?'; sendChatMessage()">Study reminder</button>
+    <button class="chat-chip" (click)="chatInput = 'When did I last have a doctor appointment?'; sendChatMessage()">Health check</button>
+    <button class="chat-chip" (click)="chatInput = 'Draft an absence email for my next event'; sendChatMessage()">Draft email</button>
+  </div>
+
+  <!-- Input bar -->
+  <div class="chat-input-bar float-input-bar">
+    <textarea
+      class="chat-input"
+      [(ngModel)]="chatInput"
+      name="floatChatInput"
+      [placeholder]="chatEventDraft ? 'Reply to continue adding your event…' : 'Ask about your schedule, add an event…'"
+      rows="1"
+      (keydown)="onChatKeydown($event)"
+      [disabled]="chatTyping"
+    ></textarea>
+    <button
+      class="chat-send-btn"
+      (click)="sendChatMessage()"
+      [disabled]="!chatInput.trim() || chatTyping"
+      title="Send (Enter)"
+      aria-label="Send message"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <path d="M22 2L11 13" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
+  <p class="chat-hint float-hint">Enter to send · Shift+Enter for new line</p>
+</div>
+
+<!-- Floating trigger button -->
+<button
+  class="float-chat-btn"
+  (click)="toggleFloatingChat()"
+  [class.float-chat-btn-open]="showFloatingChat"
+  title="AI Assistant"
+  aria-label="Open AI Assistant"
+>
+  <span class="float-chat-btn-icon" *ngIf="!showFloatingChat">✨</span>
+  <span class="float-chat-btn-icon" *ngIf="showFloatingChat">✕</span>
+</button>
+

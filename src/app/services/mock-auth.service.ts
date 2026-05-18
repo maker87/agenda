@@ -7,6 +7,14 @@ const MOCK_USERS = [
 ];
 
 const SESSION_KEY = 'agenda_mock_session';
+const PROFILE_KEY = 'agenda_user_profile';
+
+export interface UserProfile {
+  email: string;
+  username: string;
+  avatarUrl: string | null;
+  language: string;
+}
 
 @Injectable({ providedIn: 'root' })
 export class MockAuthService {
@@ -30,5 +38,40 @@ export class MockAuthService {
   getCurrentUser(): { email: string } | null {
     const raw = sessionStorage.getItem(SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
+  }
+
+  // ── Profile helpers ──
+
+  getProfile(email: string): UserProfile {
+    try {
+      const raw = localStorage.getItem(PROFILE_KEY + '_' + email);
+      if (raw) return JSON.parse(raw);
+    } catch { /* ignore */ }
+    return {
+      email,
+      username: email.split('@')[0],
+      avatarUrl: null,
+      language: 'en',
+    };
+  }
+
+  saveProfile(profile: UserProfile): void {
+    localStorage.setItem(PROFILE_KEY + '_' + profile.email, JSON.stringify(profile));
+  }
+
+  /** Returns true if the given password matches the stored mock password for the email. */
+  verifyPassword(email: string, password: string): boolean {
+    return MOCK_USERS.some(u => u.email === email && u.password === password);
+  }
+
+  /** Simulates changing the password (no-op in mock, just validates old password). */
+  changePassword(email: string, oldPassword: string, _newPassword: string): boolean {
+    return this.verifyPassword(email, oldPassword);
+  }
+
+  /** Simulates deleting the account. */
+  deleteAccount(email: string): void {
+    localStorage.removeItem(PROFILE_KEY + '_' + email);
+    this.logout();
   }
 }

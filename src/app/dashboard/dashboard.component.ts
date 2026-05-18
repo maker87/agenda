@@ -2,11 +2,14 @@ import { Component, OnInit, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { MockAuthService } from '../services/mock-auth.service';
+import { MockAuthService, UserProfile } from '../services/mock-auth.service';
 import { EventsService } from '../services/events.service';
 import { CategoryCountPipe } from '../pipes/category-count.pipe';
 import { NotificationsService, AppNotification } from '../services/notifications.service';
 import { CategoryTreeService, CategoryNode, CATEGORY_SEP } from '../services/category-tree.service';
+import { GoogleCalendarService, GCalEvent, GCalCalendar } from '../services/google-calendar.service';
+import { AiSchedulerService, AiSuggestion } from '../services/ai-scheduler.service';
+import { AiChatService, ChatMessage, EventDraft, getProactiveReminders } from '../services/ai-chat.service';
 
 interface CalendarEvent {
   id: string;
@@ -393,9 +396,203 @@ function buildCoachEvents(): CalendarEvent[] {
 })
 export class DashboardComponent implements OnInit, AfterViewInit {
   userEmail = '';
+
+  // ── Profile panel ──
+  profile: UserProfile = { email: '', username: '', avatarUrl: null, language: 'en' };
+
+  // Animal avatar options
+  readonly ANIMAL_AVATARS = [
+    { emoji: '🐶', label: 'Dog' },
+    { emoji: '🐱', label: 'Cat' },
+    { emoji: '🐭', label: 'Mouse' },
+    { emoji: '🐹', label: 'Hamster' },
+    { emoji: '🐰', label: 'Rabbit' },
+    { emoji: '🦊', label: 'Fox' },
+    { emoji: '🐻', label: 'Bear' },
+    { emoji: '🐼', label: 'Panda' },
+    { emoji: '🐨', label: 'Koala' },
+    { emoji: '🐯', label: 'Tiger' },
+    { emoji: '🦁', label: 'Lion' },
+    { emoji: '🐮', label: 'Cow' },
+    { emoji: '🐸', label: 'Frog' },
+    { emoji: '🐧', label: 'Penguin' },
+    { emoji: '🐦', label: 'Bird' },
+    { emoji: '🦆', label: 'Duck' },
+    { emoji: '🦉', label: 'Owl' },
+    { emoji: '🦋', label: 'Butterfly' },
+    { emoji: '🐢', label: 'Turtle' },
+    { emoji: '🦄', label: 'Unicorn' },
+  ];
+  showAnimalPicker = false;
+
+  // Profile form fields
+  profileUsernameInput = '';
+  profileOldPassword = '';
+  profileNewPassword = '';
+  profileConfirmPassword = '';
+  profileLanguage = 'en';
+  profileAvatarPreview: string | null = null;
+
+  // Profile feedback
+  profileUsernameMsg = '';
+  profileUsernameError = '';
+  profilePasswordMsg = '';
+  profilePasswordError = '';
+  profileAvatarMsg = '';
+  profileDeleteConfirm = false;
+  profileDeletePassword = '';
+  profileDeleteError = '';
+
+  readonly LANGUAGES = [
+    { code: 'en', label: 'English' },
+    { code: 'es', label: 'Español' },
+    { code: 'fr', label: 'Français' },
+    { code: 'de', label: 'Deutsch' },
+    { code: 'pt', label: 'Português' },
+    { code: 'zh', label: '中文' },
+    { code: 'ja', label: '日本語' },
+    { code: 'ar', label: 'العربية' },
+  ];
+
+  openProfileTab() {
+    this.profile = this.mockAuth.getProfile(this.userEmail);
+    this.profileUsernameInput = this.profile.username;
+    this.profileLanguage = this.profile.language;
+    this.profileAvatarPreview = this.profile.avatarUrl;
+    this.profileOldPassword = '';
+    this.profileNewPassword = '';
+    this.profileConfirmPassword = '';
+    this.profileUsernameMsg = '';
+    this.profileUsernameError = '';
+    this.profilePasswordMsg = '';
+    this.profilePasswordError = '';
+    this.profileAvatarMsg = '';
+    this.profileDeleteConfirm = false;
+    this.profileDeletePassword = '';
+    this.profileDeleteError = '';
+    this.showAnimalPicker = false;
+    this.activeTab = 'profile';
+  }
+
+  saveUsername() {
+    this.profileUsernameMsg = '';
+    this.profileUsernameError = '';
+    const name = this.profileUsernameInput.trim();
+    if (!name) { this.profileUsernameError = 'Username cannot be empty.'; return; }
+    if (name.length < 3) { this.profileUsernameError = 'Username must be at least 3 characters.'; return; }
+    this.profile.username = name;
+    this.mockAuth.saveProfile(this.profile);
+    this.profileUsernameMsg = 'Username updated.';
+    setTimeout(() => { this.profileUsernameMsg = ''; }, 3000);
+  }
+
+  savePassword() {
+    this.profilePasswordMsg = '';
+    this.profilePasswordError = '';
+    if (!this.profileOldPassword) { this.profilePasswordError = 'Enter your current password.'; return; }
+    if (!this.profileNewPassword) { this.profilePasswordError = 'Enter a new password.'; return; }
+    if (this.profileNewPassword.length < 8) { this.profilePasswordError = 'New password must be at least 8 characters.'; return; }
+    if (this.profileNewPassword !== this.profileConfirmPassword) { this.profilePasswordError = 'Passwords do not match.'; return; }
+    const ok = this.mockAuth.changePassword(this.userEmail, this.profileOldPassword, this.profileNewPassword);
+    if (!ok) { this.profilePasswordError = 'Current password is incorrect.'; return; }
+    this.profileOldPassword = '';
+    this.profileNewPassword = '';
+    this.profileConfirmPassword = '';
+    this.profilePasswordMsg = 'Password changed successfully.';
+    setTimeout(() => { this.profilePasswordMsg = ''; }, 3000);
+  }
+
+  onAvatarFileChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { this.profileAvatarMsg = 'Please select an image file.'; return; }
+    if (file.size > 2 * 1024 * 1024) { this.profileAvatarMsg = 'Image must be under 2 MB.'; return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      this.profileAvatarPreview = result;
+      this.profile.avatarUrl = result;
+      this.mockAuth.saveProfile(this.profile);
+      this.profileAvatarMsg = 'Avatar updated.';
+      setTimeout(() => { this.profileAvatarMsg = ''; }, 3000);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  removeAvatar() {
+    this.profileAvatarPreview = null;
+    this.profile.avatarUrl = null;
+    this.mockAuth.saveProfile(this.profile);
+    this.profileAvatarMsg = 'Avatar removed.';
+    this.showAnimalPicker = false;
+    setTimeout(() => { this.profileAvatarMsg = ''; }, 3000);
+  }
+
+  selectAnimalAvatar(emoji: string) {
+    // Convert emoji to a data URL by drawing it on a canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d')!;
+    // Purple gradient background
+    const grad = ctx.createLinearGradient(0, 0, 128, 128);
+    grad.addColorStop(0, '#6c63ff');
+    grad.addColorStop(1, '#764ba2');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(64, 64, 64, 0, Math.PI * 2);
+    ctx.fill();
+    // Draw emoji
+    ctx.font = '72px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, 64, 68);
+    const dataUrl = canvas.toDataURL('image/png');
+    this.profileAvatarPreview = dataUrl;
+    this.profile.avatarUrl = dataUrl;
+    this.mockAuth.saveProfile(this.profile);
+    this.profileAvatarMsg = 'Avatar updated.';
+    this.showAnimalPicker = false;
+    setTimeout(() => { this.profileAvatarMsg = ''; }, 3000);
+  }
+
+  saveLanguage() {
+    this.profile.language = this.profileLanguage;
+    this.mockAuth.saveProfile(this.profile);
+  }
+
+  confirmDeleteAccount() {
+    this.profileDeleteConfirm = true;
+    this.profileDeleteError = '';
+    this.profileDeletePassword = '';
+  }
+
+  cancelDeleteAccount() {
+    this.profileDeleteConfirm = false;
+    this.profileDeleteError = '';
+    this.profileDeletePassword = '';
+  }
+
+  executeDeleteAccount() {
+    if (!this.profileDeletePassword) { this.profileDeleteError = 'Enter your password to confirm.'; return; }
+    const ok = this.mockAuth.verifyPassword(this.userEmail, this.profileDeletePassword);
+    if (!ok) { this.profileDeleteError = 'Incorrect password.'; return; }
+    this.mockAuth.deleteAccount(this.userEmail);
+    this.router.navigate(['/']);
+  }
+
   googleCalendarLinked = false;
   linkingGoogle = false;
-  activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' = 'schedule';
+  googleSyncError = '';
+
+  // ── Google Calendar picker ──
+  showGcalPicker = false;
+  gcalCalendars: GCalCalendar[] = [];
+  gcalPickerLoading = false;
+  gcalImporting = false;
+  gcalImportCount = 0;
+  activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' = 'schedule';
 
   // ── History ──
   private readonly HISTORY_KEY = 'agenda_event_history';
@@ -406,10 +603,526 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   historyRestoreMsg = '';
   showScheduleModal = false;
 
+  // ── AI Chat ──
+  chatMessages: ChatMessage[] = [];
+  chatInput = '';
+  chatTyping = false;
+  showFloatingChat = false;
+  chatEventDraft: EventDraft | null = null;
+  /** Tracks which proactive reminders have already been created this session. */
+  private seenProactiveKeys = new Set<string>();
+
+  // ── AI Login Banner ──
+  loginBannerItems: { title: string; body: string }[] = [];
+  showLoginBanner = false;
+  private loginBannerTimer: any = null;
+
+  sendChatMessage() {
+    const text = this.chatInput.trim();
+    if (!text) return;
+    this.chatInput = '';
+
+    // Add user message
+    const userMsg: ChatMessage = {
+      id: `msg_${Date.now()}_u`,
+      role: 'user',
+      text,
+      timestamp: new Date(),
+    };
+    this.chatMessages = [...this.chatMessages, userMsg];
+
+    // Simulate a brief typing delay for a natural feel
+    this.chatTyping = true;
+    setTimeout(() => {
+      const { message, draft } = this.aiChatService.reply(text, this.events, this.userEmail, this.chatEventDraft);
+      this.chatMessages = [...this.chatMessages, message];
+      this.chatEventDraft = draft;
+      this.chatTyping = false;
+      this.scrollChatToBottom();
+      // Auto-fire confirm_create_event if the AI returned it directly (user said "yes")
+      if (message.actions?.length && message.actions[0].type === 'confirm_create_event') {
+        this.createEventFromChat(message.actions[0].payload);
+      }
+    }, 400 + Math.random() * 300);
+  }
+
+  handleChatAction(action: { label: string; type: string; tab?: string; reminderTitle?: string; reminderBody?: string; copyText?: string; payload?: any; slotIndex?: number }) {
+    if (action.type === 'navigate' && action.tab) {
+      this.switchTab(action.tab as any);
+      this.showFloatingChat = false;
+    }
+    if (action.type === 'create_reminder' && action.reminderTitle) {
+      this.createAiReminder(action.reminderTitle, action.reminderBody ?? '');
+    }
+    if (action.type === 'copy_text' && action.copyText) {
+      navigator.clipboard.writeText(action.copyText).then(() => {
+        this.chatMessages = [...this.chatMessages, {
+          id: `msg_${Date.now()}_copy`,
+          role: 'assistant',
+          text: '✅ Copied to clipboard!',
+          timestamp: new Date(),
+        }];
+      }).catch(() => {
+        this.chatMessages = [...this.chatMessages, {
+          id: `msg_${Date.now()}_copy`,
+          role: 'assistant',
+          text: '⚠️ Could not copy automatically. Please select and copy the text above manually.',
+          timestamp: new Date(),
+        }];
+      });
+    }
+    if (action.type === 'confirm_create_event' && action.payload) {
+      this.createEventFromChat(action.payload);
+    }
+    if (action.type === 'pick_slot' && this.chatEventDraft) {
+      const t = new Date().toISOString().split('T')[0];
+      const { message, draft } = this.aiChatService.pickSlot(action.slotIndex ?? -1, this.chatEventDraft, this.events, t);
+      this.chatMessages = [...this.chatMessages, message];
+      this.chatEventDraft = draft;
+      this.scrollChatToBottom();
+      // If picking a slot produced a confirm_create_event action, auto-fire it
+      if (message.actions?.length === 1 && message.actions[0].type === 'confirm_create_event') {
+        this.createEventFromChat(message.actions[0].payload);
+      }
+    }
+  }
+
+  async createEventFromChat(payload: any) {
+    this.chatTyping = true;
+    try {
+      const created = await this.eventsService.createEvent({
+        title:       payload.title,
+        date:        payload.date,
+        startTime:   payload.startTime,
+        endTime:     payload.endTime,
+        description: payload.description ?? '',
+        color:       payload.color ?? '#6c63ff',
+        category:    payload.category ?? '',
+        sharedWith:  payload.sharedWith ?? [],
+      }, this.userEmail);
+
+      // Refresh the events list
+      this.events = this.eventsService.listEvents(this.userEmail, (synced) => {
+        this.events = synced;
+      });
+
+      this.chatEventDraft = null;
+      this.chatMessages = [...this.chatMessages, {
+        id: `msg_${Date.now()}_created`,
+        role: 'assistant',
+        text: `✅ **"${created.title}"** has been added to your calendar on ${this.formatDate(created.date)} at ${this.formatTime(created.startTime)}!`,
+        timestamp: new Date(),
+        actions: [{ label: 'View in Agenda', type: 'navigate', tab: 'agenda' }],
+      }];
+    } catch {
+      this.chatMessages = [...this.chatMessages, {
+        id: `msg_${Date.now()}_err`,
+        role: 'assistant',
+        text: `⚠️ Something went wrong saving the event. Please try again.`,
+        timestamp: new Date(),
+      }];
+    } finally {
+      this.chatTyping = false;
+      this.scrollChatToBottom();
+    }
+  }
+
+  async createAiReminder(title: string, body: string) {
+    try {
+      await this.notificationsService.create({
+        recipientEmail: this.userEmail,
+        type: 'reminder',
+        title,
+        body,
+        eventId: '',
+        eventDate: new Date().toISOString().split('T')[0],
+        senderEmail: 'ai-assistant',
+        read: false,
+      });
+      await this.loadNotifications(this.userEmail);
+      this.chatMessages = [...this.chatMessages, {
+        id: `msg_${Date.now()}_r`,
+        role: 'assistant',
+        text: `✅ Reminder saved! You can find it in your **Notifications** tab.`,
+        timestamp: new Date(),
+        actions: [{ label: 'View Notifications', type: 'navigate', tab: 'notifications' }],
+      }];
+      this.scrollChatToBottom();
+    } catch {
+      this.chatMessages = [...this.chatMessages, {
+        id: `msg_${Date.now()}_r`,
+        role: 'assistant',
+        text: `⚠️ Couldn't save the reminder right now. Try again in a moment.`,
+        timestamp: new Date(),
+      }];
+    }
+  }
+
+  renderChatMarkdown(text: string): string {
+    return this.aiChatService.renderMarkdown(text);
+  }
+
+  /**
+   * Scans upcoming events and silently creates prep reminders in Notifications
+   * for anything important (tests, meetings, travel, etc.) that is 1, 3, or 5
+   * days away. Runs once after events load and is idempotent within a session.
+   * Returns the list of reminders that were newly created so the UI can show a banner.
+   */
+  async runProactiveReminders(): Promise<{ title: string; body: string }[]> {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const reminders = getProactiveReminders(this.events, todayStr, this.seenProactiveKeys);
+    for (const r of reminders) {
+      try {
+        await this.notificationsService.create({
+          recipientEmail: this.userEmail,
+          type: 'reminder',
+          title: r.title,
+          body: r.body,
+          eventId: r.eventId,
+          eventDate: r.eventDate,
+          senderEmail: 'ai-assistant',
+          read: false,
+        });
+      } catch {
+        // Non-fatal — best effort
+      }
+    }
+    if (reminders.length > 0) {
+      await this.loadNotifications(this.userEmail);
+    }
+    return reminders;
+  }
+
+  private scrollChatToBottom() {
+    setTimeout(() => {
+      const el = document.querySelector('.float-chat-messages');
+      if (el) el.scrollTop = el.scrollHeight;
+    }, 50);
+  }
+
+  onChatKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      this.sendChatMessage();
+    }
+  }
+
+  cancelEventCreation() {
+    this.chatEventDraft = null;
+    this.chatMessages = [...this.chatMessages, {
+      id: `msg_${Date.now()}_cancel`,
+      role: 'assistant' as const,
+      text: 'Event creation cancelled. Let me know if you need anything else!',
+      timestamp: new Date(),
+    }];
+    this.scrollChatToBottom();
+  }
+
+  toggleFloatingChat() {
+    this.showFloatingChat = !this.showFloatingChat;
+    if (this.showFloatingChat && this.chatMessages.length === 0) {
+      // Welcome message on first open
+      const hour = new Date().getHours();
+      const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+      const todayCount = this.events.filter(e => e.date === new Date().toISOString().split('T')[0]).length;
+      this.chatMessages = [{
+        id: 'welcome',
+        role: 'assistant',
+        text: `${greeting}! 👋 I'm your Agenda AI assistant. You have **${todayCount}** event${todayCount !== 1 ? 's' : ''} today.\n\nI can **add events for you**, set reminders, check if you're overdue for an appointment, or draft an absence email. Type **help** to see everything I can do.`,
+        timestamp: new Date(),
+      }];
+    }
+    if (this.showFloatingChat) {
+      this.scrollChatToBottom();
+    }
+  }
+
   // ── Notifications ──
   notifications: AppNotification[] = [];
   notifFilter: 'all' | 'share' | 'reminder' = 'all';
   notifSearch = '';
+
+  // ── Notifications sub-tab ──
+  notifSubTab: 'notifications' | 'friends' | 'share' = 'notifications';
+
+  // ── Add Friend ──
+  friendSearch = '';
+  friendSearchResults: { username: string; displayName: string; mutual: number }[] = [];
+  friends: { username: string; displayName: string; mutual: number }[] = [];
+  friendRequestsSent: Set<string> = new Set();
+  friendSearchLoading = false;
+
+  // Mock user pool for demo
+  private readonly MOCK_USERS = [
+    { username: 'alex_j',      displayName: 'Alex Johnson',    mutual: 3 },
+    { username: 'priya_s',     displayName: 'Priya Sharma',    mutual: 1 },
+    { username: 'marcus_t',    displayName: 'Marcus Thompson', mutual: 5 },
+    { username: 'lisa_m',      displayName: 'Lisa Martinez',   mutual: 0 },
+    { username: 'derek_w',     displayName: 'Derek Williams',  mutual: 2 },
+    { username: 'sarah_k',     displayName: 'Sarah Kim',       mutual: 4 },
+    { username: 'tom_r',       displayName: 'Tom Rivera',      mutual: 1 },
+    { username: 'nina_p',      displayName: 'Nina Patel',      mutual: 6 },
+    { username: 'james_o',     displayName: 'James O\'Brien',  mutual: 0 },
+    { username: 'chloe_b',     displayName: 'Chloe Bennett',   mutual: 2 },
+  ];
+
+  searchFriends() {
+    const q = this.friendSearch.trim().toLowerCase();
+    if (!q) { this.friendSearchResults = []; return; }
+    this.friendSearchLoading = true;
+    // Simulate async search
+    setTimeout(() => {
+      const friendUsernames = new Set(this.friends.map(f => f.username));
+      this.friendSearchResults = this.MOCK_USERS.filter(u =>
+        (u.username.includes(q) || u.displayName.toLowerCase().includes(q)) &&
+        !friendUsernames.has(u.username)
+      );
+      this.friendSearchLoading = false;
+    }, 300);
+  }
+
+  sendFriendRequest(username: string) {
+    this.friendRequestsSent.add(username);
+    // Find the mock user to get their display name / email
+    const user = this.MOCK_USERS.find(u => u.username === username);
+    // Simulate: the target user sends a friend request notification back to the current user (demo)
+    const mockEmail = `${username}@demo.com`;
+    const displayName = user?.displayName ?? username;
+    const incomingNotif: AppNotification = {
+      id: Date.now().toString() + Math.random().toString(36).slice(2),
+      recipientEmail: this.userEmail,
+      type: 'friend_request',
+      title: `${displayName} wants to be your friend`,
+      body: `From: ${mockEmail}`,
+      eventId: username,        // reuse eventId to store sender username
+      eventDate: '',
+      senderEmail: mockEmail,
+      read: false,
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+    };
+    this.notifications = [incomingNotif, ...this.notifications];
+  }
+
+  acceptFriendRequest(user: { username: string; displayName: string; mutual: number }) {
+    this.friends.push(user);
+    this.friendRequestsSent.delete(user.username);
+    this.friendSearchResults = this.friendSearchResults.filter(u => u.username !== user.username);
+  }
+
+  removeFriend(username: string) {
+    this.friends = this.friends.filter(f => f.username !== username);
+  }
+
+  /** Accept an incoming friend-request notification. */
+  acceptFriendNotif(n: AppNotification) {
+    n.status = 'accepted';
+    n.read = true;
+    // Add to friends list if not already there
+    const username = n.eventId; // stored in eventId
+    const mockUser = this.MOCK_USERS.find(u => u.username === username);
+    const alreadyFriend = this.friends.some(f => f.username === username);
+    if (!alreadyFriend) {
+      this.friends.push({
+        username,
+        displayName: mockUser?.displayName ?? username,
+        mutual: mockUser?.mutual ?? 0,
+      });
+    }
+    this.notificationsService.markRead(n.id).catch(() => {});
+  }
+
+  /** Reject an incoming friend-request notification. */
+  rejectFriendNotif(n: AppNotification) {
+    n.status = 'rejected';
+    n.read = true;
+    this.notificationsService.markRead(n.id).catch(() => {});
+  }
+
+  // ── Share sub-tab ──
+  shareUsername = '';
+  shareType: 'event' | 'calendar' | 'category' | 'subcategory' | 'friend' | '' = '';
+  shareSubTabError = '';
+  shareSubTabSuccess = '';
+  sentShareRequests: { username: string; type: string; label?: string }[] = [];
+
+  /** Selected category/subcategory path for share sub-tab */
+  shareSelectedCategory = '';
+
+  /** Top-level categories (no " > " in path) */
+  get shareTopLevelCategories(): string[] {
+    return this.allCategories.filter(c => !c.includes(CATEGORY_SEP));
+  }
+
+  /** Subcategories under the selected top-level category */
+  get shareSubcategories(): string[] {
+    if (!this.shareSelectedCategory) return [];
+    return this.allCategories.filter(
+      c => c.startsWith(this.shareSelectedCategory + CATEGORY_SEP)
+    );
+  }
+
+  onShareTypeChange() {
+    // Reset category selection when switching types
+    this.shareSelectedCategory = '';
+  }
+
+  submitShareSubTab() {
+    this.shareSubTabError = '';
+    this.shareSubTabSuccess = '';
+
+    const username = this.shareUsername.trim();
+    if (!username) {
+      this.shareSubTabError = 'Please enter a username.';
+      return;
+    }
+    if (!this.shareType) {
+      this.shareSubTabError = 'Please select a share type.';
+      return;
+    }
+    if ((this.shareType === 'category' || this.shareType === 'subcategory') && !this.shareSelectedCategory) {
+      this.shareSubTabError = `Please select a ${this.shareType} to share.`;
+      return;
+    }
+
+    const recipientEmail = `${username}@demo.com`;
+    let label = '';
+
+    if (this.shareType === 'calendar') {
+      label = 'Entire Calendar';
+      // Share all events with the recipient
+      const eventsToShare = this.events;
+      this.shareEventsWithUser(eventsToShare, recipientEmail);
+      this.createCalendarShareNotification(recipientEmail, eventsToShare.length);
+
+    } else if (this.shareType === 'category') {
+      label = this.shareSelectedCategory;
+      const eventsToShare = this.events.filter(e =>
+        this.categoryTreeService.isUnderPath(e.category, this.shareSelectedCategory)
+      );
+      this.shareEventsWithUser(eventsToShare, recipientEmail);
+      this.createCategoryShareNotification(recipientEmail, this.shareSelectedCategory, eventsToShare.length, false);
+
+    } else if (this.shareType === 'subcategory') {
+      label = this.shareSelectedCategory;
+      const eventsToShare = this.events.filter(e =>
+        this.categoryTreeService.isUnderPath(e.category, this.shareSelectedCategory)
+      );
+      this.shareEventsWithUser(eventsToShare, recipientEmail);
+      this.createCategoryShareNotification(recipientEmail, this.shareSelectedCategory, eventsToShare.length, true);
+
+    } else if (this.shareType === 'friend') {
+      label = 'Friend Request';
+      const mockUser = this.MOCK_USERS.find(u => u.username === username);
+      const displayName = mockUser?.displayName ?? username;
+      const mockEmail = `${username}@demo.com`;
+      const incomingNotif: AppNotification = {
+        id: Date.now().toString() + Math.random().toString(36).slice(2),
+        recipientEmail: this.userEmail,
+        type: 'friend_request',
+        title: `${displayName} wants to be your friend`,
+        body: `From: ${mockEmail}`,
+        eventId: username,
+        eventDate: '',
+        senderEmail: mockEmail,
+        read: false,
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+      };
+      this.notifications = [incomingNotif, ...this.notifications];
+    }
+
+    // Check if already sent
+    const alreadySent = this.sentShareRequests.some(
+      r => r.username === username && r.type === this.shareType &&
+           (this.shareType !== 'category' && this.shareType !== 'subcategory' || r.label === label)
+    );
+    if (alreadySent) {
+      this.shareSubTabError = `You already sent this share request to @${username}.`;
+      return;
+    }
+
+    this.sentShareRequests = [{ username, type: this.shareType, label }, ...this.sentShareRequests];
+
+    const typeLabel =
+      this.shareType === 'friend'      ? 'Friend request' :
+      this.shareType === 'calendar'    ? 'Calendar share' :
+      this.shareType === 'category'    ? `Category "${label}" share` :
+      this.shareType === 'subcategory' ? `Subcategory "${label}" share` :
+                                         'Event share';
+    this.shareSubTabSuccess = `${typeLabel} sent to @${username}.`;
+    this.shareUsername = '';
+    this.shareType = '';
+    this.shareSelectedCategory = '';
+
+    setTimeout(() => { this.shareSubTabSuccess = ''; }, 3000);
+  }
+
+  /** Add recipientEmail to sharedWith for a list of events and persist. */
+  private shareEventsWithUser(eventsToShare: CalendarEvent[], recipientEmail: string) {
+    this.events = this.events.map(e => {
+      if (eventsToShare.find(t => t.id === e.id)) {
+        return e.sharedWith.includes(recipientEmail)
+          ? e
+          : { ...e, sharedWith: [...e.sharedWith, recipientEmail] };
+      }
+      return e;
+    });
+    const updated = this.events.filter(e => eventsToShare.find(t => t.id === e.id));
+    for (const ev of updated) {
+      this.eventsService.updateEvent(ev).catch(err =>
+        console.error('[Dashboard] Failed to persist share:', err)
+      );
+    }
+  }
+
+  /** Create a notification for a full-calendar share. */
+  private async createCalendarShareNotification(recipientEmail: string, eventCount: number) {
+    try {
+      const n = await this.notificationsService.create({
+        recipientEmail,
+        type: 'share',
+        title: `${this.userEmail} shared their entire calendar with you`,
+        body: `You now have access to all ${eventCount} event${eventCount !== 1 ? 's' : ''} in their calendar.`,
+        eventId: '',
+        eventDate: '',
+        senderEmail: this.userEmail,
+        read: false,
+      });
+      if (recipientEmail === this.userEmail) {
+        this.notifications = [n, ...this.notifications];
+      }
+    } catch (err) {
+      console.warn('[Dashboard] Could not create calendar share notification:', err);
+    }
+  }
+
+  /** Create a notification for a category or subcategory share. */
+  private async createCategoryShareNotification(
+    recipientEmail: string,
+    categoryPath: string,
+    eventCount: number,
+    isSubcategory: boolean
+  ) {
+    const kind = isSubcategory ? 'subcategory' : 'category';
+    try {
+      const n = await this.notificationsService.create({
+        recipientEmail,
+        type: 'share',
+        title: `${this.userEmail} shared the "${categoryPath}" ${kind} with you`,
+        body: `You now have access to ${eventCount} event${eventCount !== 1 ? 's' : ''} in "${categoryPath}".`,
+        eventId: '',
+        eventDate: '',
+        senderEmail: this.userEmail,
+        read: false,
+      });
+      if (recipientEmail === this.userEmail) {
+        this.notifications = [n, ...this.notifications];
+      }
+    } catch (err) {
+      console.warn('[Dashboard] Could not create category share notification:', err);
+    }
+  }
   // Reminder set modal
   showReminderModal = false;
   reminderTargetEvent: CalendarEvent | null = null;
@@ -426,6 +1139,13 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   ];
   scheduleSuccess = false;
   scheduleError = '';
+
+  // ── AI Scheduler state ────────────────────────────────────────────────────
+  showAiPanel = false;
+  aiLoading = false;
+  aiError = '';
+  aiSuggestions: AiSuggestion[] = [];
+  aiDurationMin = 60;
 
   today = new Date().toISOString().split('T')[0];
   currentYear = new Date().getFullYear();
@@ -614,7 +1334,16 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     { id: '27', title: 'Quarterly OKR Review',    date: relDate(-7), startTime: '13:00', endTime: '15:00', description: 'Q1 OKR scoring and Q2 goal setting', color: '#f59e0b', category: 'Work', sharedWith: [] },
   ].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
 
-  eventColors = ['#6c63ff', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#ec4899'];
+  eventColors = [
+    // Purples & Blues
+    '#6c63ff', '#764ba2', '#3b82f6', '#0ea5e9', '#06b6d4',
+    // Greens
+    '#10b981', '#22c55e', '#84cc16', '#a3e635', '#65a30d',
+    // Warm
+    '#f59e0b', '#f97316', '#ef4444', '#e11d48', '#ec4899',
+    // Neutrals & Misc
+    '#8b5cf6', '#d946ef', '#14b8a6', '#64748b', '#1a1a2e',
+  ];
   selectedColor = '#6c63ff';
 
   // ── Category & sharing state ──
@@ -639,6 +1368,9 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   /** Segments the user has selected so far in the picker (breadcrumb). */
   categoryPickerPath: string[] = [];
 
+  /** Search query inside the category picker dropdown. */
+  categoryPickerSearch = '';
+
   /** The current level of the tree being browsed. */
   get categoryPickerLevel(): CategoryNode[] {
     let level = this.categoryTree;
@@ -648,6 +1380,13 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       level = node.children;
     }
     return level;
+  }
+
+  /** categoryPickerLevel filtered by the search query. */
+  get categoryPickerFiltered(): CategoryNode[] {
+    const q = this.categoryPickerSearch.trim().toLowerCase();
+    if (!q) return this.categoryPickerLevel;
+    return this.categoryPickerLevel.filter(n => n.name.toLowerCase().includes(q));
   }
 
   /** The full path string assembled from the picker breadcrumb. */
@@ -670,6 +1409,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.showCategoryPicker = true;
     this.showNewCategoryInput = false;
     this.newCategoryName = '';
+    this.categoryPickerSearch = '';
   }
 
   showCategoryPicker = false;
@@ -678,6 +1418,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.showCategoryPicker = false;
     this.showNewCategoryInput = false;
     this.newCategoryName = '';
+    this.categoryPickerSearch = '';
   }
 
   /** Navigate into a child node. */
@@ -685,6 +1426,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.categoryPickerPath = this.categoryTreeService.splitPath(node.fullPath);
     this.showNewCategoryInput = false;
     this.newCategoryName = '';
+    this.categoryPickerSearch = '';
   }
 
   /** Go up one level in the picker. */
@@ -692,6 +1434,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.categoryPickerPath = this.categoryPickerPath.slice(0, -1);
     this.showNewCategoryInput = false;
     this.newCategoryName = '';
+    this.categoryPickerSearch = '';
   }
 
   /** Select the current path as the category. */
@@ -728,6 +1471,120 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     return segs.join(' › ');
   }
 
+  // ── Saved Categories (Categories tab) ──
+  private readonly CATEGORIES_KEY = 'agenda_saved_categories';
+
+  /** All user-defined category paths (persisted to localStorage). */
+  savedCategories: string[] = [];
+
+  /** Form state for the "Create Category" panel. */
+  catForm = {
+    parentPath: '',   // '' = top-level, otherwise the full path of the parent
+    name: '',         // the new segment name
+    color: '#6c63ff',
+  };
+  catFormError = '';
+  catFormSuccess = '';
+
+  /** Which node is expanded in the categories tree view. */
+  expandedCatNodes = new Set<string>();
+
+  loadSavedCategories() {
+    try {
+      const raw = localStorage.getItem(this.CATEGORIES_KEY);
+      this.savedCategories = raw ? JSON.parse(raw) : [];
+    } catch {
+      this.savedCategories = [];
+    }
+  }
+
+  private persistCategories() {
+    localStorage.setItem(this.CATEGORIES_KEY, JSON.stringify(this.savedCategories));
+  }
+
+  /** All category paths: saved + those inferred from events. */
+  get allCategoryPaths(): string[] {
+    const fromEvents = this.events.map(e => e.category).filter(c => !!c);
+    const merged = new Set([...this.savedCategories, ...fromEvents]);
+    return Array.from(merged).sort();
+  }
+
+  get categoryTabTree(): CategoryNode[] {
+    return this.categoryTreeService.buildTree(this.allCategoryPaths);
+  }
+
+  toggleCatNode(path: string) {
+    if (this.expandedCatNodes.has(path)) {
+      this.expandedCatNodes.delete(path);
+    } else {
+      this.expandedCatNodes.add(path);
+    }
+  }
+
+  isCatNodeExpanded(path: string): boolean {
+    return this.expandedCatNodes.has(path);
+  }
+
+  /** Count events under a category path (including descendants). */
+  countEventsUnder(path: string): number {
+    return this.events.filter(e => this.categoryTreeService.isUnderPath(e.category, path)).length;
+  }
+
+  /** Start creating a subcategory under the given parent path. */
+  startAddSubcategory(parentPath: string) {
+    this.catForm.parentPath = parentPath;
+    this.catForm.name = '';
+    this.catFormError = '';
+    this.catFormSuccess = '';
+  }
+
+  /** Start creating a top-level category. */
+  startAddTopLevel() {
+    this.catForm.parentPath = '';
+    this.catForm.name = '';
+    this.catFormError = '';
+    this.catFormSuccess = '';
+  }
+
+  submitCatForm() {
+    const name = this.catForm.name.trim();
+    if (!name) {
+      this.catFormError = 'Category name is required.';
+      return;
+    }
+    if (name.includes(' > ')) {
+      this.catFormError = 'Category name cannot contain " > ".';
+      return;
+    }
+    const newPath = this.catForm.parentPath
+      ? this.categoryTreeService.joinPath([...this.categoryTreeService.splitPath(this.catForm.parentPath), name])
+      : name;
+
+    if (this.allCategoryPaths.includes(newPath)) {
+      this.catFormError = `"${newPath}" already exists.`;
+      return;
+    }
+
+    this.savedCategories = [...this.savedCategories, newPath].sort();
+    this.persistCategories();
+    // Expand the parent so the new node is visible
+    if (this.catForm.parentPath) {
+      this.expandedCatNodes.add(this.catForm.parentPath);
+    }
+    this.catFormSuccess = `"${newPath}" created.`;
+    this.catFormError = '';
+    this.catForm.name = '';
+    setTimeout(() => { this.catFormSuccess = ''; }, 3000);
+  }
+
+  deleteSavedCategory(path: string) {
+    // Remove the path and all descendants
+    this.savedCategories = this.savedCategories.filter(
+      p => p !== path && !p.startsWith(path + ' > ')
+    );
+    this.persistCategories();
+  }
+
   // ── Category filter tree state ──
   /** Expanded nodes in the sidebar filter tree. */
   expandedFilterNodes = new Set<string>();
@@ -750,6 +1607,9 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     private eventsService: EventsService,
     private notificationsService: NotificationsService,
     private categoryTreeService: CategoryTreeService,
+    private googleCalendarService: GoogleCalendarService,
+    private aiScheduler: AiSchedulerService,
+    private aiChatService: AiChatService,
   ) {}
 
   async ngOnInit() {
@@ -759,7 +1619,10 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       return;
     }
     this.userEmail = user.email;
+    this.profile = this.mockAuth.getProfile(user.email);
+    this.googleCalendarLinked = this.googleCalendarService.isLinked;
     this.loadHistory();
+    this.loadSavedCategories();
     await this.loadEventsFromDb(user.email);
     this.loadNotifications(user.email);
   }
@@ -776,39 +1639,94 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   private async loadEventsFromDb(email: string) {
     this.dbLoading = true;
     this.dbError = '';
-    try {
-      const dbEvents = await this.eventsService.listEvents(email);
 
-      if (dbEvents.length > 0) {
-        // Backend has data — use it
-        this.events = dbEvents;
-      } else {
-        // No events in DB yet — seed with defaults for this account
-        const seedData = email === 'alex.student@school.edu'
-          ? buildStudentEvents().map(({ id: _id, ...rest }) => rest)
-          : email === 'jordan.coach@fitlife.com'
-          ? buildCoachEvents().map(({ id: _id, ...rest }) => rest)
-          : this.events.map(({ id: _id, ...rest }) => rest);
-
-        if (seedData.length > 0) {
-          this.dbLoading = true; // keep spinner while seeding
-          this.events = await this.eventsService.seedEvents(seedData, email);
-        }
-      }
-    } catch (err: unknown) {
-      // Backend unreachable (placeholder config, no network, etc.)
-      // Fall back to in-memory seed data so the UI still works
-      console.warn('[Dashboard] DB unavailable, using local data:', err);
-      this.dbError = 'Could not connect to database — showing local data.';
-      if (email === 'alex.student@school.edu') {
-        this.events = buildStudentEvents();
-      } else if (email === 'jordan.coach@fitlife.com') {
-        this.events = buildCoachEvents();
-      }
-      // demo account keeps the already-initialised in-memory events
-    } finally {
+    // Step 1 — load from localStorage immediately (instant, offline-safe)
+    const cached = this.eventsService.listEvents(email, async (synced) => {
+      // Step 3 — called when background Amplify sync completes
+      this.events = synced;
       this.dbLoading = false;
+      this.dbError = this.eventsService.syncWarning ?? '';
+      this.showProactiveBanner(await this.runProactiveReminders());
+    });
+
+    if (cached.length > 0) {
+      // Show cached data right away while sync runs in background
+      this.events = cached;
+      this.dbLoading = false;
+      this.showProactiveBanner(await this.runProactiveReminders());
+    } else {
+      // Step 2 — nothing in cache yet: seed defaults then let sync take over
+      const seedData = email === 'alex.student@school.edu'
+        ? buildStudentEvents().map(({ id: _id, ...rest }) => rest)
+        : email === 'jordan.coach@fitlife.com'
+        ? buildCoachEvents().map(({ id: _id, ...rest }) => rest)
+        : this.events.map(({ id: _id, ...rest }) => rest);
+
+      if (seedData.length > 0) {
+        // seedEvents writes to localStorage first, then pushes to Amplify in background
+        this.events = await this.eventsService.seedEvents(seedData, email);
+      }
+      this.dbLoading = false;
+      this.showProactiveBanner(await this.runProactiveReminders());
     }
+  }
+
+  dismissLoginBanner() {
+    this.showLoginBanner = false;
+    if (this.loginBannerTimer) clearTimeout(this.loginBannerTimer);
+  }
+
+  private showProactiveBanner(reminders: { title: string; body: string }[]) {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayEvents = this.events.filter(e => e.date === todayStr);
+    const upcomingEvents = this.events.filter(e => e.date > todayStr);
+
+    // Build the always-present greeting line
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    const name = this.profile?.username || this.userEmail.split('@')[0];
+
+    const items: { title: string; body: string }[] = [];
+
+    // 1. Greeting + today summary
+    if (todayEvents.length === 0) {
+      items.push({
+        title: `${greeting}, ${name}!`,
+        body: `You have nothing scheduled today — enjoy the free day.`,
+      });
+    } else {
+      const first = todayEvents[0];
+      items.push({
+        title: `${greeting}, ${name}!`,
+        body: `You have ${todayEvents.length} event${todayEvents.length !== 1 ? 's' : ''} today. First up: ${first.title} at ${this.formatTime(first.startTime)}.`,
+      });
+    }
+
+    // 2. Next upcoming event (if not today)
+    const nextUp = upcomingEvents.sort((a, b) => a.date.localeCompare(b.date))[0];
+    if (nextUp) {
+      const daysUntil = Math.ceil(
+        (new Date(nextUp.date + 'T00:00:00').getTime() - new Date(todayStr + 'T00:00:00').getTime())
+        / (1000 * 60 * 60 * 24)
+      );
+      const when = daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`;
+      items.push({
+        title: `Coming up ${when}`,
+        body: `${nextUp.title} on ${this.formatDate(nextUp.date)} at ${this.formatTime(nextUp.startTime)}.`,
+      });
+    }
+
+    // 3. AI prep reminders (if any)
+    for (const r of reminders) {
+      items.push({ title: r.title, body: r.body });
+    }
+
+    this.loginBannerItems = items;
+    this.showLoginBanner = true;
+
+    // Auto-dismiss after 12 seconds
+    if (this.loginBannerTimer) clearTimeout(this.loginBannerTimer);
+    this.loginBannerTimer = setTimeout(() => { this.showLoginBanner = false; }, 12000);
   }
 
   scrollToYearMonth(idx: number) {
@@ -818,7 +1736,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     }, 50);
   }
 
-  switchTab(tab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications') {
+  switchTab(tab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile') {
     this.activeTab = tab;
     if (tab === 'calendar') {
       this.slideMonthIndex = this.currentMonthIndex;
@@ -840,14 +1758,111 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   linkGoogleCalendar() {
     this.linkingGoogle = true;
-    setTimeout(() => {
-      this.googleCalendarLinked = true;
+    this.googleSyncError = '';
+
+    this.googleCalendarService.authorize()
+      .then(() => this.openGcalPicker())
+      .catch((err: any) => {
+        console.error('[Google Calendar] Auth failed:', err);
+        this.googleSyncError = 'Could not connect to Google Calendar. Make sure pop-ups are allowed and try again.';
+        this.linkingGoogle = false;
+      });
+  }
+
+  /** After auth — fetch the user's calendar list and show the picker. */
+  private async openGcalPicker() {
+    try {
+      this.gcalPickerLoading = true;
+      this.gcalCalendars = await this.googleCalendarService.listCalendars();
+      // Pre-select all calendars
+      this.gcalCalendars.forEach(c => c.selected = true);
+      this.showGcalPicker = true;
+    } catch (err: any) {
+      console.error('[Google Calendar] Could not list calendars:', err);
+      this.googleSyncError = 'Signed in but could not load your calendars. Please try again.';
+    } finally {
+      this.gcalPickerLoading = false;
       this.linkingGoogle = false;
-    }, 1800);
+    }
+  }
+
+  /** Called when the user confirms the calendar picker. */
+  async importFromPicker() {
+    const selectedIds = this.gcalCalendars.filter(c => c.selected).map(c => c.id);
+    if (selectedIds.length === 0) {
+      this.googleSyncError = 'Please select at least one calendar.';
+      return;
+    }
+
+    this.gcalImporting = true;
+    this.googleSyncError = '';
+
+    try {
+      const gcalEvents = await this.googleCalendarService.fetchEventsFromCalendars(selectedIds);
+
+      // Merge: skip any event whose gcal id is already in our list
+      const existingIds = new Set(this.events.map(e => e.id));
+      const toAdd = gcalEvents.filter(g => !existingIds.has(g.id));
+
+      if (toAdd.length === 0) {
+        this.googleCalendarLinked = true;
+        this.showGcalPicker = false;
+        console.log('[Google Calendar] No new events to import.');
+        return;
+      }
+
+      // Convert to CalendarEvent and write directly to localStorage + this.events
+      const newEvents: CalendarEvent[] = toAdd.map(g => ({
+        id:          `local_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        title:       g.title,
+        date:        g.date,
+        startTime:   g.startTime,
+        endTime:     g.endTime,
+        description: g.description,
+        color:       g.color,
+        category:    'Google Calendar',
+        sharedWith:  [],
+      }));
+
+      this.eventsService.bulkAddToCache(newEvents, this.userEmail);
+
+      this.events = [...this.events, ...newEvents].sort(
+        (a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)
+      );
+
+      this.googleCalendarLinked = true;
+      this.showGcalPicker = false;
+      this.googleSyncError = '';
+      console.log(`[Google Calendar] Imported ${toAdd.length} events.`);
+    } catch (err: any) {
+      console.error('[Google Calendar] Fetch failed:', err);
+      this.googleSyncError = 'Could not fetch events. Please try again.';
+    } finally {
+      this.gcalImporting = false;
+    }
+  }
+
+  closeGcalPicker() {
+    this.showGcalPicker = false;
+    this.gcalCalendars = [];
+    this.googleSyncError = '';
+    // If user closes without importing, revoke so they're not in a half-linked state
+    if (!this.googleCalendarLinked) {
+      this.googleCalendarService.revoke();
+    }
   }
 
   unlinkGoogleCalendar() {
+    this.googleCalendarService.revoke();
     this.googleCalendarLinked = false;
+    this.googleSyncError = '';
+  }
+
+  // ── Theme ──
+  isDarkMode = false;
+
+  toggleTheme() {
+    this.isDarkMode = !this.isDarkMode;
   }
 
   // ── Top-right notification panel ──
@@ -939,8 +1954,54 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.selectedColor = '#6c63ff';
     this.scheduleError = '';
     this.scheduleSuccess = false;
+    // Reset AI panel state
+    this.showAiPanel = false;
+    this.aiSuggestions = [];
+    this.aiError = '';
+    this.aiLoading = false;
     this.showScheduleModal = true;
   }
+
+  // ── AI Scheduler methods ──────────────────────────────────────────────────
+
+  toggleAiPanel() {
+    this.showAiPanel = !this.showAiPanel;
+    if (this.showAiPanel && this.aiSuggestions.length === 0 && !this.aiLoading) {
+      this.requestAiSuggestions();
+    }
+  }
+
+  requestAiSuggestions() {
+    this.aiLoading = true;
+    this.aiError = '';
+    this.aiSuggestions = [];
+    try {
+      const title = this.form.title.trim() || 'New Event';
+      this.aiSuggestions = this.aiScheduler.getSuggestions(
+        title,
+        this.aiDurationMin,
+        this.events,
+        this.form.date || this.today
+      );
+      if (this.aiSuggestions.length === 0) {
+        this.aiError = 'No free slots found in the next 21 days. Try a shorter duration.';
+      }
+    } catch (err: any) {
+      this.aiError = err?.message ?? 'Could not generate suggestions. Please try again.';
+    } finally {
+      this.aiLoading = false;
+    }
+  }
+
+  applyAiSuggestion(s: AiSuggestion) {
+    this.form.date = s.date;
+    this.form.startTime = s.startTime;
+    this.form.endTime = s.endTime;
+    this.showAiPanel = false;
+    this.aiSuggestions = [];
+  }
+
+
 
   closeModal() {
     this.showScheduleModal = false;
@@ -1309,12 +2370,17 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.selectedColor = '#6c63ff';
     this.scheduleError = '';
     this.scheduleSuccess = false;
+    // Reset AI panel state
+    this.showAiPanel = false;
+    this.aiSuggestions = [];
+    this.aiError = '';
+    this.aiLoading = false;
     this.showScheduleModal = true;
   }
 
   editEventFromPanel(ev: CalendarEvent) {
     this.selectedEventId = ev.id;
-    this.changeForm = { date: ev.date, startTime: ev.startTime, endTime: ev.endTime };
+    this.changeForm = { date: ev.date, startTime: ev.startTime, endTime: ev.endTime, category: ev.category };
     this.changeError = '';
     this.changeStep = 'edit';
     this.showChangeModal = true;
@@ -1352,13 +2418,102 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     if (ev) this.recordHistory('deleted', ev);
     this.events = this.events.filter(e => e.id !== this.selectedEventId);
     this.showDeleteModal = false;
+    // Persist to DB
+    this.eventsService.deleteEvent(this.selectedEventId).catch(err =>
+      console.error('[Dashboard] Failed to delete event from DB:', err)
+    );
   }
 
   // ── Change modal ──
   showChangeModal = false;
   changeStep: 'search' | 'edit' | 'done' = 'search';
   changeError = '';
-  changeForm = { date: '', startTime: '', endTime: '' };
+  changeForm = { date: '', startTime: '', endTime: '', category: '' };
+
+  // Category picker state for the change modal
+  showChangeCategoryPicker = false;
+  changeCategoryPickerPath: string[] = [];
+  changeCategoryPickerSearch = '';
+  showChangeNewCategoryInput = false;
+  changeNewCategoryName = '';
+
+  get changeCategoryPickerLevel(): CategoryNode[] {
+    let level = this.categoryTree;
+    for (const seg of this.changeCategoryPickerPath) {
+      const node = level.find(n => n.name === seg);
+      if (!node) return [];
+      level = node.children;
+    }
+    return level;
+  }
+
+  get changeCategoryPickerFiltered(): CategoryNode[] {
+    const q = this.changeCategoryPickerSearch.trim().toLowerCase();
+    if (!q) return this.changeCategoryPickerLevel;
+    return this.changeCategoryPickerLevel.filter(n => n.name.toLowerCase().includes(q));
+  }
+
+  get changeCategoryPickerFullPath(): string {
+    return this.categoryTreeService.joinPath(this.changeCategoryPickerPath);
+  }
+
+  openChangeCategoryPicker() {
+    const existing = this.changeForm.category.trim();
+    if (existing) {
+      this.changeCategoryPickerPath = this.categoryTreeService.splitPath(existing);
+    } else {
+      this.changeCategoryPickerPath = [];
+    }
+    this.showChangeCategoryPicker = true;
+    this.showChangeNewCategoryInput = false;
+    this.changeNewCategoryName = '';
+    this.changeCategoryPickerSearch = '';
+  }
+
+  closeChangeCategoryPicker() {
+    this.showChangeCategoryPicker = false;
+    this.showChangeNewCategoryInput = false;
+    this.changeNewCategoryName = '';
+    this.changeCategoryPickerSearch = '';
+  }
+
+  changeCategoryPickerDrillDown(node: CategoryNode) {
+    this.changeCategoryPickerPath = this.categoryTreeService.splitPath(node.fullPath);
+    this.showChangeNewCategoryInput = false;
+    this.changeNewCategoryName = '';
+    this.changeCategoryPickerSearch = '';
+  }
+
+  changeCategoryPickerGoUp() {
+    this.changeCategoryPickerPath = this.changeCategoryPickerPath.slice(0, -1);
+    this.showChangeNewCategoryInput = false;
+    this.changeNewCategoryName = '';
+    this.changeCategoryPickerSearch = '';
+  }
+
+  changeCategoryPickerSelect() {
+    this.changeForm.category = this.changeCategoryPickerFullPath;
+    this.closeChangeCategoryPicker();
+  }
+
+  changeCategoryPickerSelectNode(node: CategoryNode) {
+    this.changeForm.category = node.fullPath;
+    this.closeChangeCategoryPicker();
+  }
+
+  changeCategoryPickerAddNew() {
+    const name = this.changeNewCategoryName.trim();
+    if (!name) return;
+    const newPath = this.changeCategoryPickerPath.length
+      ? this.categoryTreeService.joinPath([...this.changeCategoryPickerPath, name])
+      : name;
+    this.changeForm.category = newPath;
+    this.closeChangeCategoryPicker();
+  }
+
+  clearChangeCategory() {
+    this.changeForm.category = '';
+  }
 
   get selectedEvent(): CalendarEvent | undefined {
     return this.events.find(e => e.id === this.selectedEventId);
@@ -1378,7 +2533,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   proceedToChange() {
     if (!this.selectedEventId) return;
     const ev = this.selectedEvent!;
-    this.changeForm = { date: ev.date, startTime: ev.startTime, endTime: ev.endTime };
+    this.changeForm = { date: ev.date, startTime: ev.startTime, endTime: ev.endTime, category: ev.category };
     this.changeError = '';
     this.changeStep = 'edit';
   }
@@ -1391,7 +2546,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     const before = this.events.find(e => e.id === this.selectedEventId);
     this.events = this.events.map(e =>
       e.id === this.selectedEventId
-        ? { ...e, date: this.changeForm.date, startTime: this.changeForm.startTime, endTime: this.changeForm.endTime }
+        ? { ...e, date: this.changeForm.date, startTime: this.changeForm.startTime, endTime: this.changeForm.endTime, category: this.changeForm.category }
         : e
     ).sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
     const after = this.events.find(e => e.id === this.selectedEventId);
@@ -1412,11 +2567,17 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
 
   get upcomingEvents() {
-    return this.filteredEvents.filter((e) => e.date > this.today);
+    const weekAhead = new Date();
+    weekAhead.setDate(weekAhead.getDate() + 7);
+    const weekAheadStr = weekAhead.toISOString().split('T')[0];
+    return this.filteredEvents.filter((e) => e.date > this.today && e.date <= weekAheadStr);
   }
 
   get pastEvents() {
-    return this.filteredEvents.filter((e) => e.date < this.today);
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekAgoStr = weekAgo.toISOString().split('T')[0];
+    return this.filteredEvents.filter((e) => e.date < this.today && e.date >= weekAgoStr);
   }
 
   // ── Category helpers ──

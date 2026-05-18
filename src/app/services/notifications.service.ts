@@ -5,23 +5,29 @@ import type { Schema } from '../../../amplify/data/resource';
 export interface AppNotification {
   id: string;
   recipientEmail: string;
-  type: 'share' | 'reminder';
+  type: 'share' | 'reminder' | 'friend_request';
   title: string;
   body: string;
   eventId: string;
   eventDate: string;
   senderEmail: string;
   read: boolean;
-  createdAt?: string; // ISO timestamp from DynamoDB
+  createdAt?: string;
+  status?: 'pending' | 'accepted' | 'rejected';
 }
 
-const client = generateClient<Schema>();
+// Lazy — avoids crashing at module load when Amplify isn't configured
+let _client: ReturnType<typeof generateClient<Schema>> | null = null;
+function getClient() {
+  if (!_client) _client = generateClient<Schema>();
+  return _client;
+}
 
 @Injectable({ providedIn: 'root' })
 export class NotificationsService {
 
   async listForUser(email: string): Promise<AppNotification[]> {
-    const { data, errors } = await client.models.Notification.list({
+    const { data, errors } = await getClient().models.Notification.list({
       filter: { recipientEmail: { eq: email } },
     });
     if (errors?.length) throw new Error(errors[0].message);
@@ -31,7 +37,7 @@ export class NotificationsService {
   }
 
   async create(n: Omit<AppNotification, 'id' | 'createdAt'>): Promise<AppNotification> {
-    const { data, errors } = await client.models.Notification.create({
+    const { data, errors } = await getClient().models.Notification.create({
       recipientEmail: n.recipientEmail,
       type:           n.type,
       title:          n.title,
@@ -46,7 +52,7 @@ export class NotificationsService {
   }
 
   async markRead(id: string): Promise<void> {
-    await client.models.Notification.update({ id, read: true });
+    await getClient().models.Notification.update({ id, read: true });
   }
 
   async markAllRead(email: string): Promise<void> {
@@ -55,14 +61,14 @@ export class NotificationsService {
   }
 
   async delete(id: string): Promise<void> {
-    await client.models.Notification.delete({ id });
+    await getClient().models.Notification.delete({ id });
   }
 
   private toLocal(r: Schema['Notification']['type']): AppNotification {
     return {
       id:             r.id,
       recipientEmail: r.recipientEmail ?? '',
-      type:           (r.type ?? 'reminder') as 'share' | 'reminder',
+      type:           (r.type ?? 'reminder') as 'share' | 'reminder' | 'friend_request',
       title:          r.title ?? '',
       body:           r.body ?? '',
       eventId:        r.eventId ?? '',
@@ -70,6 +76,7 @@ export class NotificationsService {
       senderEmail:    r.senderEmail ?? '',
       read:           r.read ?? false,
       createdAt:      r.createdAt ?? undefined,
+      status:         undefined,
     };
   }
 }

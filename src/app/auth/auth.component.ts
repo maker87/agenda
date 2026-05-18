@@ -29,6 +29,12 @@ export class AuthComponent {
     this.errorMessage = '';
   }
 
+  fillDemo(email: string, password: string) {
+    this.email = email;
+    this.password = password;
+    this.errorMessage = '';
+  }
+
   async onLogin() {
     if (!this.email || !this.password) {
       this.errorMessage = 'Please fill in all fields.';
