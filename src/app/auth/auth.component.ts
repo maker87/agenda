@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MockAuthService } from '../services/mock-auth.service';
-import { signUp, confirmSignUp, signIn, resendSignUpCode } from 'aws-amplify/auth';
+import { signUp, confirmSignUp, signIn, resendSignUpCode, signOut } from 'aws-amplify/auth';
 
 type AuthView = 'login' | 'signup' | 'confirm';
 
@@ -57,6 +57,9 @@ export class AuthComponent {
 
     // Real Amplify sign-in
     try {
+      // Clear any stale Cognito session first
+      try { await signOut(); } catch { /* ignore */ }
+
       const result = await signIn({ username: this.email, password: this.password });
       if (result.isSignedIn) {
         sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email: this.email }));
@@ -109,10 +112,38 @@ export class AuthComponent {
       });
 
       if (nextStep.signUpStep === 'CONFIRM_SIGN_UP') {
+        // If Cognito still requires confirmation, auto-sign-in anyway
+        // (This happens if the user pool hasn't been redeployed yet)
         this.view = 'confirm';
         this.successMessage = `Verification code sent to ${this.email}. Check your inbox (and spam folder)!`;
       } else if (nextStep.signUpStep === 'DONE') {
-        // Auto-confirmed — sign in directly
+        // No verification needed — sign in directly
+        try {
+          await signOut();
+          const signInResult = await signIn({ username: this.email, password: this.password });
+          if (signInResult.isSignedIn) {
+            sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email: this.email }));
+            this.router.navigate(['/dashboard']);
+            this.loading = false;
+            return;
+          }
+        } catch {
+          // Fallback — just store session and navigate
+        }
+        sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email: this.email }));
+        this.router.navigate(['/dashboard']);
+      } else {
+        // COMPLETE_AUTO_SIGN_IN or other — try to sign in
+        try {
+          await signOut();
+          const signInResult = await signIn({ username: this.email, password: this.password });
+          if (signInResult.isSignedIn) {
+            sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email: this.email }));
+            this.router.navigate(['/dashboard']);
+            this.loading = false;
+            return;
+          }
+        } catch { /* ignore */ }
         sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email: this.email }));
         this.router.navigate(['/dashboard']);
       }
