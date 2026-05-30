@@ -4769,3 +4769,71 @@
   color: var(--text-primary);
   background: var(--bg-hover);
 }
+
+/* ── Overlap Slot Suggestions ── */
+.overlap-slots-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.overlap-slot-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--bg-surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.overlap-slot-btn:hover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  box-shadow: 0 2px 8px rgba(108, 99, 255, 0.12);
+}
+
+.overlap-slot-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.overlap-slot-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.overlap-slot-info strong {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.overlap-slot-info span {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.overlap-slot-reason {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: right;
+  flex-shrink: 0;
+  max-width: 140px;
+}

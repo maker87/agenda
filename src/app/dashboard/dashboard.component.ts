@@ -10,6 +10,7 @@ import { CategoryTreeService, CategoryNode, CATEGORY_SEP } from '../services/cat
 import { GoogleCalendarService, GCalEvent, GCalCalendar } from '../services/google-calendar.service';
 import { AiSchedulerService, AiSuggestion } from '../services/ai-scheduler.service';
 import { AiChatService, ChatMessage, EventDraft, getProactiveReminders } from '../services/ai-chat.service';
+import { I18nService } from '../services/i18n.service';
 
 interface CalendarEvent {
   id: string;
@@ -449,9 +450,17 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     { code: 'fr', label: 'Français' },
     { code: 'de', label: 'Deutsch' },
     { code: 'pt', label: 'Português' },
+    { code: 'it', label: 'Italiano' },
+    { code: 'nl', label: 'Nederlands' },
+    { code: 'sv', label: 'Svenska' },
+    { code: 'pl', label: 'Polski' },
+    { code: 'tr', label: 'Türkçe' },
+    { code: 'ru', label: 'Русский' },
     { code: 'zh', label: '中文' },
     { code: 'ja', label: '日本語' },
+    { code: 'ko', label: '한국어' },
     { code: 'ar', label: 'العربية' },
+    { code: 'hi', label: 'हिन्दी' },
   ];
 
   openProfileTab() {
@@ -560,6 +569,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   saveLanguage() {
     this.profile.language = this.profileLanguage;
     this.mockAuth.saveProfile(this.profile);
+    this.i18n.setLanguage(this.profileLanguage);
   }
 
   confirmDeleteAccount() {
@@ -690,30 +700,78 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   async createEventFromChat(payload: any) {
     this.chatTyping = true;
     try {
-      const created = await this.eventsService.createEvent({
-        title:       payload.title,
-        date:        payload.date,
-        startTime:   payload.startTime,
-        endTime:     payload.endTime,
-        description: payload.description ?? '',
-        color:       payload.color ?? '#6c63ff',
-        category:    payload.category ?? '',
-        sharedWith:  payload.sharedWith ?? [],
-      }, this.userEmail);
+      // Check if this is a recurring event
+      if (payload._recurring) {
+        const { dayOfWeek, weeks } = payload._recurring;
+        const todayStr = new Date().toISOString().split('T')[0];
+        const created: any[] = [];
 
-      // Refresh the events list
-      this.events = this.eventsService.listEvents(this.userEmail, (synced) => {
-        this.events = synced;
-      });
+        // Find the next occurrence of the target day
+        const startDate = new Date(todayStr + 'T00:00:00');
+        while (startDate.getDay() !== dayOfWeek) {
+          startDate.setDate(startDate.getDate() + 1);
+        }
 
-      this.chatEventDraft = null;
-      this.chatMessages = [...this.chatMessages, {
-        id: `msg_${Date.now()}_created`,
-        role: 'assistant',
-        text: `✅ **"${created.title}"** has been added to your calendar on ${this.formatDate(created.date)} at ${this.formatTime(created.startTime)}!`,
-        timestamp: new Date(),
-        actions: [{ label: 'View in Agenda', type: 'navigate', tab: 'agenda' }],
-      }];
+        // Create one event per week
+        for (let w = 0; w < weeks; w++) {
+          const date = new Date(startDate);
+          date.setDate(date.getDate() + w * 7);
+          const dateStr = date.toISOString().split('T')[0];
+
+          const evt = await this.eventsService.createEvent({
+            title:       payload.title,
+            date:        dateStr,
+            startTime:   payload.startTime,
+            endTime:     payload.endTime,
+            description: payload.description ?? '',
+            color:       payload.color ?? '#6c63ff',
+            category:    payload.category ?? '',
+            sharedWith:  payload.sharedWith ?? [],
+          }, this.userEmail);
+          created.push(evt);
+        }
+
+        // Refresh events
+        this.events = this.eventsService.listEvents(this.userEmail, (synced) => {
+          this.events = synced;
+        });
+
+        this.chatEventDraft = null;
+        const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dayOfWeek];
+        this.chatMessages = [...this.chatMessages, {
+          id: `msg_${Date.now()}_created`,
+          role: 'assistant',
+          text: `✅ Added **${weeks}** occurrences of **"${payload.title}"** every ${dayName} at ${this.formatTime(payload.startTime)}!`,
+          timestamp: new Date(),
+          actions: [{ label: 'View in Agenda', type: 'navigate', tab: 'agenda' }],
+        }];
+      } else {
+        // Single event
+        const created = await this.eventsService.createEvent({
+          title:       payload.title,
+          date:        payload.date,
+          startTime:   payload.startTime,
+          endTime:     payload.endTime,
+          description: payload.description ?? '',
+          color:       payload.color ?? '#6c63ff',
+          category:    payload.category ?? '',
+          sharedWith:  payload.sharedWith ?? [],
+        }, this.userEmail);
+
+        // Refresh the events list
+        this.events = this.eventsService.listEvents(this.userEmail, (synced) => {
+          this.events = synced;
+        });
+
+        this.chatEventDraft = null;
+        this.chatMessages = [...this.chatMessages, {
+          id: `msg_${Date.now()}_created`,
+          role: 'assistant',
+          text: `✅ **"${created.title}"** has been added to your calendar on ${this.formatDate(created.date)} at ${this.formatTime(created.startTime)}!`,
+          timestamp: new Date(),
+          actions: [{ label: 'View in Agenda', type: 'navigate', tab: 'agenda' }],
+        }];
+      }
     } catch {
       this.chatMessages = [...this.chatMessages, {
         id: `msg_${Date.now()}_err`,
@@ -726,7 +784,6 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       this.scrollChatToBottom();
     }
   }
-
   async createAiReminder(title: string, body: string) {
     try {
       await this.notificationsService.create({
@@ -1610,6 +1667,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     private googleCalendarService: GoogleCalendarService,
     private aiScheduler: AiSchedulerService,
     private aiChatService: AiChatService,
+    public i18n: I18nService,
   ) {}
 
   async ngOnInit() {
@@ -1620,6 +1678,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     }
     this.userEmail = user.email;
     this.profile = this.mockAuth.getProfile(user.email);
+    this.i18n.setLanguage(this.profile.language);
     this.googleCalendarLinked = this.googleCalendarService.isLinked;
     this.loadHistory();
     this.loadSavedCategories();
@@ -2153,9 +2212,112 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
 
   overlapChooseComputer() {
-    this.overlapSearchOffset = 1;
-    this.overlapSuggestedDate = this.findClosestAvailableDate();
+    this.overlapSuggestions = this.findAvailableSlots();
     this.overlapStep = 'suggest';
+  }
+
+  // ── Multiple slot suggestions for rescheduling ──
+  overlapSuggestions: { date: string; startTime: string; endTime: string; reason: string }[] = [];
+
+  private findAvailableSlots(): { date: string; startTime: string; endTime: string; reason: string }[] {
+    const ev = this.overlapSelectedEvent;
+    if (!ev) return [];
+
+    // Calculate duration of the event being rescheduled
+    const startMin = this.toMinHelper(ev.startTime);
+    const endMin = this.toMinHelper(ev.endTime);
+    const durationMin = endMin - startMin > 0 ? endMin - startMin : 60;
+
+    // Use the AI scheduler to find open slots starting from the event's original date
+    const aiSlots = this.aiScheduler.getSuggestions(
+      ev.title,
+      durationMin,
+      this.events.filter(e => e.id !== ev.id),
+      ev.date,
+    );
+
+    // Also find gaps on the SAME day
+    const sameDayEvents = this.events
+      .filter(e => e.date === ev.date && e.id !== ev.id)
+      .map(e => ({ start: this.toMinHelper(e.startTime), end: this.toMinHelper(e.endTime) }))
+      .sort((a, b) => a.start - b.start);
+
+    const sameDaySlots = this.findGapsOnDay(sameDayEvents, durationMin, ev.date);
+
+    // Combine: same-day slots first, then AI suggestions (deduplicated)
+    const all = [...sameDaySlots, ...aiSlots];
+    const seen = new Set<string>();
+    const unique: typeof all = [];
+    for (const s of all) {
+      const key = `${s.date}_${s.startTime}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(s);
+      }
+    }
+    return unique.slice(0, 5);
+  }
+
+  private findGapsOnDay(
+    dayEvents: { start: number; end: number }[],
+    durationMin: number,
+    date: string,
+  ): { date: string; startTime: string; endTime: string; reason: string }[] {
+    const results: { date: string; startTime: string; endTime: string; reason: string }[] = [];
+    const BUFFER = 15;
+    const dayStart = 8 * 60;
+    const dayEnd = 22 * 60;
+
+    const blocked = dayEvents.map(e => ({
+      start: Math.max(0, e.start - BUFFER),
+      end: Math.min(24 * 60, e.end + BUFFER),
+    }));
+
+    // Build sorted list of occupied intervals
+    const intervals = [...blocked].sort((a, b) => a.start - b.start);
+
+    // Find gaps
+    let cursor = dayStart;
+    for (const interval of intervals) {
+      if (interval.start > cursor && interval.start - cursor >= durationMin) {
+        const gapStart = Math.max(cursor, dayStart);
+        if (gapStart + durationMin <= dayEnd) {
+          results.push({
+            date,
+            startTime: this.fromMinHelper(gapStart),
+            endTime: this.fromMinHelper(gapStart + durationMin),
+            reason: `Same day — open slot between events`,
+          });
+          if (results.length >= 2) break;
+        }
+      }
+      cursor = Math.max(cursor, interval.end);
+    }
+    // Check gap after last event
+    if (results.length < 2 && cursor + durationMin <= dayEnd) {
+      results.push({
+        date,
+        startTime: this.fromMinHelper(cursor),
+        endTime: this.fromMinHelper(cursor + durationMin),
+        reason: `Same day — open slot after last event`,
+      });
+    }
+    return results;
+  }
+
+  private toMinHelper(hhmm: string): number {
+    const [h, m] = hhmm.split(':').map(Number);
+    return h * 60 + (m || 0);
+  }
+
+  private fromMinHelper(min: number): string {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
+  overlapPickSuggestion(slot: { date: string; startTime: string; endTime: string }) {
+    this.applyOverlapReschedule(slot.date, slot.startTime, slot.endTime);
   }
 
   overlapChooseManual() {

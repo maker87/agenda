@@ -410,24 +410,78 @@ export class AiChatService {
     switch (intent) {
 
       case 'add_event': {
-        // Try to extract a meaningful title from the message
-        // Strip the command verb and filler words, keep the actual subject
-        const stripped = userText
-          .replace(/^(can you|please|could you|i want to|i need to|i'd like to)\s+/i, '')
-          .replace(/^(add|create|schedule|put|book|set up|arrange|new)\s+(an?\s+|a new\s+)?/i, '')
-          .replace(/\s+(to|on|in|for)\s+(my\s+)?(calendar|agenda|schedule).*$/i, '')
-          .replace(/\s+(event|called|named)$/i, '')
-          .trim();
+        // Try to parse everything from a single natural sentence
+        const parsed = this.parseNaturalEvent(userText, t);
 
-        const quickTitle = stripped.length > 1 ? stripped : null;
+        if (parsed && parsed.title && parsed.startTime && (parsed.date || parsed.recurring)) {
+          // We got enough info in one shot — skip the wizard
+          const inferred = inferCategory(parsed.title);
+          const category = parsed.category || inferred.category;
+          const color = inferred.color;
 
-        if (quickTitle) {
-          newDraft = { step: 'duration', title: quickTitle };
-          const inferred = inferCategory(quickTitle);
-          text = `Got it — **"${quickTitle}"** _(${inferred.category})_. How long should it be? (e.g. "1 hour", "30 minutes", "2 hours")`;
+          if (parsed.recurring) {
+            // Recurring event — create multiple occurrences
+            const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][parsed.recurring.dayOfWeek];
+            const weeks = parsed.recurring.weeks || 12;
+            const endTime = parsed.endTime || this.addMinutesToTime(parsed.startTime, parsed.durationMin || 60);
+
+            text = `I'll add **"${parsed.title}"** every **${dayName}** at **${formatTime(parsed.startTime)}–${formatTime(endTime)}** for the next ${weeks} weeks.\n\n🏷️ Category: **${category}**\n\nShould I go ahead?`;
+            actions.push({
+              label: '✅ Add recurring events',
+              type: 'confirm_create_event',
+              payload: {
+                title: parsed.title,
+                date: '', // signal for recurring
+                startTime: parsed.startTime,
+                endTime,
+                description: '',
+                color,
+                category,
+                sharedWith: [],
+                _recurring: { dayOfWeek: parsed.recurring.dayOfWeek, weeks },
+              } as any,
+            });
+            newDraft = null;
+          } else {
+            // Single event with all info
+            const endTime = parsed.endTime || this.addMinutesToTime(parsed.startTime, parsed.durationMin || 60);
+            text = `Here's what I'll add:\n\n📌 **${parsed.title}**\n📅 ${formatDate(parsed.date!)}\n🕐 ${formatTime(parsed.startTime)} – ${formatTime(endTime)}\n🏷️ ${category}\n\nLooks good?`;
+            actions.push({
+              label: '✅ Add to Calendar',
+              type: 'confirm_create_event',
+              payload: {
+                title: parsed.title,
+                date: parsed.date!,
+                startTime: parsed.startTime,
+                endTime,
+                description: '',
+                color,
+                category,
+                sharedWith: [],
+              },
+            });
+            newDraft = null;
+          }
         } else {
-          newDraft = { step: 'title' };
-          text = `Sure! Let's add a new event. What's the title?`;
+          // Couldn't parse everything — fall back to wizard
+          const stripped = userText
+            .replace(/^(can you|please|could you|i want to|i need to|i'd like to)\s+/i, '')
+            .replace(/^(add|create|schedule|put|book|set up|arrange|new|i have)\s+(an?\s+|a new\s+)?/i, '')
+            .replace(/\s+(to|on|in|for)\s+(my\s+)?(calendar|agenda|schedule).*$/i, '')
+            .replace(/\s+(event|called|named)$/i, '')
+            .replace(/\s+(every|at|from)\s+.*$/i, '')
+            .trim();
+
+          const quickTitle = stripped.length > 1 ? stripped : (parsed?.title || null);
+
+          if (quickTitle) {
+            newDraft = { step: 'duration', title: quickTitle };
+            const inferred = inferCategory(quickTitle);
+            text = `Got it — **"${quickTitle}"** _(${inferred.category})_. How long should it be? (e.g. "1 hour", "30 minutes", "2 hours")`;
+          } else {
+            newDraft = { step: 'title' };
+            text = `Sure! Let's add a new event. What's the title?`;
+          }
         }
         break;
       }
@@ -1199,6 +1253,117 @@ export class AiChatService {
     const [h, m] = hhmm.split(':').map(Number);
     const total = h * 60 + m + minutes;
     return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  }
+
+  /**
+   * Parse a natural language event description in one shot.
+   * Handles: "volleyball at 4 every Wednesday", "meeting tomorrow at 2pm for 1 hour",
+   * "dentist appointment on June 5 at 9am", "soccer practice every Tuesday and Thursday at 3:30"
+   */
+  private parseNaturalEvent(text: string, todayStr: string): {
+    title: string | null;
+    date: string | null;
+    startTime: string | null;
+    endTime: string | null;
+    durationMin: number | null;
+    category: string | null;
+    recurring: { dayOfWeek: number; weeks: number } | null;
+  } | null {
+    const lower = text.toLowerCase();
+
+    // Extract time (e.g. "at 4", "at 4pm", "at 16:00", "from 3:30 to 5")
+    let startTime: string | null = null;
+    let endTime: string | null = null;
+    let durationMin: number | null = null;
+
+    // "from X to Y" pattern
+    const fromTo = lower.match(/from\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:to|until|-)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+    if (fromTo) {
+      startTime = this.parseTimeStr(fromTo[1], fromTo[2], fromTo[3]);
+      endTime = this.parseTimeStr(fromTo[4], fromTo[5], fromTo[6]);
+    }
+
+    // "at X" pattern
+    if (!startTime) {
+      const atTime = lower.match(/at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+      if (atTime) {
+        startTime = this.parseTimeStr(atTime[1], atTime[2], atTime[3]);
+      }
+    }
+
+    // Duration: "for 1 hour", "for 90 minutes"
+    const durMatch = lower.match(/for\s+(\d+(?:\.\d+)?)\s*(hour|hr|h|minute|min|m)s?/i);
+    if (durMatch) {
+      const n = parseFloat(durMatch[1]);
+      const unit = durMatch[2].charAt(0).toLowerCase();
+      durationMin = unit === 'h' ? Math.round(n * 60) : Math.round(n);
+    }
+
+    if (startTime && !endTime && durationMin) {
+      endTime = this.addMinutesToTime(startTime, durationMin);
+    }
+
+    // Recurring: "every Monday", "every Wednesday", "every Tue and Thu"
+    let recurring: { dayOfWeek: number; weeks: number } | null = null;
+    const dayNames: Record<string, number> = {
+      'sunday': 0, 'sun': 0, 'monday': 1, 'mon': 1, 'tuesday': 2, 'tue': 2, 'tues': 2,
+      'wednesday': 3, 'wed': 3, 'thursday': 4, 'thu': 4, 'thur': 4, 'thurs': 4,
+      'friday': 5, 'fri': 5, 'saturday': 6, 'sat': 6,
+    };
+    const everyMatch = lower.match(/every\s+(\w+)/i);
+    if (everyMatch) {
+      const dayStr = everyMatch[1].toLowerCase();
+      if (dayNames[dayStr] !== undefined) {
+        // Check for "for X weeks"
+        const weeksMatch = lower.match(/for\s+(\d+)\s*weeks?/i);
+        const weeks = weeksMatch ? parseInt(weeksMatch[1]) : 12;
+        recurring = { dayOfWeek: dayNames[dayStr], weeks };
+      }
+    }
+
+    // Parse a specific date if not recurring
+    let date: string | null = null;
+    if (!recurring) {
+      date = this.parseDate(lower, todayStr);
+    }
+
+    // Extract title — strip time/date/recurrence info to get the event name
+    let title = text
+      .replace(/^(can you|please|could you|i want to|i need to|i'd like to)\s+/i, '')
+      .replace(/^(add|create|schedule|put|book|set up|arrange|new|i have)\s+(an?\s+|a new\s+)?/i, '')
+      .replace(/\s+(to|on|in|for)\s+(my\s+)?(calendar|agenda|schedule)\s*$/i, '')
+      .replace(/\s*(?:at|from)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?(?:\s*(?:to|until|-)\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?/i, '')
+      .replace(/\s*every\s+\w+(?:\s+and\s+\w+)?/i, '')
+      .replace(/\s*(?:on|this|next)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today)/i, '')
+      .replace(/\s*(?:on\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}/i, '')
+      .replace(/\s*for\s+\d+(?:\.\d+)?\s*(?:hour|hr|h|minute|min|m)s?/i, '')
+      .replace(/\s*for\s+\d+\s*weeks?/i, '')
+      .replace(/\s+(event|called|named)$/i, '')
+      .trim();
+
+    // Clean up leftover prepositions
+    title = title.replace(/\s+(at|on|from|to|for|in|every)\s*$/i, '').trim();
+
+    if (!title || title.length < 2) title = null;
+
+    // Only return if we got at least a title
+    if (!title && !startTime && !recurring) return null;
+
+    return { title, date, startTime, endTime, durationMin, category: null, recurring };
+  }
+
+  private parseTimeStr(hourStr: string, minStr: string | undefined, ampm: string | undefined): string {
+    let h = parseInt(hourStr);
+    const m = minStr ? parseInt(minStr) : 0;
+    if (ampm) {
+      const ap = ampm.toLowerCase();
+      if (ap === 'pm' && h !== 12) h += 12;
+      if (ap === 'am' && h === 12) h = 0;
+    } else {
+      // No am/pm — guess: if hour <= 6, assume PM (e.g. "at 4" = 4 PM)
+      if (h >= 1 && h <= 6) h += 12;
+    }
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   }
 
   /** Build a polite absence/excuse email for a given event. */
