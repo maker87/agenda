@@ -1328,7 +1328,7 @@ export class AiChatService {
     }
 
     // Extract title — strip time/date/recurrence info to get the event name
-    let title = text
+    let title: string | null = text
       .replace(/^(can you|please|could you|i want to|i need to|i'd like to)\s+/i, '')
       .replace(/^(add|create|schedule|put|book|set up|arrange|new|i have)\s+(an?\s+|a new\s+)?/i, '')
       .replace(/\s+(to|on|in|for)\s+(my\s+)?(calendar|agenda|schedule)\s*$/i, '')
