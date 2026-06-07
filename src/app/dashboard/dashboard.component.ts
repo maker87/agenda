@@ -800,6 +800,11 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         this.events = this.eventsService.listEvents(this.userEmail, (synced) => {
           this.events = synced;
         });
+        // Force a fresh read from localStorage
+        const freshEvents = this.eventsService.listEvents(this.userEmail);
+        if (freshEvents.length > this.events.length) {
+          this.events = freshEvents;
+        }
 
         this.chatEventDraft = null;
         const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dayOfWeek];
@@ -823,10 +828,16 @@ export class DashboardComponent implements OnInit, AfterViewInit {
           sharedWith:  payload.sharedWith ?? [],
         }, this.userEmail);
 
-        // Refresh the events list
+        // Force refresh the events list by re-reading from cache
         this.events = this.eventsService.listEvents(this.userEmail, (synced) => {
           this.events = synced;
         });
+        // Also push the created event directly into the array if not already there
+        if (!this.events.find(e => e.id === created.id)) {
+          this.events = [...this.events, created].sort((a, b) =>
+            a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)
+          );
+        }
 
         this.chatEventDraft = null;
         this.chatMessages = [...this.chatMessages, {
