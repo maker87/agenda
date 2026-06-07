@@ -53,19 +53,32 @@ export const handler = async (event) => {
       for (const msg of history.slice(-10)) {
         messages.push({
           role: msg.role === 'user' ? 'user' : 'assistant',
-          content: msg.text,
+          content: [{ text: msg.text || '' }],
         });
       }
     } catch (err) { /* ignore */ }
   }
   messages.push({ role: 'user', content: [{ text: message }] });
 
+  // Nova requires first message to be from user — strip leading assistant messages
+  while (messages.length > 0 && messages[0].role !== 'user') {
+    messages.shift();
+  }
+
+  // Nova requires alternating roles — deduplicate consecutive same-role messages
+  const cleanMessages = [];
+  for (const msg of messages) {
+    if (cleanMessages.length === 0 || cleanMessages[cleanMessages.length - 1].role !== msg.role) {
+      cleanMessages.push(msg);
+    } else {
+      // Merge with previous message of same role
+      cleanMessages[cleanMessages.length - 1].content[0].text += '\n' + msg.content[0].text;
+    }
+  }
+
   const body = JSON.stringify({
     system: [{ text: SYSTEM_PROMPT + eventsContext + `\n\nToday's date: ${today}` }],
-    messages: messages.map(m => ({
-      role: m.role,
-      content: Array.isArray(m.content) ? m.content : [{ text: m.content }],
-    })),
+    messages: cleanMessages,
     inferenceConfig: {
       maxTokens: 1024,
       temperature: 0.7,
