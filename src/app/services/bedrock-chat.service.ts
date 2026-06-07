@@ -85,20 +85,37 @@ export class BedrockChatService {
    */
   private parseActions(text: string): { cleanText: string; actions: ChatAction[] } {
     const actions: ChatAction[] = [];
-    const actionRegex = /```action\s*\n?([\s\S]*?)\n?```/g;
+    
+    // Match ```action, ```json, or plain ``` blocks containing action JSON
+    const actionRegex = /```(?:action|json)?\s*\n?([\s\S]*?)\n?```/g;
 
     let match;
     while ((match = actionRegex.exec(text)) !== null) {
       try {
-        const action = JSON.parse(match[1].trim());
-        actions.push(action);
+        const parsed = JSON.parse(match[1].trim());
+        // Only treat it as an action if it has a valid type field
+        if (parsed.type && ['create_event', 'create_recurring', 'create_reminder', 'navigate'].includes(parsed.type)) {
+          actions.push(parsed);
+        }
       } catch {
-        // Ignore malformed action blocks
+        // Ignore malformed blocks
       }
     }
 
-    // Remove action blocks from the displayed text
-    const cleanText = text.replace(/```action\s*\n?[\s\S]*?\n?```/g, '').trim();
+    // Also try to find inline JSON objects with action types (no code block wrapper)
+    if (actions.length === 0) {
+      const inlineRegex = /\{[^{}]*"type"\s*:\s*"(create_event|create_recurring|create_reminder)"[^{}]*\}/g;
+      let inlineMatch;
+      while ((inlineMatch = inlineRegex.exec(text)) !== null) {
+        try {
+          const parsed = JSON.parse(inlineMatch[0]);
+          actions.push(parsed);
+        } catch { /* ignore */ }
+      }
+    }
+
+    // Remove all code blocks from the displayed text
+    const cleanText = text.replace(/```(?:action|json)?\s*\n?[\s\S]*?\n?```/g, '').trim();
 
     return { cleanText, actions };
   }
