@@ -58,18 +58,23 @@ export const handler = async (event) => {
       }
     } catch (err) { /* ignore */ }
   }
-  messages.push({ role: 'user', content: message });
+  messages.push({ role: 'user', content: [{ text: message }] });
 
   const body = JSON.stringify({
-    anthropic_version: 'bedrock-2023-05-31',
-    max_tokens: 1024,
-    system: SYSTEM_PROMPT + eventsContext + `\n\nToday's date: ${today}`,
-    messages,
+    system: [{ text: SYSTEM_PROMPT + eventsContext + `\n\nToday's date: ${today}` }],
+    messages: messages.map(m => ({
+      role: m.role,
+      content: Array.isArray(m.content) ? m.content : [{ text: m.content }],
+    })),
+    inferenceConfig: {
+      maxTokens: 1024,
+      temperature: 0.7,
+    },
   });
 
   try {
     const command = new InvokeModelCommand({
-      modelId: 'us.anthropic.claude-3-5-haiku-20241022-v1:0',
+      modelId: 'us.amazon.nova-lite-v1:0',
       contentType: 'application/json',
       accept: 'application/json',
       body: new TextEncoder().encode(body),
@@ -77,7 +82,7 @@ export const handler = async (event) => {
 
     const response = await client.send(command);
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    return responseBody.content?.[0]?.text || 'Sorry, I could not generate a response.';
+    return responseBody.output?.message?.content?.[0]?.text || 'Sorry, I could not generate a response.';
   } catch (error) {
     console.error('Bedrock error:', error);
     return `I'm having trouble connecting right now. Error: ${error.message || 'Unknown error'}`;
