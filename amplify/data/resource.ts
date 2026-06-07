@@ -1,4 +1,11 @@
-import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
+import { type ClientSchema, a, defineData, defineFunction } from '@aws-amplify/backend';
+
+const bedrockChatHandler = defineFunction({
+  name: 'bedrock-chat',
+  entry: './bedrock-chat/handler.ts',
+  timeoutSeconds: 30,
+  memoryMB: 256,
+});
 
 const schema = a.schema({
   CalendarEvent: a
@@ -27,6 +34,19 @@ const schema = a.schema({
       senderEmail:    a.string(),             // who triggered the share (for share type)
       read:           a.boolean(),            // false = unread
     })
+    .authorization((allow) => [allow.publicApiKey()]),
+
+  // Custom query for AI chat via Bedrock
+  chat: a
+    .query()
+    .arguments({
+      message: a.string().required(),
+      events: a.string(),   // JSON stringified array of events
+      today: a.string(),    // today's date YYYY-MM-DD
+      conversationHistory: a.string(), // JSON stringified conversation
+    })
+    .returns(a.string())
+    .handler(a.handler.function(bedrockChatHandler))
     .authorization((allow) => [allow.publicApiKey()]),
 });
 

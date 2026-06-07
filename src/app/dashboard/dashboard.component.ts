@@ -10,6 +10,7 @@ import { CategoryTreeService, CategoryNode, CATEGORY_SEP } from '../services/cat
 import { GoogleCalendarService, GCalEvent, GCalCalendar } from '../services/google-calendar.service';
 import { AiSchedulerService, AiSuggestion } from '../services/ai-scheduler.service';
 import { AiChatService, ChatMessage, EventDraft, getProactiveReminders } from '../services/ai-chat.service';
+import { BedrockChatService, ChatMessage as BedrockMessage, ChatAction as BedrockAction } from '../services/bedrock-chat.service';
 import { I18nService } from '../services/i18n.service';
 
 interface CalendarEvent {
@@ -641,19 +642,77 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     };
     this.chatMessages = [...this.chatMessages, userMsg];
 
-    // Simulate a brief typing delay for a natural feel
+    // Call Bedrock AI
     this.chatTyping = true;
-    setTimeout(() => {
-      const { message, draft } = this.aiChatService.reply(text, this.events, this.userEmail, this.chatEventDraft);
-      this.chatMessages = [...this.chatMessages, message];
-      this.chatEventDraft = draft;
+    this.scrollChatToBottom();
+
+    this.bedrockChat.sendMessage(text, this.events, this.chatMessages).then(({ text: reply, actions }) => {
+      const assistantMsg: ChatMessage = {
+        id: `msg_${Date.now()}_a`,
+        role: 'assistant',
+        text: reply,
+        timestamp: new Date(),
+        actions: actions.length > 0 ? actions.map(a => ({
+          label: a.type === 'create_event' ? '✅ Add to Calendar' :
+                 a.type === 'create_recurring' ? '✅ Add Recurring' :
+                 a.type === 'create_reminder' ? '🔔 Set Reminder' :
+                 a.type === 'navigate' ? (a.label || 'Go') : a.type,
+          type: a.type as any,
+          ...a,
+        })) : undefined,
+      };
+      this.chatMessages = [...this.chatMessages, assistantMsg];
       this.chatTyping = false;
       this.scrollChatToBottom();
-      // Auto-fire confirm_create_event if the AI returned it directly (user said "yes")
-      if (message.actions?.length && message.actions[0].type === 'confirm_create_event') {
-        this.createEventFromChat(message.actions[0].payload);
+
+      // Auto-execute actions
+      for (const action of actions) {
+        this.executeBedrockAction(action);
       }
-    }, 400 + Math.random() * 300);
+    }).catch(() => {
+      this.chatMessages = [...this.chatMessages, {
+        id: `msg_${Date.now()}_err`,
+        role: 'assistant',
+        text: 'Sorry, I had trouble responding. Please try again.',
+        timestamp: new Date(),
+      }];
+      this.chatTyping = false;
+      this.scrollChatToBottom();
+    });
+  }
+
+  private async executeBedrockAction(action: BedrockAction) {
+    if (action.type === 'create_event' && action.title && action.date && action.startTime && action.endTime) {
+      await this.createEventFromChat({
+        title: action.title,
+        date: action.date,
+        startTime: action.startTime,
+        endTime: action.endTime,
+        category: action.category || '',
+        color: '#6c63ff',
+        description: '',
+        sharedWith: [],
+      });
+    }
+    if (action.type === 'create_recurring' && action.title && action.startTime && action.endTime && action.dayOfWeek !== undefined) {
+      await this.createEventFromChat({
+        title: action.title,
+        date: '',
+        startTime: action.startTime,
+        endTime: action.endTime,
+        category: action.category || '',
+        color: '#6c63ff',
+        description: '',
+        sharedWith: [],
+        _recurring: { dayOfWeek: action.dayOfWeek, weeks: action.weeks || 12 },
+      } as any);
+    }
+    if (action.type === 'create_reminder' && action.title) {
+      await this.createAiReminder(action.title, action.body || '');
+    }
+    if (action.type === 'navigate' && action.tab) {
+      this.switchTab(action.tab as any);
+    }
   }
 
   handleChatAction(action: { label: string; type: string; tab?: string; reminderTitle?: string; reminderBody?: string; copyText?: string; payload?: any; slotIndex?: number }) {
@@ -1667,6 +1726,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     private googleCalendarService: GoogleCalendarService,
     private aiScheduler: AiSchedulerService,
     private aiChatService: AiChatService,
+    private bedrockChat: BedrockChatService,
     public i18n: I18nService,
   ) {}
 
