@@ -1,6 +1,5 @@
-import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-
-const client = new BedrockRuntimeClient({ region: 'us-east-1' });
+// Use dynamic import to avoid TypeScript validation issues during Amplify build
+// The AWS SDK v3 is available in the Lambda runtime environment
 
 const SYSTEM_PROMPT = `You are an AI assistant for a calendar/agenda app called "Agenda". You help users manage their schedule.
 
@@ -33,34 +32,40 @@ Keep responses concise and friendly. Use markdown bold (**text**) for emphasis. 
 export const handler = async (event: any) => {
   const { message, events, today, conversationHistory } = event.arguments;
 
+  // Dynamic import to avoid TS validation issues
+  const { BedrockRuntimeClient, InvokeModelCommand } = await import('@aws-sdk/client-bedrock-runtime');
+  const client = new BedrockRuntimeClient({ region: 'us-east-1' });
+
   // Build the events context
-  const eventsContext = events && events.length > 0
-    ? `\n\nUser's calendar events (${events.length} total):\n${events.slice(0, 50).map((e: any) =>
-        `- ${e.title} | ${e.date} ${e.startTime}-${e.endTime} | ${e.category || 'No category'}`
-      ).join('\n')}`
-    : '\n\nUser has no events on their calendar yet.';
+  let eventsContext = '\n\nUser has no events on their calendar yet.';
+  if (events) {
+    try {
+      const parsed = JSON.parse(events);
+      if (parsed.length > 0) {
+        eventsContext = `\n\nUser's calendar events (${parsed.length} total):\n` +
+          parsed.slice(0, 50).map((e: any) =>
+            `- ${e.title} | ${e.date} ${e.startTime}-${e.endTime} | ${e.category || 'No category'}`
+          ).join('\n');
+      }
+    } catch { /* ignore */ }
+  }
 
   // Build conversation messages
   const messages: any[] = [];
 
-  // Add conversation history if provided
   if (conversationHistory) {
     try {
       const history = JSON.parse(conversationHistory);
-      for (const msg of history.slice(-10)) { // last 10 messages for context
+      for (const msg of history.slice(-10)) {
         messages.push({
           role: msg.role === 'user' ? 'user' : 'assistant',
           content: msg.text,
         });
       }
-    } catch { /* ignore parse errors */ }
+    } catch { /* ignore */ }
   }
 
-  // Add current message
-  messages.push({
-    role: 'user',
-    content: message,
-  });
+  messages.push({ role: 'user', content: message });
 
   const body = JSON.stringify({
     anthropic_version: 'bedrock-2023-05-31',
@@ -79,11 +84,9 @@ export const handler = async (event: any) => {
 
     const response = await client.send(command);
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    const assistantMessage = responseBody.content?.[0]?.text || 'Sorry, I could not generate a response.';
-
-    return assistantMessage;
+    return responseBody.content?.[0]?.text || 'Sorry, I could not generate a response.';
   } catch (error: any) {
     console.error('Bedrock error:', error);
-    return `I'm having trouble connecting to my AI brain right now. Error: ${error.message || 'Unknown error'}. Please try again.`;
+    return `I'm having trouble connecting right now. Error: ${error.message || 'Unknown error'}`;
   }
 };
