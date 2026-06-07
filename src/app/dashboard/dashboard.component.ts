@@ -761,9 +761,9 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     try {
       // Check if this is a recurring event
       if (payload._recurring) {
-        const { dayOfWeek, weeks } = payload._recurring;
+        const { dayOfWeek, weeks: requestedWeeks } = payload._recurring;
+        const weeks = Math.min(requestedWeeks || 12, 12); // Cap at 12 weeks
         const todayStr = new Date().toISOString().split('T')[0];
-        const created: any[] = [];
 
         // Find the next occurrence of the target day
         const startDate = new Date(todayStr + 'T00:00:00');
@@ -771,23 +771,29 @@ export class DashboardComponent implements OnInit, AfterViewInit {
           startDate.setDate(startDate.getDate() + 1);
         }
 
-        // Create one event per week
+        // Build all dates first
+        const dates: string[] = [];
         for (let w = 0; w < weeks; w++) {
           const date = new Date(startDate);
           date.setDate(date.getDate() + w * 7);
-          const dateStr = date.toISOString().split('T')[0];
+          dates.push(date.toISOString().split('T')[0]);
+        }
 
-          const evt = await this.eventsService.createEvent({
-            title:       payload.title,
-            date:        dateStr,
-            startTime:   payload.startTime,
-            endTime:     payload.endTime,
-            description: payload.description ?? '',
-            color:       payload.color ?? '#6c63ff',
-            category:    payload.category ?? '',
-            sharedWith:  payload.sharedWith ?? [],
-          }, this.userEmail);
-          created.push(evt);
+        // Create events in parallel batches of 5
+        for (let i = 0; i < dates.length; i += 5) {
+          const batch = dates.slice(i, i + 5);
+          await Promise.all(batch.map(dateStr =>
+            this.eventsService.createEvent({
+              title:       payload.title,
+              date:        dateStr,
+              startTime:   payload.startTime,
+              endTime:     payload.endTime,
+              description: payload.description ?? '',
+              color:       payload.color ?? '#6c63ff',
+              category:    payload.category ?? '',
+              sharedWith:  payload.sharedWith ?? [],
+            }, this.userEmail)
+          ));
         }
 
         // Refresh events
