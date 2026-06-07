@@ -1,5 +1,16 @@
-// Use dynamic import to avoid TypeScript validation issues during Amplify build
-// The AWS SDK v3 is available in the Lambda runtime environment
+// Declare the AWS SDK module type so TypeScript doesn't complain
+// The SDK is available at runtime in the Lambda environment
+declare module '@aws-sdk/client-bedrock-runtime' {
+  export class BedrockRuntimeClient {
+    constructor(config: any);
+    send(command: any): Promise<any>;
+  }
+  export class InvokeModelCommand {
+    constructor(input: any);
+  }
+}
+
+import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 
 const SYSTEM_PROMPT = `You are an AI assistant for a calendar/agenda app called "Agenda". You help users manage their schedule.
 
@@ -32,8 +43,6 @@ Keep responses concise and friendly. Use markdown bold (**text**) for emphasis. 
 export const handler = async (event: any) => {
   const { message, events, today, conversationHistory } = event.arguments;
 
-  // Dynamic import to avoid TS validation issues
-  const { BedrockRuntimeClient, InvokeModelCommand } = await import('@aws-sdk/client-bedrock-runtime');
   const client = new BedrockRuntimeClient({ region: 'us-east-1' });
 
   // Build the events context
