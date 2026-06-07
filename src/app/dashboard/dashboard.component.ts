@@ -647,6 +647,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.scrollChatToBottom();
 
     this.bedrockChat.sendMessage(text, this.events, this.chatMessages).then(({ text: reply, actions }) => {
+      console.log('[AI Chat] Raw reply:', reply);
+      console.log('[AI Chat] Parsed actions:', actions);
       const assistantMsg: ChatMessage = {
         id: `msg_${Date.now()}_a`,
         role: 'assistant',
