@@ -8,7 +8,6 @@
 
 # Node
 /node_modules
-amplify/functions/*/node_modules
 npm-debug.log
 yarn-error.log
 

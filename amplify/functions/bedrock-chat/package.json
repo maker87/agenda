@@ -1,5 +1,8 @@
 {
   "name": "bedrock-chat-handler",
   "version": "1.0.0",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1063.0"
+  }
 }

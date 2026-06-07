@@ -1,3 +1,5 @@
+import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+
 const SYSTEM_PROMPT = `You are an AI assistant for a calendar/agenda app called "Agenda". You help users manage their schedule.
 
 You can:
@@ -29,11 +31,8 @@ Keep responses concise and friendly. Use markdown bold (**text**) for emphasis. 
 export const handler = async (event) => {
   const { message, events, today, conversationHistory } = event.arguments;
 
-  // Dynamic import — esbuild won't try to bundle this
-  const sdk = await import(/* @vite-ignore */ '@aws-sdk/client-bedrock-runtime');
-  const client = new sdk.BedrockRuntimeClient({ region: 'us-east-1' });
+  const client = new BedrockRuntimeClient({ region: 'us-east-1' });
 
-  // Build the events context
   let eventsContext = '\n\nUser has no events on their calendar yet.';
   if (events) {
     try {
@@ -47,9 +46,7 @@ export const handler = async (event) => {
     } catch (err) { /* ignore */ }
   }
 
-  // Build conversation messages
   const messages = [];
-
   if (conversationHistory) {
     try {
       const history = JSON.parse(conversationHistory);
@@ -61,7 +58,6 @@ export const handler = async (event) => {
       }
     } catch (err) { /* ignore */ }
   }
-
   messages.push({ role: 'user', content: message });
 
   const body = JSON.stringify({
@@ -72,7 +68,7 @@ export const handler = async (event) => {
   });
 
   try {
-    const command = new sdk.InvokeModelCommand({
+    const command = new InvokeModelCommand({
       modelId: 'anthropic.claude-3-haiku-20240307-v1:0',
       contentType: 'application/json',
       accept: 'application/json',
