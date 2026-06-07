@@ -653,13 +653,13 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         text: reply,
         timestamp: new Date(),
         actions: actions.length > 0 ? actions.map(a => ({
+          ...a,
           label: a.type === 'create_event' ? '✅ Add to Calendar' :
                  a.type === 'create_recurring' ? '✅ Add Recurring' :
                  a.type === 'create_reminder' ? '🔔 Set Reminder' :
                  a.type === 'navigate' ? (a.label || 'Go') : a.type,
-          type: a.type as any,
-          ...a,
-        })) : undefined,
+          type: a.type,
+        })) as any : undefined,
       };
       this.chatMessages = [...this.chatMessages, assistantMsg];
       this.chatTyping = false;

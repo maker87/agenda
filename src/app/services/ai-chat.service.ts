@@ -13,7 +13,7 @@ export interface ChatMessage {
 
 export interface ChatAction {
   label: string;
-  type: 'create_event' | 'navigate' | 'create_reminder' | 'copy_text' | 'confirm_create_event' | 'pick_slot';
+  type: 'create_event' | 'navigate' | 'create_reminder' | 'copy_text' | 'confirm_create_event' | 'pick_slot' | 'create_recurring';
   payload?: Partial<CalendarEvent>;
   tab?: string;
   reminderTitle?: string;
