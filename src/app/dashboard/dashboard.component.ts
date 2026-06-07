@@ -10,7 +10,7 @@ import { CategoryTreeService, CategoryNode, CATEGORY_SEP } from '../services/cat
 import { GoogleCalendarService, GCalEvent, GCalCalendar } from '../services/google-calendar.service';
 import { AiSchedulerService, AiSuggestion } from '../services/ai-scheduler.service';
 import { AiChatService, ChatMessage, EventDraft, getProactiveReminders } from '../services/ai-chat.service';
-import { BedrockChatService, ChatMessage as BedrockMessage, ChatAction as BedrockAction } from '../services/bedrock-chat.service';
+import { BedrockChatService, ChatAction as BedrockAction } from '../services/bedrock-chat.service';
 import { I18nService } from '../services/i18n.service';
 
 interface CalendarEvent {

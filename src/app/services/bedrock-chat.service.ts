@@ -2,14 +2,7 @@ import { Injectable } from '@angular/core';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../../amplify/data/resource';
 import { CalendarEvent } from './events.service';
-
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  text: string;
-  timestamp: Date;
-  actions?: ChatAction[];
-}
+import { ChatMessage } from './ai-chat.service';
 
 export interface ChatAction {
   type: 'create_event' | 'create_recurring' | 'create_reminder' | 'navigate';
