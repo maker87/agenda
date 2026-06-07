@@ -1,15 +1,3 @@
-// Declare the AWS SDK module type so TypeScript doesn't complain
-// The SDK is available at runtime in the Lambda environment
-declare module '@aws-sdk/client-bedrock-runtime' {
-  export class BedrockRuntimeClient {
-    constructor(config: any);
-    send(command: any): Promise<any>;
-  }
-  export class InvokeModelCommand {
-    constructor(input: any);
-  }
-}
-
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 
 const SYSTEM_PROMPT = `You are an AI assistant for a calendar/agenda app called "Agenda". You help users manage their schedule.
@@ -40,7 +28,7 @@ When the user wants a REMINDER, use:
 
 Keep responses concise and friendly. Use markdown bold (**text**) for emphasis. Today's date will be provided in the context.`;
 
-export const handler = async (event: any) => {
+export const handler = async (event) => {
   const { message, events, today, conversationHistory } = event.arguments;
 
   const client = new BedrockRuntimeClient({ region: 'us-east-1' });
@@ -52,15 +40,15 @@ export const handler = async (event: any) => {
       const parsed = JSON.parse(events);
       if (parsed.length > 0) {
         eventsContext = `\n\nUser's calendar events (${parsed.length} total):\n` +
-          parsed.slice(0, 50).map((e: any) =>
+          parsed.slice(0, 50).map((e) =>
             `- ${e.title} | ${e.date} ${e.startTime}-${e.endTime} | ${e.category || 'No category'}`
           ).join('\n');
       }
-    } catch { /* ignore */ }
+    } catch (err) { /* ignore */ }
   }
 
   // Build conversation messages
-  const messages: any[] = [];
+  const messages = [];
 
   if (conversationHistory) {
     try {
@@ -71,7 +59,7 @@ export const handler = async (event: any) => {
           content: msg.text,
         });
       }
-    } catch { /* ignore */ }
+    } catch (err) { /* ignore */ }
   }
 
   messages.push({ role: 'user', content: message });
@@ -94,7 +82,7 @@ export const handler = async (event: any) => {
     const response = await client.send(command);
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
     return responseBody.content?.[0]?.text || 'Sorry, I could not generate a response.';
-  } catch (error: any) {
+  } catch (error) {
     console.error('Bedrock error:', error);
     return `I'm having trouble connecting right now. Error: ${error.message || 'Unknown error'}`;
   }

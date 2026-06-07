@@ -3,7 +3,7 @@ import { defineFunction } from '@aws-amplify/backend';
 
 const bedrockChatHandler = defineFunction({
   name: 'bedrock-chat',
-  entry: '../functions/bedrock-chat/handler.ts',
+  entry: '../functions/bedrock-chat/handler.js',
   timeoutSeconds: 30,
   memoryMB: 256,
 });
