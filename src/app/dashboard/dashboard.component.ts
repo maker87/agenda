@@ -827,6 +827,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         }];
       } else {
         // Single event
+        console.log('[CreateEvent] Calling eventsService.createEvent with:', payload);
         const created = await this.eventsService.createEvent({
           title:       payload.title,
           date:        payload.date,
@@ -837,6 +838,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
           category:    payload.category ?? '',
           sharedWith:  payload.sharedWith ?? [],
         }, this.userEmail);
+        console.log('[CreateEvent] Result:', created);
+        console.log('[CreateEvent] userEmail:', this.userEmail);
 
         // Force refresh the events list by re-reading from cache
         this.events = this.eventsService.listEvents(this.userEmail, (synced) => {
