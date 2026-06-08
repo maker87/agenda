@@ -647,12 +647,18 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.scrollChatToBottom();
 
     this.bedrockChat.sendMessage(text, this.events, this.chatMessages).then(({ text: reply, actions }) => {
-      console.log('[AI Chat] Raw reply:', reply);
-      console.log('[AI Chat] Parsed actions:', actions);
+      console.log('[AI Chat] Actions found:', actions.length, actions);
+      
+      // If no actions were parsed but the AI claims it added something, warn the user
+      let displayText = reply;
+      if (actions.length === 0 && /added|created|scheduled|set.*reminder/i.test(reply)) {
+        displayText = reply + '\n\n⚠️ _The event could not be saved automatically. Please try again or add it manually._';
+      }
+
       const assistantMsg: ChatMessage = {
         id: `msg_${Date.now()}_a`,
         role: 'assistant',
-        text: reply,
+        text: actions.length > 0 ? reply : displayText,
         timestamp: new Date(),
         actions: actions.length > 0 ? actions.map(a => ({
           ...a,
@@ -669,9 +675,11 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
       // Auto-execute actions
       for (const action of actions) {
+        console.log('[AI Chat] Executing action:', action);
         this.executeBedrockAction(action);
       }
-    }).catch(() => {
+    }).catch((err) => {
+      console.error('[AI Chat] Error:', err);
       this.chatMessages = [...this.chatMessages, {
         id: `msg_${Date.now()}_err`,
         role: 'assistant',

@@ -104,7 +104,9 @@ export const handler = async (event) => {
 
     const response = await client.send(command);
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    return responseBody.output?.message?.content?.[0]?.text || 'Sorry, I could not generate a response.';
+    const result = responseBody.output?.message?.content?.[0]?.text || 'Sorry, I could not generate a response.';
+    console.log('[Bedrock] AI Response:', result);
+    return result;
   } catch (error) {
     console.error('Bedrock error:', error);
     return `I'm having trouble connecting right now. Error: ${error.message || 'Unknown error'}`;
