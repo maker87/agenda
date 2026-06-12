@@ -603,7 +603,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   gcalPickerLoading = false;
   gcalImporting = false;
   gcalImportCount = 0;
-  activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' = 'schedule';
+  activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' = 'schedule';
 
   // ── History ──
   private readonly HISTORY_KEY = 'agenda_event_history';
@@ -628,6 +628,69 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   showLoginBanner = false;
   private loginBannerTimer: any = null;
 
+  // ── AI Tab (saved conversations) ──
+  aiConversations: { id: string; title: string; messages: ChatMessage[]; createdAt: string }[] = [];
+  activeConversationId: string | null = null;
+
+  get activeConversation() {
+    return this.aiConversations.find(c => c.id === this.activeConversationId) || null;
+  }
+
+  loadAiConversations() {
+    try {
+      const raw = localStorage.getItem(`agenda_ai_chats_${this.userEmail}`);
+      this.aiConversations = raw ? JSON.parse(raw) : [];
+    } catch { this.aiConversations = []; }
+  }
+
+  saveAiConversations() {
+    localStorage.setItem(`agenda_ai_chats_${this.userEmail}`, JSON.stringify(this.aiConversations));
+  }
+
+  startNewAiConversation() {
+    const conv = {
+      id: `conv_${Date.now()}`,
+      title: 'New Chat',
+      messages: [] as ChatMessage[],
+      createdAt: new Date().toISOString(),
+    };
+    this.aiConversations.unshift(conv);
+    this.activeConversationId = conv.id;
+    this.chatMessages = [];
+    this.saveAiConversations();
+  }
+
+  openAiConversation(id: string) {
+    this.activeConversationId = id;
+    const conv = this.activeConversation;
+    this.chatMessages = conv ? [...conv.messages] : [];
+    this.scrollChatToBottom();
+  }
+
+  deleteAiConversation(id: string) {
+    this.aiConversations = this.aiConversations.filter(c => c.id !== id);
+    if (this.activeConversationId === id) {
+      this.activeConversationId = this.aiConversations[0]?.id || null;
+      this.chatMessages = this.activeConversation?.messages || [];
+    }
+    this.saveAiConversations();
+  }
+
+  private syncConversationMessages() {
+    if (this.activeConversationId) {
+      const conv = this.aiConversations.find(c => c.id === this.activeConversationId);
+      if (conv) {
+        conv.messages = [...this.chatMessages];
+        // Update title from first user message
+        const firstUser = conv.messages.find(m => m.role === 'user');
+        if (firstUser) {
+          conv.title = firstUser.text.slice(0, 40) + (firstUser.text.length > 40 ? '...' : '');
+        }
+        this.saveAiConversations();
+      }
+    }
+  }
+
   sendChatMessage() {
     const text = this.chatInput.trim();
     if (!text) return;
@@ -642,7 +705,20 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     };
     this.chatMessages = [...this.chatMessages, userMsg];
 
-    // Call Bedrock AI
+    // Check if we're in a local event creation wizard
+    if (this.chatEventDraft) {
+      this.handleEventWizardStep(text);
+      return;
+    }
+
+    // Check if user wants to create an event — start the wizard locally
+    if (/\b(add|create|schedule|new|put|book)\b.*\b(event|meeting|appointment|class|session|practice|game|exam|test|workout|lunch|dinner|call)\b/i.test(text) ||
+        /^(add|create|schedule|new)\s+\w/i.test(text)) {
+      this.startEventWizard(text);
+      return;
+    }
+
+    // For everything else, use Bedrock AI
     this.chatTyping = true;
     this.scrollChatToBottom();
 
@@ -672,6 +748,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       this.chatMessages = [...this.chatMessages, assistantMsg];
       this.chatTyping = false;
       this.scrollChatToBottom();
+      this.syncConversationMessages();
 
       // Auto-execute actions
       for (const action of actions) {
@@ -962,6 +1039,203 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       timestamp: new Date(),
     }];
     this.scrollChatToBottom();
+  }
+
+  private startEventWizard(text: string) {
+    // Try to extract a title from the message
+    const stripped = text
+      .replace(/^(can you|please|could you|i want to|i need to|i'd like to)\s+/i, '')
+      .replace(/^(add|create|schedule|put|book|set up|arrange|new|i have)\s+(an?\s+|a new\s+)?/i, '')
+      .replace(/\s+(to|on|in|for)\s+(my\s+)?(calendar|agenda|schedule).*$/i, '')
+      .replace(/\s+(event|called|named)$/i, '')
+      .trim();
+
+    if (stripped.length > 1) {
+      this.chatEventDraft = { step: 'date' as any, title: stripped };
+      this.addAssistantMsg(`Got it — **"${stripped}"**. What date? (e.g. "tomorrow", "next Monday", "June 20")`);
+    } else {
+      this.chatEventDraft = { step: 'title' };
+      this.addAssistantMsg(`Sure! Let's add a new event. What's the title?`);
+    }
+  }
+
+  private handleEventWizardStep(text: string) {
+    const lower = text.toLowerCase().trim();
+    const draft = this.chatEventDraft!;
+
+    // Allow cancel at any step
+    if (/\b(cancel|stop|never mind|forget it)\b/i.test(lower)) {
+      this.cancelEventCreation();
+      return;
+    }
+
+    switch (draft.step) {
+      case 'title':
+        if (text.trim().length < 2) {
+          this.addAssistantMsg('Please give the event a name (at least 2 characters).');
+          return;
+        }
+        this.chatEventDraft = { ...draft, step: 'date' as any, title: text.trim() };
+        this.addAssistantMsg(`**"${text.trim()}"** — got it. What date? (e.g. "tomorrow", "next Monday", "June 20")`);
+        break;
+
+      case 'date' as any:
+        // Parse the date
+        const todayStr = new Date().toISOString().split('T')[0];
+        const parsed = this.parseDateFromText(lower, todayStr);
+        if (!parsed) {
+          this.addAssistantMsg(`I couldn't understand that date. Try "tomorrow", "next Monday", "June 20", or "2026-06-15".`);
+          return;
+        }
+        this.chatEventDraft = { ...draft, step: 'time' as any, date: parsed };
+        this.addAssistantMsg(`📅 ${this.formatDate(parsed)}. What time? (e.g. "2pm to 4pm", "10:00-11:30", "at 3pm for 1 hour")`);
+        break;
+
+      case 'time' as any:
+        const times = this.parseTimesFromText(lower);
+        if (!times) {
+          this.addAssistantMsg(`I couldn't parse that time. Try "2pm to 4pm", "10:00-11:30", or "at 3pm for 1 hour".`);
+          return;
+        }
+        this.chatEventDraft = { ...draft, step: 'category' as any, startTime: times.start, endTime: times.end };
+        this.addAssistantMsg(`🕐 ${this.formatTime(times.start)} – ${this.formatTime(times.end)}. What category? (e.g. Work, Personal, Fitness, School, Social, Health) Or say "skip" to auto-pick.`);
+        break;
+
+      case 'category' as any:
+        let category = text.trim();
+        if (/skip|auto|none|no/i.test(lower)) {
+          // Auto-detect from title
+          const cats: Record<string, RegExp> = {
+            'Work': /meeting|work|call|sync|interview|presentation/i,
+            'School': /exam|test|class|study|homework|lecture/i,
+            'Fitness': /gym|workout|run|yoga|swim|sport|practice|game|basketball|soccer|tennis|track/i,
+            'Health': /doctor|dentist|therapy|appointment|checkup/i,
+            'Social': /lunch|dinner|party|drinks|hangout|date/i,
+          };
+          category = 'Personal';
+          for (const [cat, regex] of Object.entries(cats)) {
+            if (regex.test(draft.title || '')) { category = cat; break; }
+          }
+        }
+        this.chatEventDraft = { ...draft, step: 'description' as any, category };
+        this.addAssistantMsg(`🏷️ ${category}. Any description? (Or say "no" to skip)`);
+        break;
+
+      case 'description' as any:
+        const description = /no|skip|none|nope/i.test(lower) ? '' : text.trim();
+        // All info collected — create the event!
+        this.chatEventDraft = null;
+        this.createEventFromChat({
+          title: draft.title,
+          date: draft.date,
+          startTime: draft.startTime,
+          endTime: draft.endTime,
+          category: draft.category || 'Personal',
+          color: '#6c63ff',
+          description,
+          sharedWith: [],
+        });
+        break;
+    }
+  }
+
+  private addAssistantMsg(text: string) {
+    this.chatMessages = [...this.chatMessages, {
+      id: `msg_${Date.now()}_a`,
+      role: 'assistant' as const,
+      text,
+      timestamp: new Date(),
+    }];
+    this.scrollChatToBottom();
+    this.syncConversationMessages();
+  }
+
+  private parseDateFromText(text: string, todayStr: string): string | null {
+    if (/\btoday\b/.test(text)) return todayStr;
+    if (/\btomorrow\b/.test(text)) {
+      const d = new Date(todayStr + 'T00:00:00');
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().split('T')[0];
+    }
+    const dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    const nextDay = text.match(/(?:next\s+|this\s+)?(\w+day)/i);
+    if (nextDay) {
+      const idx = dayNames.indexOf(nextDay[1].toLowerCase());
+      if (idx !== -1) {
+        const d = new Date(todayStr + 'T00:00:00');
+        const cur = d.getDay();
+        let diff = idx - cur;
+        if (diff <= 0) diff += 7;
+        d.setDate(d.getDate() + diff);
+        return d.toISOString().split('T')[0];
+      }
+    }
+    const inDays = text.match(/in\s+(\d+)\s+days?/i);
+    if (inDays) {
+      const d = new Date(todayStr + 'T00:00:00');
+      d.setDate(d.getDate() + parseInt(inDays[1]));
+      return d.toISOString().split('T')[0];
+    }
+    const months: Record<string, string> = { jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12' };
+    const monthDay = text.match(/(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+(\d{1,2})/i);
+    if (monthDay) {
+      const m = months[monthDay[1].toLowerCase().slice(0, 3)];
+      const day = monthDay[2].padStart(2, '0');
+      const y = todayStr.slice(0, 4);
+      return `${y}-${m}-${day}`;
+    }
+    const iso = text.match(/(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
+    return null;
+  }
+
+  private parseTimesFromText(text: string): { start: string; end: string } | null {
+    // "2pm to 4pm", "2:00-4:00", "at 3pm for 1 hour"
+    const parseTime = (s: string): string | null => {
+      const m = s.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+      if (!m) return null;
+      let h = parseInt(m[1]);
+      const min = m[2] ? parseInt(m[2]) : 0;
+      const ap = m[3]?.toLowerCase();
+      if (ap === 'pm' && h !== 12) h += 12;
+      if (ap === 'am' && h === 12) h = 0;
+      if (!ap && h >= 1 && h <= 6) h += 12; // assume PM for small numbers
+      return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+    };
+
+    // "from X to Y" or "X to Y" or "X-Y"
+    const range = text.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*(?:to|-|until)\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i);
+    if (range) {
+      const start = parseTime(range[1]);
+      const end = parseTime(range[2]);
+      if (start && end) return { start, end };
+    }
+
+    // "at Xpm for Y hours"
+    const atFor = text.match(/(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+for\s+(\d+(?:\.\d+)?)\s*(hour|hr|h|min)/i);
+    if (atFor) {
+      const start = parseTime(atFor[1]);
+      if (start) {
+        const dur = atFor[3].startsWith('h') ? parseFloat(atFor[2]) * 60 : parseFloat(atFor[2]);
+        const [sh, sm] = start.split(':').map(Number);
+        const total = sh * 60 + sm + dur;
+        const end = `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(Math.round(total % 60)).padStart(2, '0')}`;
+        return { start, end };
+      }
+    }
+
+    // Just "at Xpm" — default 1 hour
+    const atOnly = text.match(/(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm))/i);
+    if (atOnly) {
+      const start = parseTime(atOnly[1]);
+      if (start) {
+        const [sh, sm] = start.split(':').map(Number);
+        const end = `${String((sh + 1) % 24).padStart(2, '0')}:${String(sm).padStart(2, '0')}`;
+        return { start, end };
+      }
+    }
+
+    return null;
   }
 
   toggleFloatingChat() {
@@ -1433,52 +1707,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     sharedWith: [],
   };
 
-  events: CalendarEvent[] = [
-    // ── Today ──
-    { id: '1',  title: 'Morning Standup',        date: relDate(0),  startTime: '09:00', endTime: '09:30', description: 'Daily sync with the engineering team', color: '#6c63ff', category: 'Work', sharedWith: [] },
-    { id: '2',  title: 'Design Review',           date: relDate(0),  startTime: '10:30', endTime: '11:30', description: 'Review new onboarding flow mockups', color: '#ec4899', category: 'Work', sharedWith: [] },
-    { id: '3',  title: 'Lunch with Sarah',        date: relDate(0),  startTime: '12:30', endTime: '13:30', description: 'Catch up at The Rooftop Café', color: '#10b981', category: 'Personal', sharedWith: [] },
-    { id: '4',  title: 'Product Roadmap Q3',      date: relDate(0),  startTime: '14:00', endTime: '15:00', description: 'Align on Q3 priorities with stakeholders', color: '#f59e0b', category: 'Work', sharedWith: [] },
-    { id: '5',  title: 'Code Review Session',     date: relDate(0),  startTime: '15:30', endTime: '16:30', description: 'Review PRs for the auth module', color: '#3b82f6', category: 'Work', sharedWith: [] },
-    { id: '6',  title: 'Team Happy Hour',         date: relDate(0),  startTime: '17:00', endTime: '18:30', description: 'End-of-week wind-down 🍻', color: '#ef4444', category: 'Social', sharedWith: [] },
-
-    // ── Tomorrow ──
-    { id: '7',  title: 'Investor Call',           date: relDate(1),  startTime: '09:00', endTime: '10:00', description: 'Series A update with Sequoia', color: '#6c63ff', category: 'Work', sharedWith: [] },
-    { id: '8',  title: 'Sprint Planning',         date: relDate(1),  startTime: '10:30', endTime: '12:00', description: 'Plan sprint 24 tasks and story points', color: '#3b82f6', category: 'Work', sharedWith: [] },
-    { id: '9',  title: 'UX Workshop',             date: relDate(1),  startTime: '13:00', endTime: '15:00', description: 'User journey mapping session', color: '#ec4899', category: 'Work', sharedWith: [] },
-    { id: '10', title: 'Dentist Appointment',     date: relDate(1),  startTime: '16:00', endTime: '17:00', description: 'Annual check-up at City Dental', color: '#10b981', category: 'Personal', sharedWith: [] },
-
-    // ── Day after tomorrow ──
-    { id: '11', title: 'All-Hands Meeting',       date: relDate(2),  startTime: '10:00', endTime: '11:30', description: 'Company-wide Q2 results presentation', color: '#f59e0b', category: 'Work', sharedWith: [] },
-    { id: '12', title: 'Backend Architecture',    date: relDate(2),  startTime: '13:00', endTime: '14:30', description: 'Discuss microservices migration plan', color: '#6c63ff', category: 'Work', sharedWith: [] },
-    { id: '13', title: 'Yoga Class',              date: relDate(2),  startTime: '18:00', endTime: '19:00', description: 'Vinyasa flow at Studio Zen', color: '#10b981', category: 'Health', sharedWith: [] },
-
-    // ── +3 days ──
-    { id: '14', title: 'Client Demo',             date: relDate(3),  startTime: '11:00', endTime: '12:00', description: 'Live demo for Acme Corp', color: '#ef4444', category: 'Work', sharedWith: [] },
-    { id: '15', title: 'Marketing Sync',          date: relDate(3),  startTime: '14:00', endTime: '15:00', description: 'Campaign performance review', color: '#ec4899', category: 'Work', sharedWith: [] },
-
-    // ── +5 days ──
-    { id: '16', title: 'Conference: Day 1',       date: relDate(5),  startTime: '09:00', endTime: '18:00', description: 'AngularConf 2026 — keynote & workshops', color: '#3b82f6', category: 'Conference', sharedWith: [] },
-    { id: '17', title: 'Conference Dinner',       date: relDate(5),  startTime: '19:00', endTime: '21:00', description: 'Networking dinner at The Grand Hotel', color: '#6c63ff', category: 'Conference', sharedWith: [] },
-
-    // ── +6 days ──
-    { id: '18', title: 'Conference: Day 2',       date: relDate(6),  startTime: '09:00', endTime: '17:00', description: 'AngularConf 2026 — deep-dive sessions', color: '#3b82f6', category: 'Conference', sharedWith: [] },
-
-    // ── +10 days ──
-    { id: '19', title: 'Performance Reviews',     date: relDate(10), startTime: '10:00', endTime: '12:00', description: 'Mid-year 1:1 reviews with direct reports', color: '#f59e0b', category: 'Work', sharedWith: [] },
-    { id: '20', title: 'Flight to NYC',           date: relDate(10), startTime: '15:00', endTime: '18:00', description: 'AA 204 — JFK arrival 6 PM', color: '#ef4444', category: 'Travel', sharedWith: [] },
-
-    // ── +14 days ──
-    { id: '21', title: 'Board Meeting',           date: relDate(14), startTime: '09:00', endTime: '12:00', description: 'Quarterly board review — NYC office', color: '#6c63ff', category: 'Work', sharedWith: [] },
-    { id: '22', title: 'Team Offsite Kickoff',    date: relDate(14), startTime: '14:00', endTime: '17:00', description: 'Q3 planning offsite at Hudson Yards', color: '#10b981', category: 'Work', sharedWith: [] },
-
-    // ── Past events ──
-    { id: '23', title: 'Kickoff Meeting',         date: relDate(-1), startTime: '09:00', endTime: '10:00', description: 'Project kickoff for new dashboard', color: '#6c63ff', category: 'Work', sharedWith: [] },
-    { id: '24', title: 'User Research Session',   date: relDate(-1), startTime: '14:00', endTime: '16:00', description: 'Interviews with 5 beta users', color: '#ec4899', category: 'Work', sharedWith: [] },
-    { id: '25', title: 'Weekly Retrospective',    date: relDate(-3), startTime: '16:00', endTime: '17:00', description: 'Sprint 23 retro', color: '#3b82f6', category: 'Work', sharedWith: [] },
-    { id: '26', title: 'Onboarding: New Hire',    date: relDate(-5), startTime: '10:00', endTime: '12:00', description: 'Welcome Alex to the team', color: '#10b981', category: 'Work', sharedWith: [] },
-    { id: '27', title: 'Quarterly OKR Review',    date: relDate(-7), startTime: '13:00', endTime: '15:00', description: 'Q1 OKR scoring and Q2 goal setting', color: '#f59e0b', category: 'Work', sharedWith: [] },
-  ].sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+  events: CalendarEvent[] = [];
 
   eventColors = [
     // Purples & Blues
@@ -1772,6 +2001,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.googleCalendarLinked = this.googleCalendarService.isLinked;
     this.loadHistory();
     this.loadSavedCategories();
+    this.loadAiConversations();
     await this.loadEventsFromDb(user.email);
     this.loadNotifications(user.email);
   }
@@ -1804,17 +2034,16 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       this.dbLoading = false;
       this.showProactiveBanner(await this.runProactiveReminders());
     } else {
-      // Step 2 — nothing in cache yet: seed defaults then let sync take over
-      const seedData = email === 'alex.student@school.edu'
-        ? buildStudentEvents().map(({ id: _id, ...rest }) => rest)
-        : email === 'jordan.coach@fitlife.com'
-        ? buildCoachEvents().map(({ id: _id, ...rest }) => rest)
-        : this.events.map(({ id: _id, ...rest }) => rest);
-
-      if (seedData.length > 0) {
-        // seedEvents writes to localStorage first, then pushes to Amplify in background
+      // Step 2 — nothing in cache: start with empty calendar for new users
+      // Only seed demo events for the demo accounts
+      if (email === 'alex.student@school.edu') {
+        const seedData = buildStudentEvents().map(({ id: _id, ...rest }) => rest);
+        this.events = await this.eventsService.seedEvents(seedData, email);
+      } else if (email === 'jordan.coach@fitlife.com') {
+        const seedData = buildCoachEvents().map(({ id: _id, ...rest }) => rest);
         this.events = await this.eventsService.seedEvents(seedData, email);
       }
+      // All other users start with a blank calendar
       this.dbLoading = false;
       this.showProactiveBanner(await this.runProactiveReminders());
     }
@@ -1885,7 +2114,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     }, 50);
   }
 
-  switchTab(tab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile') {
+  switchTab(tab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai') {
     this.activeTab = tab;
     if (tab === 'calendar') {
       this.slideMonthIndex = this.currentMonthIndex;
@@ -1897,6 +2126,14 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     }
     if (tab === 'notifications') {
       this.notifSearch = '';
+    }
+    if (tab === 'ai') {
+      // Auto-open the last conversation or start a new one
+      if (this.aiConversations.length === 0) {
+        this.startNewAiConversation();
+      } else if (!this.activeConversationId) {
+        this.openAiConversation(this.aiConversations[0].id);
+      }
     }
   }
 
