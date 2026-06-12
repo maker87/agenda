@@ -233,8 +233,11 @@ export class EventsService {
       if (errors?.length) throw new Error(errors[0].message);
       const remote = (data ?? []).map(this.toLocal);
       const cache = this.readCache(ownerEmail);
-      const localOnly = cache.filter(e => e.id.startsWith('local_') && !remote.find(r => r.id === e.id));
-      const merged = this.sort([...remote, ...localOnly]);
+      // Keep local-only items AND any cached items not yet in remote
+      // (handles the race where createEvent completes but list doesn't include it yet)
+      const remoteIds = new Set(remote.map(r => r.id));
+      const notInRemote = cache.filter(e => !remoteIds.has(e.id));
+      const merged = this.sort([...remote, ...notInRemote]);
       this.writeCache(ownerEmail, merged);
       this.syncWarning = null;
       if (onSyncComplete) onSyncComplete(merged);
