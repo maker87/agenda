@@ -123,7 +123,12 @@ export class EventsService {
       });
       if (errors?.length) throw new Error(errors[0].message);
       const saved = this.toLocal(data!);
-      const updated = this.readCache(ownerEmail).map(e => e.id === tempId ? saved : e);
+      // Re-read cache and either replace the temp entry or append the saved event
+      const currentCache = this.readCache(ownerEmail);
+      const hasTemp = currentCache.some(e => e.id === tempId);
+      const updated = hasTemp
+        ? currentCache.map(e => e.id === tempId ? saved : e)
+        : [...currentCache, saved];
       this.writeCache(ownerEmail, this.sort(updated));
       this.syncWarning = null;
       return saved;
