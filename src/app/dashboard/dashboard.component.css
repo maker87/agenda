@@ -3595,6 +3595,110 @@
   border-color: #ef4444;
 }
 
+/* Rename button */
+.cat-node-rename {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.cat-node-rename:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* Inline rename input */
+.cat-rename-input {
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1.5px solid var(--accent);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  min-width: 0;
+}
+
+.cat-rename-input:focus {
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.cat-rename-save {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.cat-rename-save:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.cat-rename-cancel {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.cat-rename-cancel:hover {
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+.cat-rename-error {
+  font-size: 12px;
+  color: var(--error-text);
+  padding: 4px 0 4px 40px;
+}
+
+/* Delete confirmation */
+.cat-delete-confirm {
+  padding: 10px 12px 10px 40px;
+  background: var(--error-bg, #fef2f2);
+  border-radius: 8px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.cat-delete-msg {
+  font-size: 13px;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.cat-delete-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.cat-delete-yes {
+  padding: 5px 14px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: none;
+  background: #ef4444;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.cat-delete-yes:hover {
+  background: #dc2626;
+}
+
+.cat-delete-no {
+  padding: 5px 14px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.cat-delete-no:hover {
+  background: var(--bg-hover);
+}
+
 /* ══════════════════════════════════════════
    PROFILE TAB
 ══════════════════════════════════════════ */
@@ -5022,4 +5126,130 @@
   .ai-conv-item {
     min-width: 160px;
   }
+}
+
+/* ── Weekly Summary Tab ── */
+.weekly-ai-card {
+  background: var(--accent-light);
+  border: 1.5px solid var(--accent);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 24px;
+}
+
+.weekly-ai-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.weekly-ai-icon {
+  font-size: 18px;
+}
+
+.weekly-ai-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.weekly-ai-body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.weekly-days {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.weekly-day {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  transition: border-color 0.15s;
+}
+
+.weekly-day-today {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-light);
+}
+
+.weekly-day-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.weekly-day-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.weekly-day-badge {
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--accent);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.weekly-day-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.weekly-day-events {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.weekly-event {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.weekly-event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.weekly-event-time {
+  font-size: 13px;
+  color: var(--text-secondary);
+  min-width: 70px;
+}
+
+.weekly-event-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.weekly-event-cat {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-surface-2);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+.weekly-day-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
 }

@@ -603,7 +603,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   gcalPickerLoading = false;
   gcalImporting = false;
   gcalImportCount = 0;
-  activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' = 'schedule';
+  activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly' = 'schedule';
 
   // ── History ──
   private readonly HISTORY_KEY = 'agenda_event_history';
@@ -689,6 +689,67 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         this.saveAiConversations();
       }
     }
+  }
+
+  // ── Weekly Summary Tab ──
+  weeklySummaryDays: { date: string; label: string; events: any[]; isToday: boolean }[] = [];
+  weeklyAiSuggestions: string = '';
+  weeklyAiLoading = false;
+
+  loadWeeklySummary() {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const days: typeof this.weeklySummaryDays = [];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(todayStr + 'T00:00:00');
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayEvents = this.events
+        .filter(e => e.date === dateStr)
+        .sort((a, b) => a.startTime.localeCompare(b.startTime));
+      days.push({
+        date: dateStr,
+        label: d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+        events: dayEvents,
+        isToday: i === 0,
+      });
+    }
+
+    this.weeklySummaryDays = days;
+    this.getWeeklyAiSuggestions();
+  }
+
+  async getWeeklyAiSuggestions() {
+    this.weeklyAiLoading = true;
+    this.weeklyAiSuggestions = '';
+
+    const totalEvents = this.weeklySummaryDays.reduce((sum, d) => sum + d.events.length, 0);
+    const busyDays = this.weeklySummaryDays.filter(d => d.events.length >= 3);
+    const freeDays = this.weeklySummaryDays.filter(d => d.events.length === 0);
+
+    try {
+      const prompt = `Give me 3-4 brief scheduling tips for this week. My schedule: ${totalEvents} events total, ${busyDays.length} busy days, ${freeDays.length} free days. Events include: ${this.events.filter(e => e.date >= this.weeklySummaryDays[0]?.date && e.date <= this.weeklySummaryDays[6]?.date).slice(0, 10).map(e => e.title).join(', ') || 'nothing scheduled'}.`;
+
+      const { text } = await this.bedrockChat.sendMessage(prompt, this.events, []);
+      this.weeklyAiSuggestions = text;
+    } catch {
+      // Fallback to local suggestions
+      const tips: string[] = [];
+      if (freeDays.length > 0) {
+        tips.push(`You have **${freeDays.length} free day${freeDays.length > 1 ? 's' : ''}** this week (${freeDays.map(d => d.label.split(',')[0]).join(', ')}). Great time for personal projects or self-care.`);
+      }
+      if (busyDays.length > 0) {
+        tips.push(`**${busyDays[0].label}** is your busiest day with ${busyDays[0].events.length} events. Plan breaks between them.`);
+      }
+      if (totalEvents === 0) {
+        tips.push(`Your week is completely open! Consider adding some structure — workouts, study time, or social activities.`);
+      }
+      if (totalEvents > 15) {
+        tips.push(`You have ${totalEvents} events this week — that's a lot! Make sure to schedule downtime.`);
+      }
+      this.weeklyAiSuggestions = tips.join('\n\n') || 'Your week looks good! No specific suggestions.';
+    }
+    this.weeklyAiLoading = false;
   }
 
   sendChatMessage() {
@@ -1360,7 +1421,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
 
   // ── Share sub-tab ──
-  shareUsername = '';
+  shareSubTabEmail = '';
   shareType: 'event' | 'calendar' | 'category' | 'subcategory' | 'friend' | '' = '';
   shareSubTabError = '';
   shareSubTabSuccess = '';
@@ -1391,9 +1452,19 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.shareSubTabError = '';
     this.shareSubTabSuccess = '';
 
-    const username = this.shareUsername.trim();
-    if (!username) {
-      this.shareSubTabError = 'Please enter a username.';
+    const email = this.shareSubTabEmail.trim().toLowerCase();
+    if (!email) {
+      this.shareSubTabError = 'Please enter an email address.';
+      return;
+    }
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      this.shareSubTabError = 'Please enter a valid email address.';
+      return;
+    }
+    if (email === this.userEmail) {
+      this.shareSubTabError = 'You cannot share with yourself.';
       return;
     }
     if (!this.shareType) {
@@ -1405,7 +1476,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       return;
     }
 
-    const recipientEmail = `${username}@demo.com`;
+    const recipientEmail = email;
     let label = '';
 
     if (this.shareType === 'calendar') {
@@ -1433,18 +1504,16 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
     } else if (this.shareType === 'friend') {
       label = 'Friend Request';
-      const mockUser = this.MOCK_USERS.find(u => u.username === username);
-      const displayName = mockUser?.displayName ?? username;
-      const mockEmail = `${username}@demo.com`;
+      const displayName = email;
       const incomingNotif: AppNotification = {
         id: Date.now().toString() + Math.random().toString(36).slice(2),
         recipientEmail: this.userEmail,
         type: 'friend_request',
         title: `${displayName} wants to be your friend`,
-        body: `From: ${mockEmail}`,
-        eventId: username,
+        body: `From: ${email}`,
+        eventId: email,
         eventDate: '',
-        senderEmail: mockEmail,
+        senderEmail: email,
         read: false,
         createdAt: new Date().toISOString(),
         status: 'pending',
@@ -1454,15 +1523,15 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
     // Check if already sent
     const alreadySent = this.sentShareRequests.some(
-      r => r.username === username && r.type === this.shareType &&
+      r => r.username === email && r.type === this.shareType &&
            (this.shareType !== 'category' && this.shareType !== 'subcategory' || r.label === label)
     );
     if (alreadySent) {
-      this.shareSubTabError = `You already sent this share request to @${username}.`;
+      this.shareSubTabError = `You already sent this share request to ${email}.`;
       return;
     }
 
-    this.sentShareRequests = [{ username, type: this.shareType, label }, ...this.sentShareRequests];
+    this.sentShareRequests = [{ username: email, type: this.shareType, label }, ...this.sentShareRequests];
 
     const typeLabel =
       this.shareType === 'friend'      ? 'Friend request' :
@@ -1470,8 +1539,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       this.shareType === 'category'    ? `Category "${label}" share` :
       this.shareType === 'subcategory' ? `Subcategory "${label}" share` :
                                          'Event share';
-    this.shareSubTabSuccess = `${typeLabel} sent to @${username}.`;
-    this.shareUsername = '';
+    this.shareSubTabSuccess = `${typeLabel} sent to ${email}.`;
+    this.shareSubTabEmail = '';
     this.shareType = '';
     this.shareSelectedCategory = '';
 
@@ -1847,7 +1916,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
 
   // ── Saved Categories (Categories tab) ──
-  private readonly CATEGORIES_KEY = 'agenda_saved_categories';
+  private get CATEGORIES_KEY() { return `agenda_saved_categories_${this.userEmail}`; }
 
   /** All user-defined category paths (persisted to localStorage). */
   savedCategories: string[] = [];
@@ -1952,6 +2021,118 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     setTimeout(() => { this.catFormSuccess = ''; }, 3000);
   }
 
+  // ── Rename category state ──
+  renamingCatPath: string | null = null;
+  renameCatInput = '';
+  renameCatError = '';
+
+  /** Start inline-renaming a category node. */
+  startRenameCategory(path: string, currentName: string) {
+    this.renamingCatPath = path;
+    this.renameCatInput = currentName;
+    this.renameCatError = '';
+  }
+
+  cancelRenameCategory() {
+    this.renamingCatPath = null;
+    this.renameCatInput = '';
+    this.renameCatError = '';
+  }
+
+  /** Commit the rename: updates savedCategories and reassigns events. */
+  submitRenameCategory(oldPath: string) {
+    const newName = this.renameCatInput.trim();
+    if (!newName) {
+      this.renameCatError = 'Name cannot be empty.';
+      return;
+    }
+    if (newName.includes(' > ')) {
+      this.renameCatError = 'Name cannot contain " > ".';
+      return;
+    }
+
+    // Build the new full path
+    const segments = this.categoryTreeService.splitPath(oldPath);
+    segments[segments.length - 1] = newName;
+    const newPath = this.categoryTreeService.joinPath(segments);
+
+    // If unchanged, just cancel
+    if (newPath === oldPath) {
+      this.cancelRenameCategory();
+      return;
+    }
+
+    // Check for conflicts
+    if (this.allCategoryPaths.includes(newPath)) {
+      this.renameCatError = `"${newPath}" already exists.`;
+      return;
+    }
+
+    // Update savedCategories: rename the path and all descendants
+    this.savedCategories = this.savedCategories.map(p => {
+      if (p === oldPath) return newPath;
+      if (p.startsWith(oldPath + CATEGORY_SEP)) {
+        return newPath + p.slice(oldPath.length);
+      }
+      return p;
+    });
+    this.persistCategories();
+
+    // Reassign events that used this category (or a descendant)
+    for (const event of this.events) {
+      if (event.category === oldPath) {
+        event.category = newPath;
+      } else if (event.category.startsWith(oldPath + CATEGORY_SEP)) {
+        event.category = newPath + event.category.slice(oldPath.length);
+      }
+    }
+
+    // Update expanded-node tracking
+    if (this.expandedCatNodes.has(oldPath)) {
+      this.expandedCatNodes.delete(oldPath);
+      this.expandedCatNodes.add(newPath);
+    }
+
+    this.cancelRenameCategory();
+    this.catFormSuccess = `Renamed to "${newPath}".`;
+    setTimeout(() => { this.catFormSuccess = ''; }, 3000);
+  }
+
+  // ── Delete category state ──
+  deletingCatPath: string | null = null;
+  deleteCatConfirmInput = '';
+
+  /** Start delete flow — if category has events, show confirmation. */
+  startDeleteCategory(path: string) {
+    this.deletingCatPath = path;
+    this.deleteCatConfirmInput = '';
+  }
+
+  cancelDeleteCategory() {
+    this.deletingCatPath = null;
+    this.deleteCatConfirmInput = '';
+  }
+
+  /** Delete category and optionally reassign its events to another category. */
+  confirmDeleteCategory(path: string, reassignTo: string) {
+    // Reassign events that used this category (or a descendant)
+    for (const event of this.events) {
+      if (event.category === path || event.category.startsWith(path + CATEGORY_SEP)) {
+        event.category = reassignTo;
+      }
+    }
+
+    // Remove from saved categories
+    this.savedCategories = this.savedCategories.filter(
+      p => p !== path && !p.startsWith(path + CATEGORY_SEP)
+    );
+    this.persistCategories();
+    this.expandedCatNodes.delete(path);
+    this.deletingCatPath = null;
+    this.catFormSuccess = `"${path}" deleted.`;
+    setTimeout(() => { this.catFormSuccess = ''; }, 3000);
+  }
+
   deleteSavedCategory(path: string) {
     // Remove the path and all descendants
     this.savedCategories = this.savedCategories.filter(
@@ -2022,7 +2203,11 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     // Step 1 — load from localStorage immediately (instant, offline-safe)
     const cached = this.eventsService.listEvents(email, async (synced) => {
       // Step 3 — called when background Amplify sync completes
-      this.events = synced;
+      // Also merge shared events from other users
+      const shared = await this.eventsService.listSharedEvents(email);
+      const ownIds = new Set(synced.map(e => e.id));
+      const uniqueShared = shared.filter(e => !ownIds.has(e.id));
+      this.events = [...synced, ...uniqueShared];
       this.dbLoading = false;
       this.dbError = this.eventsService.syncWarning ?? '';
       this.showProactiveBanner(await this.runProactiveReminders());
@@ -2043,7 +2228,14 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         const seedData = buildCoachEvents().map(({ id: _id, ...rest }) => rest);
         this.events = await this.eventsService.seedEvents(seedData, email);
       }
-      // All other users start with a blank calendar
+      // For all users (including new ones), also load shared events
+      const shared = await this.eventsService.listSharedEvents(email);
+      if (shared.length > 0) {
+        const ownIds = new Set(this.events.map(e => e.id));
+        const uniqueShared = shared.filter(e => !ownIds.has(e.id));
+        this.events = [...this.events, ...uniqueShared];
+      }
+      // All other users start with a blank calendar (plus any shared events)
       this.dbLoading = false;
       this.showProactiveBanner(await this.runProactiveReminders());
     }
@@ -2114,7 +2306,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     }, 50);
   }
 
-  switchTab(tab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai') {
+  switchTab(tab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly') {
     this.activeTab = tab;
     if (tab === 'calendar') {
       this.slideMonthIndex = this.currentMonthIndex;
@@ -2134,6 +2326,9 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       } else if (!this.activeConversationId) {
         this.openAiConversation(this.aiConversations[0].id);
       }
+    }
+    if (tab === 'weekly') {
+      this.loadWeeklySummary();
     }
   }
 

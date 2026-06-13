@@ -222,6 +222,25 @@ export class EventsService {
 
   // ── Background sync ───────────────────────────────────────────────────────
 
+  /** Fetch events that other users have shared with the given email. */
+  async listSharedEvents(recipientEmail: string): Promise<CalendarEvent[]> {
+    try {
+      const { data, errors } = await getClient().models.CalendarEvent.list();
+      if (errors?.length) throw new Error(errors[0].message);
+      // Filter for events where sharedWith includes the recipient
+      const shared = (data ?? [])
+        .filter(record => {
+          const sw = record.sharedWith ?? [];
+          return sw.includes(recipientEmail) && record.ownerEmail !== recipientEmail;
+        })
+        .map(this.toLocal);
+      return shared;
+    } catch (err) {
+      console.warn('[EventsService] listSharedEvents failed:', err);
+      return [];
+    }
+  }
+
   private async backgroundSync(ownerEmail: string, onSyncComplete?: (events: CalendarEvent[]) => void) {
     if (this.syncing) return;
     this.syncing = true;

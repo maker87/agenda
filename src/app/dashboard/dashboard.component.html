@@ -162,6 +162,14 @@
         <span class="nav-icon">✨</span>
         AI Chat
       </button>
+      <button
+        class="nav-item"
+        [class.active]="activeTab === 'weekly'"
+        (click)="switchTab('weekly')"
+      >
+        <span class="nav-icon">📊</span>
+        Weekly Summary
+      </button>
     </nav>
 
     <div class="sidebar-footer">
@@ -882,23 +890,23 @@
       <ng-container *ngIf="notifSubTab === 'share'">
 
         <div class="share-subtab-section">
-          <p class="friend-search-hint">Send a share request by entering a username and selecting a share type.</p>
+          <p class="friend-search-hint">Send a share request by entering the recipient's email address and selecting a share type.</p>
 
           <div class="field" style="margin-bottom:16px">
-            <label class="share-field-label">Username</label>
+            <label class="share-field-label">Email Address</label>
             <div class="friend-search-wrap">
-              <span class="history-search-icon">👤</span>
+              <span class="history-search-icon">✉️</span>
               <input
                 class="history-search-input"
-                type="text"
-                [(ngModel)]="shareUsername"
-                name="shareUsername"
-                placeholder="Enter username…"
+                type="email"
+                [(ngModel)]="shareSubTabEmail"
+                name="shareSubTabEmail"
+                placeholder="Enter email address…"
               />
               <button
                 class="history-search-clear"
-                *ngIf="shareUsername"
-                (click)="shareUsername = ''"
+                *ngIf="shareSubTabEmail"
+                (click)="shareSubTabEmail = ''"
                 title="Clear"
               >✕</button>
             </div>
@@ -1017,7 +1025,7 @@
             class="btn-primary"
             style="width:100%;padding:12px"
             (click)="submitShareSubTab()"
-            [disabled]="!shareUsername.trim() || !shareType || ((shareType === 'category' || shareType === 'subcategory') && !shareSelectedCategory)"
+            [disabled]="!shareSubTabEmail.trim() || !shareType || ((shareType === 'category' || shareType === 'subcategory') && !shareSelectedCategory)"
           >
             Send Share Request
           </button>
@@ -1299,6 +1307,58 @@
       </div>
     </div>
 
+    <!-- ── WEEKLY SUMMARY TAB ── -->
+    <div *ngIf="activeTab === 'weekly'" class="tab-content">
+      <header class="page-header">
+        <div>
+          <h2 class="page-title">Weekly Summary</h2>
+          <p class="page-subtitle">Your next 7 days at a glance with AI suggestions</p>
+        </div>
+        <button class="btn-primary" (click)="getWeeklyAiSuggestions()" [disabled]="weeklyAiLoading">
+          {{ weeklyAiLoading ? 'Loading...' : '✨ Refresh Tips' }}
+        </button>
+      </header>
+
+      <!-- AI Suggestions Card -->
+      <div class="weekly-ai-card">
+        <div class="weekly-ai-header">
+          <span class="weekly-ai-icon">✨</span>
+          <span class="weekly-ai-title">AI Suggestions</span>
+        </div>
+        <div class="weekly-ai-body" *ngIf="!weeklyAiLoading">
+          <div [innerHTML]="renderChatMarkdown(weeklyAiSuggestions)"></div>
+        </div>
+        <div class="weekly-ai-body" *ngIf="weeklyAiLoading">
+          <span class="typing-dot"></span>
+          <span class="typing-dot"></span>
+          <span class="typing-dot"></span>
+          Analyzing your week...
+        </div>
+      </div>
+
+      <!-- Day-by-day breakdown -->
+      <div class="weekly-days">
+        <div class="weekly-day" *ngFor="let day of weeklySummaryDays" [class.weekly-day-today]="day.isToday">
+          <div class="weekly-day-header">
+            <span class="weekly-day-label">{{ day.label }}</span>
+            <span class="weekly-day-badge" *ngIf="day.isToday">Today</span>
+            <span class="weekly-day-count">{{ day.events.length }} event{{ day.events.length !== 1 ? 's' : '' }}</span>
+          </div>
+          <div class="weekly-day-events" *ngIf="day.events.length > 0">
+            <div class="weekly-event" *ngFor="let ev of day.events">
+              <span class="weekly-event-dot" [style.background]="ev.color"></span>
+              <span class="weekly-event-time">{{ formatTime(ev.startTime) }}</span>
+              <span class="weekly-event-title">{{ ev.title }}</span>
+              <span class="weekly-event-cat" *ngIf="ev.category">{{ ev.category }}</span>
+            </div>
+          </div>
+          <div class="weekly-day-empty" *ngIf="day.events.length === 0">
+            <span>No events — free day!</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── AI CHAT TAB ── -->
     <div *ngIf="activeTab === 'ai'" class="tab-content ai-tab">
       <header class="page-header">
@@ -1407,16 +1467,36 @@
         >{{ isCatNodeExpanded(node.fullPath) ? '▾' : '▸' }}</button>
         <span class="cat-node-toggle-spacer" *ngIf="node.children.length === 0"></span>
 
-        <!-- Name -->
-        <span class="cat-node-name">{{ node.name }}</span>
+        <!-- Name (show input when renaming, otherwise plain text) -->
+        <ng-container *ngIf="renamingCatPath !== node.fullPath">
+          <span class="cat-node-name">{{ node.name }}</span>
+        </ng-container>
+        <ng-container *ngIf="renamingCatPath === node.fullPath">
+          <input
+            class="cat-rename-input"
+            type="text"
+            [(ngModel)]="renameCatInput"
+            name="renameCatInput"
+            (keyup.enter)="submitRenameCategory(node.fullPath)"
+            (keyup.escape)="cancelRenameCategory()"
+            autofocus
+          />
+          <button class="cat-node-btn cat-rename-save" (click)="submitRenameCategory(node.fullPath)" title="Save">✓</button>
+          <button class="cat-node-btn cat-rename-cancel" (click)="cancelRenameCategory()" title="Cancel">✕</button>
+        </ng-container>
 
         <!-- Event count badge -->
-        <span class="cat-node-count" *ngIf="countEventsUnder(node.fullPath) > 0">
+        <span class="cat-node-count" *ngIf="countEventsUnder(node.fullPath) > 0 && renamingCatPath !== node.fullPath">
           {{ countEventsUnder(node.fullPath) }} event{{ countEventsUnder(node.fullPath) !== 1 ? 's' : '' }}
         </span>
 
-        <!-- Actions -->
-        <div class="cat-node-actions">
+        <!-- Actions (hidden during rename) -->
+        <div class="cat-node-actions" *ngIf="renamingCatPath !== node.fullPath">
+          <button
+            class="cat-node-btn cat-node-rename"
+            (click)="startRenameCategory(node.fullPath, node.name)"
+            title="Rename category"
+          >✏️</button>
           <button
             class="cat-node-btn cat-node-add"
             (click)="startAddSubcategory(node.fullPath); expandedCatNodes.add(node.fullPath)"
@@ -1424,10 +1504,28 @@
           >+ Sub</button>
           <button
             class="cat-node-btn cat-node-delete"
-            (click)="deleteSavedCategory(node.fullPath)"
+            (click)="startDeleteCategory(node.fullPath)"
             title="Delete category"
-            *ngIf="countEventsUnder(node.fullPath) === 0"
-          >✕</button>
+          >🗑️</button>
+        </div>
+      </div>
+
+      <!-- Rename error -->
+      <div class="cat-rename-error" *ngIf="renamingCatPath === node.fullPath && renameCatError">
+        {{ renameCatError }}
+      </div>
+
+      <!-- Delete confirmation -->
+      <div class="cat-delete-confirm" *ngIf="deletingCatPath === node.fullPath">
+        <div class="cat-delete-msg" *ngIf="countEventsUnder(node.fullPath) > 0">
+          ⚠️ This category has <strong>{{ countEventsUnder(node.fullPath) }}</strong> event(s). They will be unassigned.
+        </div>
+        <div class="cat-delete-msg" *ngIf="countEventsUnder(node.fullPath) === 0">
+          Delete "{{ node.name }}"?
+        </div>
+        <div class="cat-delete-actions">
+          <button class="btn-danger cat-delete-yes" (click)="confirmDeleteCategory(node.fullPath, '')">Delete</button>
+          <button class="btn-secondary cat-delete-no" (click)="cancelDeleteCategory()">Cancel</button>
         </div>
       </div>
 
