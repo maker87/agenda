@@ -3335,11 +3335,70 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   selectedEventId = '';
   deleteError = '';
 
+  // ── Mini calendar browser (shared for delete & change modals) ──
+  browseMode: 'search' | 'calendar' = 'search';
+  browseMonth = new Date().getMonth();
+  browseYear = new Date().getFullYear();
+  browseSelectedDate = '';
+  browseDayEvents: CalendarEvent[] = [];
+
+  get browseMonthName(): string {
+    return this.monthNames[this.browseMonth];
+  }
+
+  get browseWeeks() {
+    return this.buildWeeks(this.browseYear, this.browseMonth);
+  }
+
+  toggleBrowseMode() {
+    if (this.browseMode === 'search') {
+      this.browseMode = 'calendar';
+      this.browseMonth = new Date().getMonth();
+      this.browseYear = new Date().getFullYear();
+      this.browseSelectedDate = '';
+      this.browseDayEvents = [];
+    }
+  }
+
+  browsePrevMonth() {
+    if (this.browseMonth === 0) {
+      this.browseMonth = 11;
+      this.browseYear--;
+    } else {
+      this.browseMonth--;
+    }
+    this.browseSelectedDate = '';
+    this.browseDayEvents = [];
+  }
+
+  browseNextMonth() {
+    if (this.browseMonth === 11) {
+      this.browseMonth = 0;
+      this.browseYear++;
+    } else {
+      this.browseMonth++;
+    }
+    this.browseSelectedDate = '';
+    this.browseDayEvents = [];
+  }
+
+  browseSelectDay(dateStr: string) {
+    this.browseSelectedDate = dateStr;
+    this.browseDayEvents = this.events.filter(e => e.date === dateStr);
+  }
+
+  browseSelectEvent(id: string) {
+    this.selectedEventId = id;
+  }
+
   openDeleteModal() {
     this.searchQuery = '';
     this.searchResults = [];
     this.selectedEventId = '';
     this.deleteError = '';
+    this.browseMode = 'search';
+    this.browseSelectedDate = '';
+    this.browseDayEvents = [];
     this.showDeleteModal = true;
   }
 
@@ -3467,6 +3526,9 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.selectedEventId = '';
     this.changeError = '';
     this.changeStep = 'search';
+    this.browseMode = 'search';
+    this.browseSelectedDate = '';
+    this.browseDayEvents = [];
     this.showChangeModal = true;
   }
 

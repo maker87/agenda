@@ -321,6 +321,22 @@
   color: #1a1a2e;
 }
 
+.footer-links {
+  display: flex;
+  gap: 20px;
+}
+
+.footer-links a {
+  font-size: 13px;
+  color: #666;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-links a:hover {
+  color: #6c63ff;
+}
+
 .footer-copy {
   font-size: 13px;
   color: #888;

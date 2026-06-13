@@ -1640,55 +1640,23 @@
 
 <!-- ── DELETE EVENT MODAL ── -->
 <div class="modal-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
-  <div class="modal" (click)="$event.stopPropagation()">
+  <div class="modal modal-browse" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>Delete Event</h3>
       <button class="modal-close" (click)="closeDeleteModal()">✕</button>
     </div>
     <div class="modal-form">
-      <div class="field">
-        <label>Search event name</label>
-        <input type="text" [(ngModel)]="searchQuery" name="deleteSearch" placeholder="e.g. Standup" (ngModelChange)="onSearchChange()" class="search-input" autofocus />
+      <!-- Toggle between search and calendar browse -->
+      <div class="browse-toggle">
+        <button class="browse-toggle-btn" [class.active]="browseMode === 'search'" (click)="browseMode = 'search'">🔍 Search</button>
+        <button class="browse-toggle-btn" [class.active]="browseMode === 'calendar'" (click)="toggleBrowseMode()">🗓 Browse Calendar</button>
       </div>
-      <div class="search-results" *ngIf="searchResults.length > 0">
-        <div
-          class="search-result-item"
-          *ngFor="let ev of searchResults"
-          [class.selected]="selectedEventId === ev.id"
-          (click)="selectEvent(ev.id)"
-        >
-          <span class="result-dot" [style.background]="ev.color"></span>
-          <div class="result-info">
-            <span class="result-title">{{ ev.title }}</span>
-            <span class="result-meta">{{ formatDate(ev.date) }} · {{ formatTime(ev.startTime) }}</span>
-          </div>
-          <span class="result-check" *ngIf="selectedEventId === ev.id">✓</span>
-        </div>
-      </div>
-      <div class="search-empty" *ngIf="searchQuery && searchResults.length === 0">No events found matching "{{ searchQuery }}"</div>
-      <div class="error-msg" *ngIf="deleteError">{{ deleteError }}</div>
-      <div class="modal-actions">
-        <button class="btn-secondary" (click)="closeDeleteModal()">Cancel</button>
-        <button class="btn-danger" (click)="confirmDelete()" [disabled]="!selectedEventId">Delete Event</button>
-      </div>
-    </div>
-  </div>
-</div>
 
-<!-- ── CHANGE EVENT MODAL ── -->
-<div class="modal-overlay" *ngIf="showChangeModal" (click)="closeChangeModal()">
-  <div class="modal" (click)="$event.stopPropagation()">
-    <div class="modal-header">
-      <h3>{{ changeStep === 'search' ? 'Change Event' : 'Update Event' }}</h3>
-      <button class="modal-close" (click)="closeChangeModal()">✕</button>
-    </div>
-    <div class="modal-form" [class.picker-open]="showChangeCategoryPicker">
-
-      <!-- Step 1: search -->
-      <ng-container *ngIf="changeStep === 'search'">
+      <!-- Search mode -->
+      <ng-container *ngIf="browseMode === 'search'">
         <div class="field">
           <label>Search event name</label>
-          <input type="text" [(ngModel)]="searchQuery" name="changeSearch" placeholder="e.g. Design Review" (ngModelChange)="onSearchChange()" class="search-input" autofocus />
+          <input type="text" [(ngModel)]="searchQuery" name="deleteSearch" placeholder="e.g. Standup" (ngModelChange)="onSearchChange()" class="search-input" autofocus />
         </div>
         <div class="search-results" *ngIf="searchResults.length > 0">
           <div
@@ -1706,6 +1674,160 @@
           </div>
         </div>
         <div class="search-empty" *ngIf="searchQuery && searchResults.length === 0">No events found matching "{{ searchQuery }}"</div>
+      </ng-container>
+
+      <!-- Calendar browse mode -->
+      <ng-container *ngIf="browseMode === 'calendar'">
+        <div class="browse-calendar">
+          <div class="browse-cal-header">
+            <button class="browse-cal-arrow" (click)="browsePrevMonth()">‹</button>
+            <span class="browse-cal-title">{{ browseMonthName }} {{ browseYear }}</span>
+            <button class="browse-cal-arrow" (click)="browseNextMonth()">›</button>
+          </div>
+          <div class="browse-cal-grid">
+            <div class="browse-cal-day-label" *ngFor="let d of dayLabels">{{ d }}</div>
+            <ng-container *ngFor="let week of browseWeeks">
+              <ng-container *ngFor="let cell of week">
+                <div
+                  class="browse-cal-cell"
+                  [class.empty]="!cell"
+                  [class.today]="cell?.isToday"
+                  [class.has-events]="cell && cell.events.length > 0"
+                  [class.selected-day]="cell && cell.dateStr === browseSelectedDate"
+                  (click)="cell && cell.events.length > 0 && browseSelectDay(cell.dateStr)"
+                >
+                  <span class="browse-cal-day-num" *ngIf="cell">{{ cell.day }}</span>
+                  <span class="browse-cal-dot" *ngIf="cell && cell.events.length > 0"></span>
+                </div>
+              </ng-container>
+            </ng-container>
+          </div>
+        </div>
+
+        <!-- Events for selected day -->
+        <div class="browse-day-events" *ngIf="browseSelectedDate">
+          <div class="browse-day-label">Events on {{ formatDate(browseSelectedDate) }}</div>
+          <div class="search-results" *ngIf="browseDayEvents.length > 0">
+            <div
+              class="search-result-item"
+              *ngFor="let ev of browseDayEvents"
+              [class.selected]="selectedEventId === ev.id"
+              (click)="browseSelectEvent(ev.id)"
+            >
+              <span class="result-dot" [style.background]="ev.color"></span>
+              <div class="result-info">
+                <span class="result-title">{{ ev.title }}</span>
+                <span class="result-meta">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
+              </div>
+              <span class="result-check" *ngIf="selectedEventId === ev.id">✓</span>
+            </div>
+          </div>
+          <div class="search-empty" *ngIf="browseDayEvents.length === 0">No events on this day.</div>
+        </div>
+        <div class="browse-hint" *ngIf="!browseSelectedDate">Click a day with events to see them.</div>
+      </ng-container>
+
+      <div class="error-msg" *ngIf="deleteError">{{ deleteError }}</div>
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="closeDeleteModal()">Cancel</button>
+        <button class="btn-danger" (click)="confirmDelete()" [disabled]="!selectedEventId">Delete Event</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CHANGE EVENT MODAL ── -->
+<div class="modal-overlay" *ngIf="showChangeModal" (click)="closeChangeModal()">
+  <div class="modal modal-browse" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>{{ changeStep === 'search' ? 'Change Event' : 'Update Event' }}</h3>
+      <button class="modal-close" (click)="closeChangeModal()">✕</button>
+    </div>
+    <div class="modal-form" [class.picker-open]="showChangeCategoryPicker">
+
+      <!-- Step 1: search -->
+      <ng-container *ngIf="changeStep === 'search'">
+        <!-- Toggle between search and calendar browse -->
+        <div class="browse-toggle">
+          <button class="browse-toggle-btn" [class.active]="browseMode === 'search'" (click)="browseMode = 'search'">🔍 Search</button>
+          <button class="browse-toggle-btn" [class.active]="browseMode === 'calendar'" (click)="toggleBrowseMode()">🗓 Browse Calendar</button>
+        </div>
+
+        <!-- Search mode -->
+        <ng-container *ngIf="browseMode === 'search'">
+          <div class="field">
+            <label>Search event name</label>
+            <input type="text" [(ngModel)]="searchQuery" name="changeSearch" placeholder="e.g. Design Review" (ngModelChange)="onSearchChange()" class="search-input" autofocus />
+          </div>
+          <div class="search-results" *ngIf="searchResults.length > 0">
+            <div
+              class="search-result-item"
+              *ngFor="let ev of searchResults"
+              [class.selected]="selectedEventId === ev.id"
+              (click)="selectEvent(ev.id)"
+            >
+              <span class="result-dot" [style.background]="ev.color"></span>
+              <div class="result-info">
+                <span class="result-title">{{ ev.title }}</span>
+                <span class="result-meta">{{ formatDate(ev.date) }} · {{ formatTime(ev.startTime) }}</span>
+              </div>
+              <span class="result-check" *ngIf="selectedEventId === ev.id">✓</span>
+            </div>
+          </div>
+          <div class="search-empty" *ngIf="searchQuery && searchResults.length === 0">No events found matching "{{ searchQuery }}"</div>
+        </ng-container>
+
+        <!-- Calendar browse mode -->
+        <ng-container *ngIf="browseMode === 'calendar'">
+          <div class="browse-calendar">
+            <div class="browse-cal-header">
+              <button class="browse-cal-arrow" (click)="browsePrevMonth()">‹</button>
+              <span class="browse-cal-title">{{ browseMonthName }} {{ browseYear }}</span>
+              <button class="browse-cal-arrow" (click)="browseNextMonth()">›</button>
+            </div>
+            <div class="browse-cal-grid">
+              <div class="browse-cal-day-label" *ngFor="let d of dayLabels">{{ d }}</div>
+              <ng-container *ngFor="let week of browseWeeks">
+                <ng-container *ngFor="let cell of week">
+                  <div
+                    class="browse-cal-cell"
+                    [class.empty]="!cell"
+                    [class.today]="cell?.isToday"
+                    [class.has-events]="cell && cell.events.length > 0"
+                    [class.selected-day]="cell && cell.dateStr === browseSelectedDate"
+                    (click)="cell && cell.events.length > 0 && browseSelectDay(cell.dateStr)"
+                  >
+                    <span class="browse-cal-day-num" *ngIf="cell">{{ cell.day }}</span>
+                    <span class="browse-cal-dot" *ngIf="cell && cell.events.length > 0"></span>
+                  </div>
+                </ng-container>
+              </ng-container>
+            </div>
+          </div>
+
+          <!-- Events for selected day -->
+          <div class="browse-day-events" *ngIf="browseSelectedDate">
+            <div class="browse-day-label">Events on {{ formatDate(browseSelectedDate) }}</div>
+            <div class="search-results" *ngIf="browseDayEvents.length > 0">
+              <div
+                class="search-result-item"
+                *ngFor="let ev of browseDayEvents"
+                [class.selected]="selectedEventId === ev.id"
+                (click)="browseSelectEvent(ev.id)"
+              >
+                <span class="result-dot" [style.background]="ev.color"></span>
+                <div class="result-info">
+                  <span class="result-title">{{ ev.title }}</span>
+                  <span class="result-meta">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
+                </div>
+                <span class="result-check" *ngIf="selectedEventId === ev.id">✓</span>
+              </div>
+            </div>
+            <div class="search-empty" *ngIf="browseDayEvents.length === 0">No events on this day.</div>
+          </div>
+          <div class="browse-hint" *ngIf="!browseSelectedDate">Click a day with events to see them.</div>
+        </ng-container>
+
         <div class="modal-actions">
           <button class="btn-secondary" (click)="closeChangeModal()">Cancel</button>
           <button class="btn-warning" (click)="proceedToChange()" [disabled]="!selectedEventId">Next →</button>
@@ -2439,7 +2561,7 @@
           <input type="checkbox" [(ngModel)]="cal.selected" [name]="'gcal_' + cal.id" />
           <span class="gcal-cal-dot" [style.background]="cal.color"></span>
           <span class="gcal-cal-name">{{ cal.name }}</span>
-          <span class="gcal-cal-primary" *ngIf="cal.primary">Primary</span>
+          <span class="gcal-cal-primary" *ngIf="cal.primary">(Primary Calendar)</span>
         </label>
 
         <div *ngIf="gcalCalendars.length === 0" class="gcal-picker-empty">

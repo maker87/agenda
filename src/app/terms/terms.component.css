@@ -1,0 +1,170 @@
+/* ── Legal Page Shared Styles ── */
+.legal-wrapper {
+  min-height: 100vh;
+  background: #fafbff;
+  font-family: inherit;
+}
+
+/* ── Nav ── */
+.legal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 48px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.nav-icon {
+  font-size: 28px;
+}
+
+.nav-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a2e;
+  letter-spacing: -0.5px;
+}
+
+.nav-btn {
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.nav-btn-ghost {
+  background: transparent;
+  color: #444;
+}
+
+.nav-btn-ghost:hover {
+  background: #f0eeff;
+  color: #6c63ff;
+}
+
+/* ── Content ── */
+.legal-content {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 48px 80px;
+}
+
+.legal-content h1 {
+  font-size: 36px;
+  font-weight: 800;
+  color: #1a1a2e;
+  margin: 0 0 8px;
+  letter-spacing: -0.5px;
+}
+
+.last-updated {
+  font-size: 14px;
+  color: #888;
+  margin: 0 0 40px;
+}
+
+.legal-content section {
+  margin-bottom: 32px;
+}
+
+.legal-content h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 12px;
+}
+
+.legal-content h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 16px 0 8px;
+}
+
+.legal-content p {
+  font-size: 15px;
+  color: #555;
+  line-height: 1.7;
+  margin: 0 0 12px;
+}
+
+.legal-content ul {
+  margin: 8px 0 16px;
+  padding-left: 24px;
+}
+
+.legal-content li {
+  font-size: 15px;
+  color: #555;
+  line-height: 1.7;
+  margin-bottom: 6px;
+}
+
+.legal-content a {
+  color: #6c63ff;
+  text-decoration: none;
+}
+
+.legal-content a:hover {
+  text-decoration: underline;
+}
+
+.legal-content strong {
+  color: #333;
+}
+
+/* ── Footer ── */
+.legal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 48px;
+  max-width: 1200px;
+  margin: 0 auto;
+  border-top: 1px solid #eee;
+}
+
+.footer-brand {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.footer-copy {
+  font-size: 13px;
+  color: #888;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .legal-nav {
+    padding: 16px 20px;
+  }
+
+  .legal-content {
+    padding: 24px 20px 60px;
+  }
+
+  .legal-content h1 {
+    font-size: 28px;
+  }
+
+  .legal-footer {
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px;
+    text-align: center;
+  }
+}
