@@ -606,9 +606,13 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly' = 'schedule';
 
   // ── History ──
-  private readonly HISTORY_KEY = 'agenda_event_history';
+  private readonly HISTORY_KEY_PREFIX = 'agenda_event_history_';
   private readonly HISTORY_TTL_DAYS = 7;
   history: HistoryEntry[] = [];
+
+  private get historyKey(): string {
+    return this.HISTORY_KEY_PREFIX + (this.userEmail || 'default');
+  }
   historyFilter: 'all' | HistoryAction = 'all';
   historySearch = '';
   historyRestoreMsg = '';
@@ -4015,7 +4019,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   private loadHistory() {
     try {
-      const raw = localStorage.getItem(this.HISTORY_KEY);
+      const raw = localStorage.getItem(this.historyKey);
       if (!raw) { this.history = []; return; }
       const parsed: HistoryEntry[] = JSON.parse(raw);
       const cutoff = Date.now() - this.HISTORY_TTL_DAYS * 24 * 60 * 60 * 1000;
@@ -4027,7 +4031,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
 
   private saveHistory() {
-    localStorage.setItem(this.HISTORY_KEY, JSON.stringify(this.history));
+    localStorage.setItem(this.historyKey, JSON.stringify(this.history));
   }
 
   private recordHistory(action: HistoryAction, snapshot: CalendarEvent, previousSnapshot?: CalendarEvent) {

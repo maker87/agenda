@@ -31,6 +31,10 @@
           I already have an account
         </button>
       </div>
+      <div class="hero-trust">
+        <span class="hero-trust-icon">🔒</span>
+        <span>No credit card required · Free forever plan · Cancel anytime</span>
+      </div>
     </div>
     <div class="hero-visual">
       <div class="hero-calendar-preview">
@@ -38,23 +42,28 @@
           <span class="preview-dot red"></span>
           <span class="preview-dot yellow"></span>
           <span class="preview-dot green"></span>
+          <span class="preview-title">Today's Schedule</span>
         </div>
         <div class="preview-body">
           <div class="preview-event" style="--ev-color: #6c63ff">
             <span class="preview-event-time">9:00 AM</span>
             <span class="preview-event-title">Team Standup</span>
+            <span class="preview-event-tag">Work</span>
           </div>
           <div class="preview-event" style="--ev-color: #10b981">
             <span class="preview-event-time">11:30 AM</span>
             <span class="preview-event-title">Design Review</span>
+            <span class="preview-event-tag">Meeting</span>
           </div>
           <div class="preview-event" style="--ev-color: #f59e0b">
             <span class="preview-event-time">2:00 PM</span>
             <span class="preview-event-title">Client Call</span>
+            <span class="preview-event-tag">Client</span>
           </div>
           <div class="preview-event" style="--ev-color: #ec4899">
             <span class="preview-event-time">4:30 PM</span>
             <span class="preview-event-title">Gym Session</span>
+            <span class="preview-event-tag">Personal</span>
           </div>
         </div>
       </div>
@@ -64,6 +73,7 @@
   <!-- Features Section -->
   <section class="features">
     <h2 class="features-title">Everything you need to stay organized</h2>
+    <p class="features-subtitle">Powerful features designed to save you time and keep you on track.</p>
     <div class="features-grid">
       <div class="feature-card">
         <div class="feature-icon">✨</div>
@@ -98,6 +108,535 @@
     </div>
   </section>
 
+  <!-- Feature Showcase: AI Chat -->
+  <section class="showcase">
+    <div class="showcase-content">
+      <span class="showcase-badge">AI Assistant</span>
+      <h2 class="showcase-title">Chat with your calendar</h2>
+      <p class="showcase-desc">
+        Ask Agenda's AI anything about your schedule. It can find free time slots, suggest
+        optimal meeting times, and even help you plan your entire week. Just type naturally
+        and let AI handle the rest.
+      </p>
+      <ul class="showcase-list">
+        <li><span class="showcase-check">✓</span> "When am I free this Thursday afternoon?"</li>
+        <li><span class="showcase-check">✓</span> "Schedule a 1-hour workout 3 times this week"</li>
+        <li><span class="showcase-check">✓</span> "Move my Friday meeting to next Monday"</li>
+        <li><span class="showcase-check">✓</span> "What does my week look like?"</li>
+      </ul>
+    </div>
+    <div class="showcase-visual">
+      <div class="chat-preview">
+        <div class="chat-bubble user">When am I free tomorrow?</div>
+        <div class="chat-bubble ai">
+          <span class="chat-ai-icon">✨</span>
+          You have free slots tomorrow at:<br>
+          • 10:00 – 11:30 AM<br>
+          • 1:00 – 3:00 PM<br>
+          • After 4:30 PM<br>
+          Would you like me to schedule something?
+        </div>
+        <div class="chat-bubble user">Book a focus session from 1 to 3 PM</div>
+        <div class="chat-bubble ai">
+          <span class="chat-ai-icon">✨</span>
+          Done! I've added "Focus Session" tomorrow from 1:00 to 3:00 PM. Want me to set a reminder?
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature Showcase: Calendar Views -->
+  <section class="showcase showcase-reverse">
+    <div class="showcase-content">
+      <span class="showcase-badge">Calendar Views</span>
+      <h2 class="showcase-title">See your time, your way</h2>
+      <p class="showcase-desc">
+        Switch between year, month, week, and day views to zoom in or out of your schedule.
+        Color-coded events make it easy to distinguish work from personal time at a glance.
+      </p>
+      <ul class="showcase-list">
+        <li><span class="showcase-check">✓</span> Year overview with monthly grids</li>
+        <li><span class="showcase-check">✓</span> Month slideshow with event pills</li>
+        <li><span class="showcase-check">✓</span> Week columns with time blocks</li>
+        <li><span class="showcase-check">✓</span> Day timeline for detailed planning</li>
+      </ul>
+    </div>
+    <div class="showcase-visual">
+      <div class="calendar-mini-preview">
+        <div class="mini-month-header">
+          <span>June 2026</span>
+          <span class="mini-badge">This month</span>
+        </div>
+        <div class="mini-grid">
+          <span class="mini-day-label">S</span>
+          <span class="mini-day-label">M</span>
+          <span class="mini-day-label">T</span>
+          <span class="mini-day-label">W</span>
+          <span class="mini-day-label">T</span>
+          <span class="mini-day-label">F</span>
+          <span class="mini-day-label">S</span>
+          <span class="mini-day empty"></span>
+          <span class="mini-day">1</span>
+          <span class="mini-day">2</span>
+          <span class="mini-day has-event">3</span>
+          <span class="mini-day">4</span>
+          <span class="mini-day has-event">5</span>
+          <span class="mini-day">6</span>
+          <span class="mini-day">7</span>
+          <span class="mini-day has-event">8</span>
+          <span class="mini-day">9</span>
+          <span class="mini-day">10</span>
+          <span class="mini-day">11</span>
+          <span class="mini-day has-event">12</span>
+          <span class="mini-day today">13</span>
+          <span class="mini-day">14</span>
+          <span class="mini-day has-event">15</span>
+          <span class="mini-day">16</span>
+          <span class="mini-day">17</span>
+          <span class="mini-day has-event">18</span>
+          <span class="mini-day">19</span>
+          <span class="mini-day">20</span>
+          <span class="mini-day has-event">21</span>
+          <span class="mini-day">22</span>
+          <span class="mini-day">23</span>
+          <span class="mini-day">24</span>
+          <span class="mini-day has-event">25</span>
+          <span class="mini-day">26</span>
+          <span class="mini-day">27</span>
+          <span class="mini-day">28</span>
+          <span class="mini-day">29</span>
+          <span class="mini-day">30</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature Showcase: Smart Reminders & Notifications -->
+  <section class="showcase">
+    <div class="showcase-content">
+      <span class="showcase-badge">Notifications</span>
+      <h2 class="showcase-title">Never miss what matters</h2>
+      <p class="showcase-desc">
+        Set custom reminders for any event — 5 minutes before, 1 hour, or even days ahead.
+        Get notified about event invites, shared calendars, and AI-generated suggestions,
+        all in one unified notification center.
+      </p>
+      <ul class="showcase-list">
+        <li><span class="showcase-check">✓</span> Custom reminder timing per event</li>
+        <li><span class="showcase-check">✓</span> Event invite accept/decline flow</li>
+        <li><span class="showcase-check">✓</span> AI-generated daily login reminders</li>
+        <li><span class="showcase-check">✓</span> Filter by type: reminders, invites, shared</li>
+      </ul>
+    </div>
+    <div class="showcase-visual">
+      <div class="notif-preview">
+        <div class="notif-preview-header">
+          <span>Notifications</span>
+          <span class="notif-preview-badge">3 new</span>
+        </div>
+        <div class="notif-preview-item unread">
+          <span class="notif-preview-icon reminder">🔔</span>
+          <div class="notif-preview-body">
+            <span class="notif-preview-title">Team Standup in 15 minutes</span>
+            <span class="notif-preview-time">Just now</span>
+          </div>
+        </div>
+        <div class="notif-preview-item unread">
+          <span class="notif-preview-icon invite">📩</span>
+          <div class="notif-preview-body">
+            <span class="notif-preview-title">Sara invited you to "Design Sprint"</span>
+            <span class="notif-preview-time">2 min ago</span>
+          </div>
+        </div>
+        <div class="notif-preview-item">
+          <span class="notif-preview-icon share">↗</span>
+          <div class="notif-preview-body">
+            <span class="notif-preview-title">James shared "Q3 Planning" with you</span>
+            <span class="notif-preview-time">1 hour ago</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Feature Showcase: Categories & Organization -->
+  <section class="showcase showcase-reverse">
+    <div class="showcase-content">
+      <span class="showcase-badge">Organization</span>
+      <h2 class="showcase-title">Color-code your life</h2>
+      <p class="showcase-desc">
+        Create nested categories with custom colors to organize events by work, personal,
+        health, or anything else. Filter your agenda by category to focus on what matters
+        right now.
+      </p>
+      <ul class="showcase-list">
+        <li><span class="showcase-check">✓</span> Unlimited nested categories</li>
+        <li><span class="showcase-check">✓</span> Custom colors per category</li>
+        <li><span class="showcase-check">✓</span> Filter events by category</li>
+        <li><span class="showcase-check">✓</span> Category count badges on calendar</li>
+      </ul>
+    </div>
+    <div class="showcase-visual">
+      <div class="categories-preview">
+        <div class="cat-preview-item">
+          <span class="cat-preview-dot" style="background: #6c63ff"></span>
+          <span class="cat-preview-name">Work</span>
+          <span class="cat-preview-count">12 events</span>
+        </div>
+        <div class="cat-preview-item sub">
+          <span class="cat-preview-dot" style="background: #818cf8"></span>
+          <span class="cat-preview-name">Meetings</span>
+          <span class="cat-preview-count">8 events</span>
+        </div>
+        <div class="cat-preview-item sub">
+          <span class="cat-preview-dot" style="background: #a78bfa"></span>
+          <span class="cat-preview-name">Deadlines</span>
+          <span class="cat-preview-count">4 events</span>
+        </div>
+        <div class="cat-preview-item">
+          <span class="cat-preview-dot" style="background: #10b981"></span>
+          <span class="cat-preview-name">Personal</span>
+          <span class="cat-preview-count">7 events</span>
+        </div>
+        <div class="cat-preview-item sub">
+          <span class="cat-preview-dot" style="background: #34d399"></span>
+          <span class="cat-preview-name">Health &amp; Fitness</span>
+          <span class="cat-preview-count">4 events</span>
+        </div>
+        <div class="cat-preview-item">
+          <span class="cat-preview-dot" style="background: #f59e0b"></span>
+          <span class="cat-preview-name">Side Projects</span>
+          <span class="cat-preview-count">3 events</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Use Cases Section -->
+  <section class="use-cases">
+    <h2 class="section-title">Built for every kind of schedule</h2>
+    <p class="section-subtitle">Whether you're a freelancer, a team lead, or a student, Agenda adapts to your workflow.</p>
+    <div class="use-cases-grid">
+      <div class="use-case-card">
+        <div class="use-case-icon">💼</div>
+        <h3>Professionals</h3>
+        <p>Manage meetings, deadlines, and client calls. Sync with Google Calendar so everything's in one place. Get AI reminders before important presentations.</p>
+      </div>
+      <div class="use-case-card">
+        <div class="use-case-icon">🎓</div>
+        <h3>Students</h3>
+        <p>Track classes, assignments, and exam dates. Set recurring weekly schedules and get reminders for submission deadlines.</p>
+      </div>
+      <div class="use-case-card">
+        <div class="use-case-icon">👨‍👩‍👧‍👦</div>
+        <h3>Families</h3>
+        <p>Coordinate family events, share calendars with your partner, and never forget school pickups or doctor appointments.</p>
+      </div>
+      <div class="use-case-card">
+        <div class="use-case-icon">🚀</div>
+        <h3>Freelancers</h3>
+        <p>Juggle multiple clients and projects. Use categories to separate clients, and let AI find gaps in your schedule for deep work.</p>
+      </div>
+      <div class="use-case-card">
+        <div class="use-case-icon">🏋️</div>
+        <h3>Fitness & Health</h3>
+        <p>Plan workouts, track meals, and schedule meditation sessions. Set recurring health habits and get reminded to stay consistent.</p>
+      </div>
+      <div class="use-case-card">
+        <div class="use-case-icon">🎨</div>
+        <h3>Creators</h3>
+        <p>Plan content calendars, schedule recording sessions, and organize collaborations. Keep creative deadlines front and center.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works Section -->
+  <section class="how-it-works">
+    <h2 class="section-title">Get started in 3 simple steps</h2>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-number">1</div>
+        <h3>Create your account</h3>
+        <p>Sign up in seconds — no credit card required. Connect your existing calendars if you'd like.</p>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step-card">
+        <div class="step-number">2</div>
+        <h3>Add your events</h3>
+        <p>Manually add events, import from Google Calendar, or let AI suggest scheduling based on your habits.</p>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step-card">
+        <div class="step-number">3</div>
+        <h3>Stay on track</h3>
+        <p>Get smart reminders, track your to-dos, and let Agenda handle the rest so you can focus on what matters.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Weekly Summary Preview -->
+  <section class="weekly-summary-section">
+    <div class="weekly-summary-content">
+      <span class="showcase-badge">Weekly Insights</span>
+      <h2 class="showcase-title">Your week at a glance</h2>
+      <p class="showcase-desc">
+        Get a smart weekly summary that shows you how you spent your time. See breakdowns by category,
+        busiest days, and upcoming highlights — so you can plan next week even better.
+      </p>
+      <div class="weekly-stats-preview">
+        <div class="weekly-stat">
+          <span class="weekly-stat-value">23</span>
+          <span class="weekly-stat-label">Events this week</span>
+        </div>
+        <div class="weekly-stat">
+          <span class="weekly-stat-value">14h</span>
+          <span class="weekly-stat-label">In meetings</span>
+        </div>
+        <div class="weekly-stat">
+          <span class="weekly-stat-value">6h</span>
+          <span class="weekly-stat-label">Focus time</span>
+        </div>
+        <div class="weekly-stat">
+          <span class="weekly-stat-value">Tue</span>
+          <span class="weekly-stat-label">Busiest day</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Integrations Section -->
+  <section class="integrations">
+    <h2 class="section-title">Works with tools you already use</h2>
+    <p class="section-subtitle">Connect Agenda with your favorite services to keep everything in sync.</p>
+    <div class="integrations-grid">
+      <div class="integration-card">
+        <div class="integration-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="3" width="18" height="18" rx="2" fill="#fff" stroke="#e0e0e0"/>
+            <rect x="3" y="7" width="18" height="2" fill="#4285F4"/>
+            <text x="12" y="17" text-anchor="middle" font-size="8" font-weight="bold" fill="#4285F4">G</text>
+          </svg>
+        </div>
+        <h4>Google Calendar</h4>
+        <p>Two-way sync keeps events updated across both platforms automatically.</p>
+      </div>
+      <div class="integration-card">
+        <div class="integration-icon">🤖</div>
+        <h4>AI (Bedrock)</h4>
+        <p>Powered by AWS Bedrock for intelligent scheduling suggestions and natural language chat.</p>
+      </div>
+      <div class="integration-card">
+        <div class="integration-icon">☁️</div>
+        <h4>AWS Amplify</h4>
+        <p>Secure cloud backend with real-time data sync, authentication, and scalability.</p>
+      </div>
+      <div class="integration-card">
+        <div class="integration-icon">🌐</div>
+        <h4>Responsive Web</h4>
+        <p>Works on any device — desktop, tablet, or phone. No app download needed.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats Section -->
+  <section class="stats-bar">
+    <div class="stat-item">
+      <span class="stat-number">10K+</span>
+      <span class="stat-label">Active Users</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number">500K+</span>
+      <span class="stat-label">Events Scheduled</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number">99.9%</span>
+      <span class="stat-label">Uptime</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number">4.8/5</span>
+      <span class="stat-label">User Rating</span>
+    </div>
+  </section>
+
+  <!-- Testimonials Section -->
+  <section class="testimonials">
+    <h2 class="section-title">Loved by people who value their time</h2>
+    <div class="testimonials-grid">
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"Agenda transformed how I manage my week. The AI suggestions are spot on — it feels like having a personal assistant."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">SM</div>
+          <div>
+            <span class="testimonial-name">Sara M.</span>
+            <span class="testimonial-role">Product Manager</span>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"I sync all my Google Calendars here and love the category view. Finally, a calendar app that actually helps me prioritize."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">JR</div>
+          <div>
+            <span class="testimonial-name">James R.</span>
+            <span class="testimonial-role">Freelance Developer</span>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"The smart reminders are a game changer. I haven't missed a deadline since I started using Agenda three months ago."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">LP</div>
+          <div>
+            <span class="testimonial-name">Laura P.</span>
+            <span class="testimonial-role">Marketing Director</span>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"The AI chat is insanely useful. I just say 'find me 2 hours for deep work' and it does it. I've doubled my focus time."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">DK</div>
+          <div>
+            <span class="testimonial-name">David K.</span>
+            <span class="testimonial-role">Software Engineer</span>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"I manage my family's schedule, my freelance work, and my gym routine all in one app. The categories keep everything sane."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">AM</div>
+          <div>
+            <span class="testimonial-name">Ana M.</span>
+            <span class="testimonial-role">Freelance Designer</span>
+          </div>
+        </div>
+      </div>
+      <div class="testimonial-card">
+        <div class="testimonial-stars">★★★★★</div>
+        <p class="testimonial-text">"Finally an app that works across all my devices seamlessly. The weekly summary helps me reflect on how I spend my time."</p>
+        <div class="testimonial-author">
+          <div class="testimonial-avatar">TC</div>
+          <div>
+            <span class="testimonial-name">Tom C.</span>
+            <span class="testimonial-role">Startup Founder</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Comparison Section -->
+  <section class="comparison">
+    <h2 class="section-title">Why Agenda over other calendar apps?</h2>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="highlight-col">Agenda</th>
+            <th>Basic Calendars</th>
+            <th>Other AI Tools</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>AI-powered scheduling</td>
+            <td class="highlight-col"><span class="check-yes">✓</span></td>
+            <td><span class="check-no">✗</span></td>
+            <td><span class="check-yes">✓</span></td>
+          </tr>
+          <tr>
+            <td>Natural language chat</td>
+            <td class="highlight-col"><span class="check-yes">✓</span></td>
+            <td><span class="check-no">✗</span></td>
+            <td><span class="check-partial">~</span></td>
+          </tr>
+          <tr>
+            <td>Google Calendar sync</td>
+            <td class="highlight-col"><span class="check-yes">✓</span></td>
+            <td><span class="check-yes">✓</span></td>
+            <td><span class="check-partial">~</span></td>
+          </tr>
+          <tr>
+            <td>Nested categories</td>
+            <td class="highlight-col"><span class="check-yes">✓</span></td>
+            <td><span class="check-no">✗</span></td>
+            <td><span class="check-no">✗</span></td>
+          </tr>
+          <tr>
+            <td>Event sharing &amp; invites</td>
+            <td class="highlight-col"><span class="check-yes">✓</span></td>
+            <td><span class="check-partial">~</span></td>
+            <td><span class="check-no">✗</span></td>
+          </tr>
+          <tr>
+            <td>Weekly insights &amp; summaries</td>
+            <td class="highlight-col"><span class="check-yes">✓</span></td>
+            <td><span class="check-no">✗</span></td>
+            <td><span class="check-partial">~</span></td>
+          </tr>
+          <tr>
+            <td>Free forever plan</td>
+            <td class="highlight-col"><span class="check-yes">✓</span></td>
+            <td><span class="check-yes">✓</span></td>
+            <td><span class="check-no">✗</span></td>
+          </tr>
+          <tr>
+            <td>Dark mode</td>
+            <td class="highlight-col"><span class="check-yes">✓</span></td>
+            <td><span class="check-partial">~</span></td>
+            <td><span class="check-yes">✓</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section class="faq">
+    <h2 class="section-title">Frequently asked questions</h2>
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary>Is Agenda free to use?</summary>
+        <p>Yes! Agenda offers a generous free tier that includes all core features like event management, categories, smart reminders, and AI scheduling suggestions.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Can I import events from Google Calendar?</summary>
+        <p>Absolutely. Connect your Google account and Agenda will sync your events automatically. Changes made in either app stay up to date.</p>
+      </details>
+      <details class="faq-item">
+        <summary>How does the AI scheduling work?</summary>
+        <p>Our AI analyzes your existing schedule, habits, and preferences to suggest optimal times for new events. It considers factors like meeting gaps, focus time, and your personal routines.</p>
+      </details>
+      <details class="faq-item">
+        <summary>What can I do with the AI chat?</summary>
+        <p>You can ask natural-language questions like "When am I free tomorrow?" or give commands like "Schedule a workout at 7 AM on weekdays." The AI understands context and can manage your schedule conversationally.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Is my data safe?</summary>
+        <p>Your data is encrypted at rest and in transit. We use AWS infrastructure with strict access controls. You can read more in our Privacy Policy.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Can I use Agenda on mobile?</summary>
+        <p>Agenda is built as a responsive web app that works beautifully on any device — phone, tablet, or desktop. No app download needed.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Can I share events with other people?</summary>
+        <p>Yes! You can share individual events or entire calendars with anyone. They'll receive an invite notification and can accept or decline right from their notification panel.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Does it support dark mode?</summary>
+        <p>Of course. Toggle between light and dark themes with a single click from the dashboard. Your preference is saved automatically.</p>
+      </details>
+    </div>
+  </section>
+
   <!-- CTA Section -->
   <section class="cta">
     <h2>Ready to take control of your schedule?</h2>
@@ -105,15 +644,29 @@
     <button class="hero-btn hero-btn-primary" (click)="goToSignup()">
       Create Your Free Account
     </button>
+    <span class="cta-note">No credit card required · Setup in under 30 seconds</span>
   </section>
 
   <!-- Footer -->
   <footer class="landing-footer">
-    <span class="footer-brand">📅 Agenda</span>
-    <div class="footer-links">
-      <a routerLink="/privacy">Privacy Policy</a>
-      <a routerLink="/terms">Terms of Service</a>
+    <div class="footer-top">
+      <div class="footer-brand-col">
+        <span class="footer-brand">📅 Agenda</span>
+        <p class="footer-tagline">Your smart scheduling assistant. Organize your life effortlessly with AI-powered calendar management.</p>
+      </div>
+      <div class="footer-links-col">
+        <h4>Product</h4>
+        <a (click)="goToSignup()">Get Started</a>
+        <a (click)="goToLogin()">Log In</a>
+      </div>
+      <div class="footer-links-col">
+        <h4>Legal</h4>
+        <a routerLink="/privacy">Privacy Policy</a>
+        <a routerLink="/terms">Terms of Service</a>
+      </div>
     </div>
-    <span class="footer-copy">&copy; 2026 Agenda. All rights reserved.</span>
+    <div class="footer-bottom">
+      <span class="footer-copy">&copy; 2026 Agenda. All rights reserved.</span>
+    </div>
   </footer>
 </div>
