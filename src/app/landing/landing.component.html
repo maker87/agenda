@@ -1,0 +1,115 @@
+<div class="landing-wrapper">
+  <!-- Navigation bar -->
+  <nav class="landing-nav">
+    <div class="nav-brand">
+      <span class="nav-icon">📅</span>
+      <span class="nav-title">Agenda</span>
+    </div>
+    <div class="nav-actions">
+      <button class="nav-btn nav-btn-ghost" (click)="goToLogin()">Log In</button>
+      <button class="nav-btn nav-btn-primary" (click)="goToSignup()">Sign Up</button>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-content">
+      <h1 class="hero-title">
+        Your smart
+        <span class="hero-highlight">scheduling</span>
+        assistant
+      </h1>
+      <p class="hero-subtitle">
+        Organize your life effortlessly. AI-powered calendar management, smart reminders,
+        and seamless scheduling — all in one place.
+      </p>
+      <div class="hero-actions">
+        <button class="hero-btn hero-btn-primary" (click)="goToSignup()">
+          Get Started Free
+        </button>
+        <button class="hero-btn hero-btn-secondary" (click)="goToLogin()">
+          I already have an account
+        </button>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="hero-calendar-preview">
+        <div class="preview-header">
+          <span class="preview-dot red"></span>
+          <span class="preview-dot yellow"></span>
+          <span class="preview-dot green"></span>
+        </div>
+        <div class="preview-body">
+          <div class="preview-event" style="--ev-color: #6c63ff">
+            <span class="preview-event-time">9:00 AM</span>
+            <span class="preview-event-title">Team Standup</span>
+          </div>
+          <div class="preview-event" style="--ev-color: #10b981">
+            <span class="preview-event-time">11:30 AM</span>
+            <span class="preview-event-title">Design Review</span>
+          </div>
+          <div class="preview-event" style="--ev-color: #f59e0b">
+            <span class="preview-event-time">2:00 PM</span>
+            <span class="preview-event-title">Client Call</span>
+          </div>
+          <div class="preview-event" style="--ev-color: #ec4899">
+            <span class="preview-event-time">4:30 PM</span>
+            <span class="preview-event-title">Gym Session</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features">
+    <h2 class="features-title">Everything you need to stay organized</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">✨</div>
+        <h3>AI-Powered Scheduling</h3>
+        <p>Let AI suggest the best times for your events based on your habits and preferences.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔔</div>
+        <h3>Smart Reminders</h3>
+        <p>Never miss an appointment with intelligent notifications that adapt to your routine.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🗓</div>
+        <h3>Multiple Views</h3>
+        <p>Year, month, week, or day view — see your schedule exactly how you want it.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔗</div>
+        <h3>Google Calendar Sync</h3>
+        <p>Import and sync with Google Calendar to keep all your events in one place.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🏷️</div>
+        <h3>Categories &amp; Tags</h3>
+        <p>Organize events with nested categories and color-coded labels.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">👥</div>
+        <h3>Share Events</h3>
+        <p>Collaborate with others by sharing events and calendars effortlessly.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="cta">
+    <h2>Ready to take control of your schedule?</h2>
+    <p>Join thousands of users who manage their time smarter with Agenda.</p>
+    <button class="hero-btn hero-btn-primary" (click)="goToSignup()">
+      Create Your Free Account
+    </button>
+  </section>
+
+  <!-- Footer -->
+  <footer class="landing-footer">
+    <span class="footer-brand">📅 Agenda</span>
+    <span class="footer-copy">&copy; 2026 Agenda. All rights reserved.</span>
+  </footer>
+</div>

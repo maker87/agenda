@@ -1,5 +1,6 @@
 .auth-wrapper {
   min-height: 100vh;
+  min-height: 100dvh; /* dynamic viewport height — avoids mobile browser chrome overlap */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -14,6 +15,22 @@
   width: 100%;
   max-width: 420px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+/* Back to home link */
+.back-home-link {
+  display: inline-block;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6c63ff;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.back-home-link:hover {
+  opacity: 0.7;
 }
 
 /* Brand */
@@ -240,4 +257,78 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ── Mobile Responsive ── */
+@media (max-width: 480px) {
+  .auth-wrapper {
+    padding: 12px;
+    align-items: flex-start;
+    padding-top: 24px;
+  }
+
+  .auth-card {
+    padding: 28px 20px;
+    border-radius: 16px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+  }
+
+  .brand {
+    margin-bottom: 24px;
+  }
+
+  .brand-icon {
+    font-size: 40px;
+  }
+
+  .brand-name {
+    font-size: 24px;
+  }
+
+  .auth-form h2 {
+    font-size: 20px;
+  }
+
+  .field input {
+    padding: 13px 14px;
+    font-size: 16px; /* prevents iOS zoom on focus */
+    border-radius: 10px;
+  }
+
+  .btn-primary {
+    padding: 14px;
+    font-size: 16px;
+    min-height: 50px;
+    border-radius: 12px;
+  }
+
+  .demo-btn {
+    padding: 12px 14px;
+  }
+
+  .demo-accounts {
+    margin-top: 16px;
+    padding-top: 16px;
+  }
+}
+
+/* Ensure touch targets are at least 44px */
+@media (pointer: coarse) {
+  .field input {
+    min-height: 44px;
+    font-size: 16px; /* prevents iOS zoom */
+  }
+
+  .btn-primary {
+    min-height: 48px;
+  }
+
+  .link-btn {
+    padding: 8px 4px;
+    font-size: 15px;
+  }
+
+  .demo-btn {
+    min-height: 48px;
+  }
 }

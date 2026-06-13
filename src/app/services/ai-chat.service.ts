@@ -171,6 +171,8 @@ const INTENTS: Intent[] = [
       /\b(draft (an? )?email|write (an? )?email|compose (an? )?email|email (draft|template))\b/i,
       /\b(can'?t (make it|attend|come)|will miss|going to miss|won'?t be (there|able)|excuse (for|my))\b/i,
       /\b(apology email|absence email|miss(ing)? (the |my )?(event|meeting|class|appointment))\b/i,
+      /\b(follow.?up email|thank.?you email|reschedule email|meeting request email|invitation email|cancellation email|confirmation email)\b/i,
+      /\b(email.*(about|for|regarding|to confirm|to cancel|to reschedule|to follow up|to thank|to invite))\b/i,
     ],
   },
   {
@@ -330,6 +332,15 @@ const PREP_RULES: PrepRule[] = [
 /**
  * Scan upcoming events and return proactive reminders that should be created.
  * Only returns reminders that haven't been seen before (caller tracks seen set).
+ *
+ * Generates personalized reminders based on the user's actual calendar:
+ * - Prep reminders for exams, meetings, sports, travel, etc.
+ * - Busy day warnings when schedule is packed
+ * - Early morning heads-up when first event starts before 8 AM
+ * - Back-to-back event alerts (no breaks between events)
+ * - Long day wind-down reminders (6+ hours scheduled)
+ * - Habit streak encouragement for recurring activities
+ * - Free day suggestions when surrounded by busy days
  */
 export function getProactiveReminders(
   events: CalendarEvent[],
@@ -338,12 +349,31 @@ export function getProactiveReminders(
 ): ProactiveReminder[] {
   const results: ProactiveReminder[] = [];
 
+  // Helper: convert HH:MM to total minutes
+  const toMinutes = (hhmm: string): number => {
+    const [h, m] = hhmm.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  // Helper: get events for a specific date
+  const eventsOnDate = (date: string) =>
+    events.filter(e => e.date === date).sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  // Helper: count total scheduled hours on a date
+  const scheduledMinutes = (date: string): number => {
+    return eventsOnDate(date).reduce((sum, e) => {
+      const dur = toMinutes(e.endTime) - toMinutes(e.startTime);
+      return sum + Math.max(dur, 0);
+    }, 0);
+  };
+
+  // ── 1. Standard prep reminders (exams, meetings, sports, etc.) ──
   for (const event of events) {
     const daysUntil = Math.ceil(
       (new Date(event.date + 'T00:00:00').getTime() - new Date(todayStr + 'T00:00:00').getTime())
       / (1000 * 60 * 60 * 24)
     );
-    if (daysUntil < 0 || daysUntil > 7) continue; // only look 7 days ahead
+    if (daysUntil < 0 || daysUntil > 7) continue;
 
     for (const rule of PREP_RULES) {
       if (!rule.keywords.test(`${event.title} ${event.category}`)) continue;
@@ -359,6 +389,174 @@ export function getProactiveReminders(
           body:  rule.buildBody(event.title, formatDate(event.date), days),
           eventId:   event.id,
           eventDate: event.date,
+        });
+        alreadySeen.add(key);
+      }
+    }
+  }
+
+  // ── 2. Busy day warning — tomorrow has 5+ events ──
+  const tomorrowStr = addDays(todayStr, 1);
+  const tomorrowEvents = eventsOnDate(tomorrowStr);
+  if (tomorrowEvents.length >= 5) {
+    const key = `busy_day_${tomorrowStr}`;
+    if (!alreadySeen.has(key)) {
+      const totalHours = Math.round(scheduledMinutes(tomorrowStr) / 60);
+      const categories = [...new Set(tomorrowEvents.map(e => e.category).filter(Boolean))];
+      const catText = categories.length > 0 ? ` across ${categories.slice(0, 3).join(', ')}` : '';
+      results.push({
+        title: `Heads up: busy day tomorrow`,
+        body: `You have ${tomorrowEvents.length} events (~${totalHours}h scheduled)${catText}. ` +
+              `First up: ${tomorrowEvents[0].title} at ${formatTime(tomorrowEvents[0].startTime)}. ` +
+              `Consider prepping tonight and getting good rest.`,
+        eventId: tomorrowEvents[0].id,
+        eventDate: tomorrowStr,
+      });
+      alreadySeen.add(key);
+    }
+  }
+
+  // ── 3. Early morning alert — tomorrow's first event is before 8 AM ──
+  if (tomorrowEvents.length > 0) {
+    const firstEvent = tomorrowEvents[0];
+    const firstStartMin = toMinutes(firstEvent.startTime);
+    if (firstStartMin < 480) { // before 8:00 AM
+      const key = `early_morning_${tomorrowStr}`;
+      if (!alreadySeen.has(key)) {
+        results.push({
+          title: `Early start tomorrow: ${firstEvent.title}`,
+          body: `${firstEvent.title} starts at ${formatTime(firstEvent.startTime)} tomorrow. ` +
+                `Set your alarm early and prepare what you need tonight!`,
+          eventId: firstEvent.id,
+          eventDate: tomorrowStr,
+        });
+        alreadySeen.add(key);
+      }
+    }
+  }
+
+  // ── 4. Back-to-back events — no breaks today ──
+  const todayEvents = eventsOnDate(todayStr);
+  if (todayEvents.length >= 3) {
+    let backToBackCount = 0;
+    for (let i = 0; i < todayEvents.length - 1; i++) {
+      const endMin = toMinutes(todayEvents[i].endTime);
+      const nextStartMin = toMinutes(todayEvents[i + 1].startTime);
+      if (nextStartMin - endMin < 15) backToBackCount++;
+    }
+    if (backToBackCount >= 2) {
+      const key = `back_to_back_${todayStr}`;
+      if (!alreadySeen.has(key)) {
+        results.push({
+          title: `Packed schedule today — find micro-breaks`,
+          body: `You have ${backToBackCount + 1} events with less than 15 min between them. ` +
+                `Try to grab water, stretch, or take a 5-min walk between activities.`,
+          eventId: todayEvents[0].id,
+          eventDate: todayStr,
+        });
+        alreadySeen.add(key);
+      }
+    }
+  }
+
+  // ── 5. Long day wind-down — today has 6+ hours of events ──
+  const todayScheduledMin = scheduledMinutes(todayStr);
+  if (todayScheduledMin >= 360) { // 6+ hours
+    const key = `long_day_${todayStr}`;
+    if (!alreadySeen.has(key)) {
+      const lastEvent = todayEvents[todayEvents.length - 1];
+      results.push({
+        title: `Long day — don't forget to recharge`,
+        body: `You have ~${Math.round(todayScheduledMin / 60)} hours scheduled today. ` +
+              `Your last event (${lastEvent.title}) ends at ${formatTime(lastEvent.endTime)}. ` +
+              `Plan some downtime after — you've earned it.`,
+        eventId: lastEvent.id,
+        eventDate: todayStr,
+      });
+      alreadySeen.add(key);
+    }
+  }
+
+  // ── 6. Habit streak encouragement — detect recurring activity patterns ──
+  // Look for activities the user does regularly and encourage maintaining the streak
+  const weekAgo = addDays(todayStr, -7);
+  const recentEvents = events.filter(e => e.date >= weekAgo && e.date < todayStr);
+  const categoryFrequency: Record<string, number> = {};
+  recentEvents.forEach(e => {
+    if (e.category) categoryFrequency[e.category] = (categoryFrequency[e.category] ?? 0) + 1;
+  });
+
+  // Find categories with 3+ occurrences in the past week (active habits)
+  const activeHabits = Object.entries(categoryFrequency)
+    .filter(([_, count]) => count >= 3)
+    .map(([cat]) => cat);
+
+  for (const habit of activeHabits) {
+    // Check if there's an instance of this habit scheduled today or tomorrow
+    const hasToday = todayEvents.some(e => e.category === habit);
+    const hasTomorrow = tomorrowEvents.some(e => e.category === habit);
+
+    // If not scheduled today AND not scheduled tomorrow, nudge to keep the streak
+    if (!hasToday && !hasTomorrow) {
+      const key = `streak_${habit}_${todayStr}`;
+      if (!alreadySeen.has(key)) {
+        const count = categoryFrequency[habit];
+        results.push({
+          title: `Keep your ${habit} streak going!`,
+          body: `You had ${count} ${habit} sessions this past week — great momentum! ` +
+                `Nothing scheduled for today or tomorrow. Consider adding one to stay consistent.`,
+          eventId: '',
+          eventDate: todayStr,
+        });
+        alreadySeen.add(key);
+      }
+    }
+  }
+
+  // ── 7. Free day after busy stretch — suggest rest ──
+  if (todayEvents.length === 0) {
+    // Check if the past 2 days were busy (4+ events each)
+    const yesterday = addDays(todayStr, -1);
+    const dayBefore = addDays(todayStr, -2);
+    const yesterdayCount = eventsOnDate(yesterday).length;
+    const dayBeforeCount = eventsOnDate(dayBefore).length;
+
+    if (yesterdayCount >= 4 && dayBeforeCount >= 4) {
+      const key = `rest_day_${todayStr}`;
+      if (!alreadySeen.has(key)) {
+        results.push({
+          title: `Free day — enjoy the break!`,
+          body: `After ${yesterdayCount + dayBeforeCount} events over the last 2 days, ` +
+                `today is clear. Great time for self-care, catching up on rest, or doing something fun.`,
+          eventId: '',
+          eventDate: todayStr,
+        });
+        alreadySeen.add(key);
+      }
+    }
+  }
+
+  // ── 8. Upcoming week overview — Sunday evening planning prompt ──
+  const todayDate = new Date(todayStr + 'T00:00:00');
+  if (todayDate.getDay() === 0) { // Sunday
+    const nextMonday = addDays(todayStr, 1);
+    const nextFriday = addDays(todayStr, 5);
+    const nextWeekEvents = events.filter(e => e.date >= nextMonday && e.date <= nextFriday);
+    if (nextWeekEvents.length > 0) {
+      const key = `week_preview_${todayStr}`;
+      if (!alreadySeen.has(key)) {
+        const busyDays = new Set(nextWeekEvents.map(e => e.date));
+        const busiestDate = [...busyDays].reduce((a, b) =>
+          eventsOnDate(a).length >= eventsOnDate(b).length ? a : b
+        );
+        const busiestCount = eventsOnDate(busiestDate).length;
+        results.push({
+          title: `Week ahead: ${nextWeekEvents.length} events`,
+          body: `You have ${nextWeekEvents.length} events across ${busyDays.size} days next week. ` +
+                `Busiest day: ${formatDate(busiestDate)} (${busiestCount} events). ` +
+                `Take a few minutes tonight to review and prepare.`,
+          eventId: nextWeekEvents[0].id,
+          eventDate: nextMonday,
         });
         alreadySeen.add(key);
       }
@@ -507,8 +705,11 @@ export class AiChatService {
           `• **Category summary** — "Show me a breakdown by category"\n` +
           `• **Set a reminder** — "Remind me to study for my AP Calc exam"\n` +
           `• **Study reminders** — "When should I start studying for my test?"\n` +
+          `• **Planning advice** — "How should I plan my week?" or "Am I too busy?"\n` +
+          `• **Schedule tips** — "Any suggestions for my schedule?" or "Help me organize my time"\n` +
           `• **Inactivity check** — "When did I last have a doctor appointment?"\n` +
-          `• **Draft an email** — "Draft an absence email for my soccer practice"\n\n` +
+          `• **Draft an email** — "Draft an absence email for my soccer practice"\n` +
+          `• **More email types** — follow-up, thank you, reschedule, cancellation, invitation, confirmation\n\n` +
           `Just ask naturally — I'll do my best!`;
         break;
       }
@@ -829,8 +1030,11 @@ export class AiChatService {
       }
 
       case 'draft_email': {
-        // Find the event they might be missing
-        const emailKeywords = userText.replace(/draft|write|compose|email|can'?t|won'?t|miss|attend|make it|apology|absence/gi, ' ').trim();
+        // Determine which type of email the user wants
+        const emailType = this.detectEmailType(userText);
+
+        // Find the event they're referring to
+        const emailKeywords = userText.replace(/draft|write|compose|email|can'?t|won'?t|miss|attend|make it|apology|absence|follow.?up|thank|reschedule|cancel|confirm|invite|request|meeting/gi, ' ').trim();
         const words = emailKeywords.split(/\s+/).filter(w => w.length > 2);
 
         const matchedForEmail = events.find(e => {
@@ -838,22 +1042,71 @@ export class AiChatService {
           return words.some(w => hay.includes(w.toLowerCase()));
         }) ?? events.filter(e => e.date >= t).sort((a, b) => a.date.localeCompare(b.date))[0];
 
-        if (!matchedForEmail) {
-          text = `I don't see a specific event to draft an email for. Try: "Draft an email for my soccer practice" or "Write an absence email for AP Calculus".`;
+        if (!matchedForEmail && emailType !== 'general') {
+          text = `I don't see a specific event to draft an email for. Try:\n\n` +
+            `• "Draft an absence email for my soccer practice"\n` +
+            `• "Write a follow-up email for my meeting"\n` +
+            `• "Compose a reschedule email for AP Calculus"\n` +
+            `• "Draft a thank you email for my interview"\n` +
+            `• "Write a meeting request email"\n` +
+            `• "Draft a cancellation email for lunch"\n` +
+            `• "Write a confirmation email for the appointment"`;
         } else {
-          const emailDraft = this.buildAbsenceEmail(matchedForEmail);
-          text = `Here's a draft absence email for **${matchedForEmail.title}** on ${formatDate(matchedForEmail.date)}:\n\n---\n\n${emailDraft}\n\n---\n\nTap below to copy it to your clipboard.`;
+          let emailDraft: string;
+          let emailLabel: string;
+
+          switch (emailType) {
+            case 'follow_up':
+              emailDraft = this.buildFollowUpEmail(matchedForEmail!);
+              emailLabel = 'follow-up';
+              break;
+            case 'thank_you':
+              emailDraft = this.buildThankYouEmail(matchedForEmail!);
+              emailLabel = 'thank you';
+              break;
+            case 'reschedule':
+              emailDraft = this.buildRescheduleEmail(matchedForEmail!);
+              emailLabel = 'reschedule request';
+              break;
+            case 'cancellation':
+              emailDraft = this.buildCancellationEmail(matchedForEmail!);
+              emailLabel = 'cancellation';
+              break;
+            case 'meeting_request':
+              emailDraft = this.buildMeetingRequestEmail(matchedForEmail!);
+              emailLabel = 'meeting request';
+              break;
+            case 'invitation':
+              emailDraft = this.buildInvitationEmail(matchedForEmail!);
+              emailLabel = 'invitation';
+              break;
+            case 'confirmation':
+              emailDraft = this.buildConfirmationEmail(matchedForEmail!);
+              emailLabel = 'confirmation';
+              break;
+            case 'absence':
+            default:
+              emailDraft = this.buildAbsenceEmail(matchedForEmail!);
+              emailLabel = 'absence';
+              break;
+          }
+
+          text = `Here's a draft **${emailLabel}** email for **${matchedForEmail!.title}** on ${formatDate(matchedForEmail!.date)}:\n\n---\n\n${emailDraft}\n\n---\n\nTap below to copy it to your clipboard.`;
           actions.push({
-            label: 'Copy Email Draft',
+            label: '📋 Copy Email Draft',
             type: 'copy_text',
             copyText: emailDraft,
           });
-          actions.push({
-            label: 'Set Absence Reminder',
-            type: 'create_reminder',
-            reminderTitle: `Absence: ${matchedForEmail.title}`,
-            reminderBody: `You marked yourself as absent for ${matchedForEmail.title} on ${formatDate(matchedForEmail.date)}.`,
-          });
+
+          // Offer a reminder for absence/cancellation emails
+          if (emailType === 'absence' || emailType === 'cancellation') {
+            actions.push({
+              label: '🔔 Set Absence Reminder',
+              type: 'create_reminder',
+              reminderTitle: `Absence: ${matchedForEmail!.title}`,
+              reminderBody: `You marked yourself as absent for ${matchedForEmail!.title} on ${formatDate(matchedForEmail!.date)}.`,
+            });
+          }
         }
         break;
       }
@@ -1372,5 +1625,73 @@ export class AiChatService {
     const timeStr = `${formatTime(event.startTime)}–${formatTime(event.endTime)}`;
     const subject = `Unable to Attend: ${event.title}`;
     return `Subject: ${subject}\n\nHello,\n\nI hope this message finds you well. I'm writing to let you know that I will unfortunately be unable to attend ${event.title} scheduled for ${dateStr} from ${timeStr}.\n\nI apologize for any inconvenience this may cause. Please let me know if there is anything I can do to prepare in advance or if there are materials I should review afterward.\n\nThank you for your understanding.\n\nBest regards`;
+  }
+
+  /** Detect the type of email the user wants to draft. */
+  private detectEmailType(text: string): string {
+    const lower = text.toLowerCase();
+    if (/follow.?up/i.test(lower)) return 'follow_up';
+    if (/thank.?(you|s)/i.test(lower)) return 'thank_you';
+    if (/reschedul/i.test(lower)) return 'reschedule';
+    if (/cancel/i.test(lower)) return 'cancellation';
+    if (/meeting request/i.test(lower) || /request.*(meeting|call)/i.test(lower)) return 'meeting_request';
+    if (/invit/i.test(lower)) return 'invitation';
+    if (/confirm/i.test(lower)) return 'confirmation';
+    if (/absence|can'?t (make|attend)|won'?t be|miss|excuse/i.test(lower)) return 'absence';
+    return 'absence'; // default
+  }
+
+  /** Build a follow-up email after an event. */
+  private buildFollowUpEmail(event: CalendarEvent): string {
+    const dateStr = formatDate(event.date);
+    const subject = `Following Up: ${event.title}`;
+    return `Subject: ${subject}\n\nHello,\n\nI wanted to follow up regarding ${event.title} that took place on ${dateStr}.\n\nThank you for your time and the discussion we had. I wanted to check in on the next steps we discussed and see if there's anything else I can help with or prepare for.\n\nPlease let me know if you'd like to schedule a follow-up or if there's any additional information you need from me.\n\nLooking forward to hearing from you.\n\nBest regards`;
+  }
+
+  /** Build a thank you email for an event. */
+  private buildThankYouEmail(event: CalendarEvent): string {
+    const dateStr = formatDate(event.date);
+    const subject = `Thank You — ${event.title}`;
+    return `Subject: ${subject}\n\nHello,\n\nI wanted to take a moment to thank you for ${event.title} on ${dateStr}. I really appreciated the time and effort that went into it.\n\nIt was a valuable experience and I'm grateful for the opportunity. I look forward to any future sessions or events.\n\nThank you again for everything.\n\nBest regards`;
+  }
+
+  /** Build a reschedule request email. */
+  private buildRescheduleEmail(event: CalendarEvent): string {
+    const dateStr = formatDate(event.date);
+    const timeStr = `${formatTime(event.startTime)}–${formatTime(event.endTime)}`;
+    const subject = `Reschedule Request: ${event.title}`;
+    return `Subject: ${subject}\n\nHello,\n\nI hope this message finds you well. I'm writing to request a reschedule for ${event.title}, currently planned for ${dateStr} from ${timeStr}.\n\nDue to an unavoidable conflict, I'm unable to make the originally scheduled time. Would it be possible to move this to a different date or time? I'm flexible and happy to work around your availability.\n\nI apologize for any inconvenience and appreciate your understanding.\n\nBest regards`;
+  }
+
+  /** Build a cancellation email. */
+  private buildCancellationEmail(event: CalendarEvent): string {
+    const dateStr = formatDate(event.date);
+    const timeStr = `${formatTime(event.startTime)}–${formatTime(event.endTime)}`;
+    const subject = `Cancellation Notice: ${event.title}`;
+    return `Subject: ${subject}\n\nHello,\n\nI'm writing to inform you that I need to cancel ${event.title} scheduled for ${dateStr} from ${timeStr}.\n\nI sincerely apologize for the late notice and any inconvenience this may cause. If possible, I'd be happy to reschedule at a time that works for everyone.\n\nPlease let me know how you'd like to proceed.\n\nBest regards`;
+  }
+
+  /** Build a meeting request email. */
+  private buildMeetingRequestEmail(event: CalendarEvent): string {
+    const dateStr = formatDate(event.date);
+    const timeStr = `${formatTime(event.startTime)}–${formatTime(event.endTime)}`;
+    const subject = `Meeting Request: ${event.title}`;
+    return `Subject: ${subject}\n\nHello,\n\nI'd like to request a meeting regarding ${event.title}. I have it tentatively scheduled for ${dateStr} from ${timeStr}.\n\nThe purpose of this meeting is to discuss ${event.description || 'the relevant topics and next steps'}.\n\nPlease let me know if this time works for you, or suggest an alternative that fits your schedule better.\n\nThank you, and I look forward to connecting.\n\nBest regards`;
+  }
+
+  /** Build an invitation email for an event. */
+  private buildInvitationEmail(event: CalendarEvent): string {
+    const dateStr = formatDate(event.date);
+    const timeStr = `${formatTime(event.startTime)}–${formatTime(event.endTime)}`;
+    const subject = `You're Invited: ${event.title}`;
+    return `Subject: ${subject}\n\nHello,\n\nI'd like to invite you to ${event.title} on ${dateStr} from ${timeStr}.\n\n${event.description ? `Details: ${event.description}\n\n` : ''}I hope you can make it! Please let me know if you're available and I'll send over any additional details you might need.\n\nLooking forward to seeing you there.\n\nBest regards`;
+  }
+
+  /** Build a confirmation email for an event. */
+  private buildConfirmationEmail(event: CalendarEvent): string {
+    const dateStr = formatDate(event.date);
+    const timeStr = `${formatTime(event.startTime)}–${formatTime(event.endTime)}`;
+    const subject = `Confirmed: ${event.title}`;
+    return `Subject: ${subject}\n\nHello,\n\nI'm writing to confirm my attendance at ${event.title} on ${dateStr} from ${timeStr}.\n\n${event.description ? `I understand the details are: ${event.description}\n\n` : ''}Please let me know if there's anything I should prepare or bring. I'm looking forward to it.\n\nThank you.\n\nBest regards`;
   }
 }

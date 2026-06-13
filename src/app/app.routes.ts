@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { LandingComponent } from './landing/landing.component';
 import { AuthComponent } from './auth/auth.component';
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { MockAuthService } from './services/mock-auth.service';
@@ -8,7 +9,7 @@ import { MockAuthService } from './services/mock-auth.service';
 function authGuard() {
   const auth = inject(MockAuthService);
   const router = inject(Router);
-  return auth.isLoggedIn() ? true : router.createUrlTree(['/']);
+  return auth.isLoggedIn() ? true : router.createUrlTree(['/auth']);
 }
 
 function guestGuard() {
@@ -18,7 +19,8 @@ function guestGuard() {
 }
 
 export const routes: Routes = [
-  { path: '', component: AuthComponent, canActivate: [guestGuard] },
+  { path: '', component: LandingComponent, canActivate: [guestGuard] },
+  { path: 'auth', component: AuthComponent, canActivate: [guestGuard] },
   { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
   { path: '**', redirectTo: '' },
 ];

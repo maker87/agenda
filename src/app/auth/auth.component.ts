@@ -1,11 +1,13 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { MockAuthService } from '../services/mock-auth.service';
 import { signUp, confirmSignUp, signIn, resendSignUpCode, signOut } from 'aws-amplify/auth';
 
 type AuthView = 'login' | 'signup' | 'confirm';
+
+const AUTH_STATE_KEY = 'agenda_auth_pending';
 
 @Component({
   selector: 'app-auth',
@@ -14,7 +16,7 @@ type AuthView = 'login' | 'signup' | 'confirm';
   templateUrl: './auth.component.html',
   styleUrl: './auth.component.css',
 })
-export class AuthComponent {
+export class AuthComponent implements OnInit {
   view: AuthView = 'login';
   email = '';
   password = '';
@@ -25,18 +27,69 @@ export class AuthComponent {
   loading = false;
   resending = false;
 
-  constructor(private router: Router, private mockAuth: MockAuthService) {}
+  constructor(private router: Router, private route: ActivatedRoute, private mockAuth: MockAuthService) {}
+
+  ngOnInit() {
+    // Check query param to determine initial view (login or signup)
+    const mode = this.route.snapshot.queryParamMap.get('mode');
+    if (mode === 'signup') {
+      this.view = 'signup';
+    } else {
+      this.view = 'login';
+    }
+
+    // Restore auth state if user navigated away (e.g. to check email on mobile)
+    this.restoreAuthState();
+  }
+
+  /** Save pending signup state so users can switch apps and come back. */
+  private saveAuthState() {
+    try {
+      sessionStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
+        view: this.view,
+        email: this.email,
+        password: this.password,
+      }));
+    } catch { /* ignore */ }
+  }
+
+  /** Restore saved auth state (e.g. after returning from email app on mobile). */
+  private restoreAuthState() {
+    try {
+      const raw = sessionStorage.getItem(AUTH_STATE_KEY);
+      if (!raw) return;
+      const state = JSON.parse(raw);
+      if (state.view === 'confirm' && state.email) {
+        this.view = 'confirm';
+        this.email = state.email;
+        this.password = state.password || '';
+        this.successMessage = `Enter the verification code sent to ${this.email}`;
+      }
+    } catch { /* ignore */ }
+  }
+
+  /** Clear saved auth state (on successful login or when going back). */
+  private clearAuthState() {
+    try { sessionStorage.removeItem(AUTH_STATE_KEY); } catch { /* ignore */ }
+  }
 
   switchView(v: AuthView) {
     this.view = v;
     this.errorMessage = '';
     this.successMessage = '';
+    if (v !== 'confirm') {
+      this.clearAuthState();
+    }
   }
 
   fillDemo(email: string, password: string) {
     this.email = email;
     this.password = password;
     this.errorMessage = '';
+  }
+
+  goHome() {
+    this.router.navigate(['/']);
   }
 
   async onLogin() {
@@ -62,11 +115,13 @@ export class AuthComponent {
 
       const result = await signIn({ username: this.email, password: this.password });
       if (result.isSignedIn) {
+        this.clearAuthState();
         sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email: this.email }));
         this.router.navigate(['/dashboard']);
       } else if (result.nextStep?.signInStep === 'CONFIRM_SIGN_UP') {
         this.view = 'confirm';
         this.errorMessage = 'Please verify your email first.';
+        this.saveAuthState();
       } else {
         this.errorMessage = 'Additional steps required. Please try again.';
       }
@@ -74,6 +129,7 @@ export class AuthComponent {
       if (err?.name === 'UserNotConfirmedException') {
         this.view = 'confirm';
         this.errorMessage = 'Your email is not verified. Enter the code we sent.';
+        this.saveAuthState();
       } else if (err?.name === 'NotAuthorizedException') {
         this.errorMessage = 'Invalid email or password.';
       } else if (err?.name === 'UserNotFoundException') {
@@ -116,6 +172,7 @@ export class AuthComponent {
         // (This happens if the user pool hasn't been redeployed yet)
         this.view = 'confirm';
         this.successMessage = `Verification code sent to ${this.email}. Check your inbox (and spam folder)!`;
+        this.saveAuthState();
       } else if (nextStep.signUpStep === 'DONE') {
         // No verification needed — sign in directly
         try {
@@ -179,6 +236,7 @@ export class AuthComponent {
         try {
           const signInResult = await signIn({ username: this.email, password: this.password });
           if (signInResult.isSignedIn) {
+            this.clearAuthState();
             sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email: this.email }));
             this.router.navigate(['/dashboard']);
             this.loading = false;
@@ -187,6 +245,7 @@ export class AuthComponent {
         } catch {
           // If auto sign-in fails, send to login
         }
+        this.clearAuthState();
         this.successMessage = 'Email verified! You can now sign in.';
         this.view = 'login';
       }

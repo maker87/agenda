@@ -54,6 +54,7 @@
     <!-- Filter pills -->
     <div class="notif-panel-filters">
       <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'all'"      (click)="notifPanelFilter = 'all'">All</button>
+      <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'event_invite'" (click)="notifPanelFilter = 'event_invite'">Invites</button>
       <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'share'"    (click)="notifPanelFilter = 'share'">Shared</button>
       <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'reminder'" (click)="notifPanelFilter = 'reminder'">Reminders</button>
     </div>
@@ -72,14 +73,27 @@
         [class.unread]="!n.read"
         (click)="markNotifRead(n)"
       >
-        <div class="notif-panel-item-icon" [class.share]="n.type === 'share'" [class.reminder]="n.type === 'reminder'">
+        <div class="notif-panel-item-icon" [class.share]="n.type === 'share'" [class.reminder]="n.type === 'reminder'" [class.invite]="n.type === 'event_invite'" [class.invite-response]="n.type === 'invite_response'">
           <span *ngIf="n.type === 'share'">↗</span>
           <span *ngIf="n.type === 'reminder'">🔔</span>
+          <span *ngIf="n.type === 'event_invite'">📩</span>
+          <span *ngIf="n.type === 'invite_response'">✉️</span>
         </div>
         <div class="notif-panel-item-body">
           <div class="notif-panel-item-title">{{ n.title }}</div>
           <div class="notif-panel-item-sub" *ngIf="n.body">{{ n.body }}</div>
           <div class="notif-panel-item-time" *ngIf="n.createdAt">{{ formatNotifTime(n.createdAt) }}</div>
+          <!-- Accept / Decline buttons for pending event invites -->
+          <div class="notif-invite-actions" *ngIf="n.type === 'event_invite' && n.status === 'pending'">
+            <button class="notif-invite-accept" (click)="$event.stopPropagation(); acceptInvite(n)">✓ Accept</button>
+            <button class="notif-invite-decline" (click)="$event.stopPropagation(); declineInvite(n)">✗ Decline</button>
+          </div>
+          <div class="notif-invite-status" *ngIf="n.type === 'event_invite' && n.status === 'accepted'">
+            <span class="notif-invite-badge accepted">Accepted</span>
+          </div>
+          <div class="notif-invite-status" *ngIf="n.type === 'event_invite' && n.status === 'rejected'">
+            <span class="notif-invite-badge declined">Declined</span>
+          </div>
         </div>
         <div class="notif-panel-item-unread-dot" *ngIf="!n.read"></div>
         <button class="notif-panel-item-delete" (click)="$event.stopPropagation(); deleteNotif(n)" title="Dismiss">✕</button>
@@ -306,7 +320,7 @@
           *ngFor="let cat of allCategories"
           [class.active]="activeCategoryFilter === cat"
           (click)="setCategoryFilter(cat)"
-        >{{ cat }}</button>
+        ><span class="cat-pill-dot" [style.background]="getCategoryColor(cat)"></span>{{ cat }}</button>
       </div>
 
       <!-- Past -->
@@ -448,6 +462,15 @@
             name="viewDay"
           />
         </div>
+      </div>
+
+      <!-- Category color legend -->
+      <div class="cal-category-legend" *ngIf="allCategories.length > 0">
+        <span class="cal-legend-label">Categories:</span>
+        <span class="cal-legend-item" *ngFor="let cat of allCategories">
+          <span class="cal-legend-dot" [style.background]="getCategoryColor(cat)"></span>
+          <span class="cal-legend-name">{{ cat }}</span>
+        </span>
       </div>
 
       <!-- ── YEAR VIEW — scrollable all months ── -->
@@ -756,6 +779,7 @@
         <!-- Filter pills -->
         <div class="history-filters" *ngIf="notifications.length > 0">
           <button class="history-filter-pill" [class.active]="notifFilter === 'all'"      (click)="notifFilter = 'all'">All</button>
+          <button class="history-filter-pill" [class.active]="notifFilter === 'event_invite'" (click)="notifFilter = 'event_invite'">Invites</button>
           <button class="history-filter-pill" [class.active]="notifFilter === 'share'"    (click)="notifFilter = 'share'">Shared with me</button>
           <button class="history-filter-pill" [class.active]="notifFilter === 'reminder'" (click)="notifFilter = 'reminder'">Reminders</button>
         </div>
@@ -789,9 +813,11 @@
             (click)="markNotifRead(n)"
           >
             <!-- Type icon -->
-            <div class="notif-icon" [class.notif-icon-share]="n.type === 'share'" [class.notif-icon-reminder]="n.type === 'reminder'">
+            <div class="notif-icon" [class.notif-icon-share]="n.type === 'share'" [class.notif-icon-reminder]="n.type === 'reminder'" [class.notif-icon-invite]="n.type === 'event_invite'" [class.notif-icon-invite-response]="n.type === 'invite_response'">
               <span *ngIf="n.type === 'share'">↗</span>
               <span *ngIf="n.type === 'reminder'">🔔</span>
+              <span *ngIf="n.type === 'event_invite'">📩</span>
+              <span *ngIf="n.type === 'invite_response'">✉️</span>
             </div>
 
             <!-- Content -->
@@ -799,6 +825,17 @@
               <div class="notif-title">{{ n.title }}</div>
               <div class="notif-sub" *ngIf="n.body">{{ n.body }}</div>
               <div class="notif-time" *ngIf="n.createdAt">{{ formatNotifTime(n.createdAt) }}</div>
+              <!-- Accept / Decline buttons for pending event invites -->
+              <div class="notif-invite-actions" *ngIf="n.type === 'event_invite' && n.status === 'pending'">
+                <button class="notif-invite-accept" (click)="$event.stopPropagation(); acceptInvite(n)">✓ Accept</button>
+                <button class="notif-invite-decline" (click)="$event.stopPropagation(); declineInvite(n)">✗ Decline</button>
+              </div>
+              <div class="notif-invite-status" *ngIf="n.type === 'event_invite' && n.status === 'accepted'">
+                <span class="notif-invite-badge accepted">Accepted</span>
+              </div>
+              <div class="notif-invite-status" *ngIf="n.type === 'event_invite' && n.status === 'rejected'">
+                <span class="notif-invite-badge declined">Declined</span>
+              </div>
             </div>
 
             <!-- Unread dot -->
@@ -816,15 +853,15 @@
 
         <!-- Search bar -->
         <div class="friend-search-section">
-          <p class="friend-search-hint">Search by username or display name to add friends.</p>
+          <p class="friend-search-hint">Search by email address to find and add friends. Give them a nickname for easy sharing.</p>
           <div class="friend-search-wrap">
-            <span class="history-search-icon">🔍</span>
+            <span class="history-search-icon">✉️</span>
             <input
               class="history-search-input"
-              type="text"
+              type="email"
               [(ngModel)]="friendSearch"
               name="friendSearch"
-              placeholder="Search username…"
+              placeholder="Search by email address…"
               (ngModelChange)="searchFriends()"
             />
             <button class="history-search-clear" *ngIf="friendSearch" (click)="friendSearch = ''; friendSearchResults = []" title="Clear">✕</button>
@@ -841,20 +878,31 @@
               <div class="friend-avatar">{{ user.displayName[0] }}</div>
               <div class="friend-info">
                 <span class="friend-display-name">{{ user.displayName }}</span>
-                <span class="friend-username">&#64;{{ user.username }}</span>
-                <span class="friend-mutual" *ngIf="user.mutual > 0">{{ user.mutual }} mutual friend{{ user.mutual > 1 ? 's' : '' }}</span>
+                <span class="friend-username">{{ user.email }}</span>
+              </div>
+              <div class="friend-add-section" *ngIf="!friendRequestsSent.has(user.email)">
+                <input
+                  class="friend-nickname-input"
+                  type="text"
+                  [(ngModel)]="friendNickname"
+                  name="friendNickname"
+                  placeholder="Nickname…"
+                  (keydown.enter)="sendFriendRequest(user.email)"
+                />
+                <button
+                  class="friend-add-btn"
+                  (click)="sendFriendRequest(user.email)"
+                  [disabled]="!friendNickname.trim()"
+                  [title]="friendNickname.trim() ? 'Add friend' : 'Enter a nickname first'"
+                >+ Add</button>
               </div>
               <button
-                class="friend-add-btn"
-                *ngIf="!friendRequestsSent.has(user.username)"
-                (click)="sendFriendRequest(user.username)"
-              >+ Add</button>
-              <button
                 class="friend-pending-btn"
-                *ngIf="friendRequestsSent.has(user.username)"
+                *ngIf="friendRequestsSent.has(user.email)"
                 disabled
-              >✓ Requested</button>
+              >✓ Added</button>
             </div>
+            <p class="friend-search-error" *ngIf="friendSearchError">{{ friendSearchError }}</p>
           </div>
 
           <!-- No results -->
@@ -868,12 +916,13 @@
           <h3 class="section-label">Your Friends ({{ friends.length }})</h3>
           <div class="friend-results">
             <div class="friend-result-item" *ngFor="let f of friends">
-              <div class="friend-avatar friend-avatar-added">{{ f.displayName[0] }}</div>
+              <div class="friend-avatar friend-avatar-added">{{ f.nickname[0] || f.displayName[0] }}</div>
               <div class="friend-info">
-                <span class="friend-display-name">{{ f.displayName }}</span>
-                <span class="friend-username">&#64;{{ f.username }}</span>
+                <span class="friend-display-name">{{ f.nickname }}</span>
+                <span class="friend-username">{{ f.email }}</span>
+                <span class="friend-real-name" *ngIf="f.nickname !== f.displayName">{{ f.displayName }}</span>
               </div>
-              <button class="friend-remove-btn" (click)="removeFriend(f.username)" title="Remove friend">Remove</button>
+              <button class="friend-remove-btn" (click)="removeFriend(f.email)" title="Remove friend">Remove</button>
             </div>
           </div>
         </div>
@@ -881,7 +930,7 @@
         <!-- Empty friends state -->
         <div *ngIf="friends.length === 0 && !friendSearch" class="empty-state large" style="margin-top:24px">
           <span class="empty-icon">👥</span>
-          <p>No friends added yet. Search for someone above to get started.</p>
+          <p>No friends added yet. Search by email above to get started.</p>
         </div>
 
       </ng-container>
@@ -1113,6 +1162,35 @@
           <ng-container *ngFor="let node of categoryTabTree">
             <ng-container *ngTemplateOutlet="catNodeTpl; context: { node: node, depth: 0 }"></ng-container>
           </ng-container>
+        </div>
+      </div>
+
+      <!-- Unassigned events -->
+      <div class="cat-tree-section" *ngIf="unassignedEvents.length > 0">
+        <div class="cat-tree-header">
+          <h3 class="cat-tree-title">Unassigned Events</h3>
+          <span class="cat-tree-count">{{ unassignedEvents.length }} events</span>
+        </div>
+
+        <div class="events-list">
+          <div class="event-card" *ngFor="let event of unassignedEvents">
+            <div class="event-color-bar" [style.background]="event.color"></div>
+            <div class="event-body">
+              <div class="event-header">
+                <div class="event-title-group">
+                  <span class="event-title">{{ event.title }}</span>
+                </div>
+                <div class="event-actions">
+                  <button class="share-btn" (click)="openShareModal(event)" title="Share event">↗</button>
+                  <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+                </div>
+              </div>
+              <div class="event-time">
+                📅 {{ formatDate(event.date) }} · {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
+              </div>
+              <div class="event-desc" *ngIf="event.description">{{ event.description }}</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1626,11 +1704,11 @@
         <div class="field-row">
           <div class="field">
             <label>Start Time</label>
-            <input type="time" [(ngModel)]="changeForm.startTime" name="changeStart" />
+            <input type="text" inputmode="numeric" [(ngModel)]="changeForm.startTime" name="changeStart" placeholder="HH:MM (e.g. 09:00)" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" />
           </div>
           <div class="field">
             <label>End Time</label>
-            <input type="time" [(ngModel)]="changeForm.endTime" name="changeEnd" />
+            <input type="text" inputmode="numeric" [(ngModel)]="changeForm.endTime" name="changeEnd" placeholder="HH:MM (e.g. 10:00)" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" />
           </div>
         </div>
 
@@ -2005,11 +2083,11 @@
         <div class="field-row" style="margin-top:14px">
           <div class="field">
             <label>Start Time</label>
-            <input type="time" [(ngModel)]="overlapTimeStart" name="overlapTimeStart" />
+            <input type="text" inputmode="numeric" [(ngModel)]="overlapTimeStart" name="overlapTimeStart" placeholder="HH:MM (e.g. 09:00)" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" />
           </div>
           <div class="field">
             <label>End Time</label>
-            <input type="time" [(ngModel)]="overlapTimeEnd" name="overlapTimeEnd" />
+            <input type="text" inputmode="numeric" [(ngModel)]="overlapTimeEnd" name="overlapTimeEnd" placeholder="HH:MM (e.g. 10:00)" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" />
           </div>
         </div>
 
@@ -2069,9 +2147,12 @@
           <label for="start-time">Start Time *</label>
           <input
             id="start-time"
-            type="time"
+            type="text"
+            inputmode="numeric"
             [(ngModel)]="form.startTime"
             name="startTime"
+            placeholder="HH:MM (e.g. 09:00)"
+            pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
             required
           />
         </div>
@@ -2079,9 +2160,12 @@
           <label for="end-time">End Time *</label>
           <input
             id="end-time"
-            type="time"
+            type="text"
+            inputmode="numeric"
             [(ngModel)]="form.endTime"
             name="endTime"
+            placeholder="HH:MM (e.g. 10:00)"
+            pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
             required
           />
         </div>
@@ -2446,6 +2530,81 @@
       <div class="modal-actions" *ngIf="!reminderSuccess">
         <button class="btn-secondary" (click)="closeReminderModal()">Cancel</button>
         <button class="btn-primary" (click)="confirmReminder()">Set Reminder</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── AI CATEGORY SUGGESTION MODAL (for accepted invites) ── -->
+<div class="modal-overlay" *ngIf="showInviteCategoryModal" (click)="skipInviteCategory()">
+  <div class="modal invite-category-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>📂 Categorize Event</h3>
+      <button class="modal-close" (click)="skipInviteCategory()">✕</button>
+    </div>
+    <div class="modal-form" *ngIf="inviteCategoryEvent">
+
+      <!-- Event preview -->
+      <div class="share-event-preview">
+        <span class="result-dot" [style.background]="inviteCategoryEvent.color"></span>
+        <div>
+          <div class="share-event-title">{{ inviteCategoryEvent.title }}</div>
+          <div class="share-event-meta">{{ formatDate(inviteCategoryEvent.date) }} · {{ formatTime(inviteCategoryEvent.startTime) }}</div>
+        </div>
+      </div>
+
+      <p class="invite-category-desc">This event has been added to your calendar. Would you like to assign it a category?</p>
+
+      <!-- AI loading state -->
+      <div class="invite-category-loading" *ngIf="inviteCategoryLoading">
+        <span class="invite-category-spinner">🤖</span>
+        <span>AI is suggesting a category...</span>
+      </div>
+
+      <!-- AI suggestion -->
+      <div class="invite-category-suggestion" *ngIf="!inviteCategoryLoading && inviteCategorySuggestion">
+        <div class="invite-category-label">AI Suggestion:</div>
+        <button
+          class="invite-category-pill suggested"
+          (click)="confirmInviteCategory(inviteCategorySuggestion)"
+        >
+          ✨ {{ inviteCategorySuggestion }}
+        </button>
+      </div>
+
+      <!-- Existing categories -->
+      <div class="invite-category-existing" *ngIf="!inviteCategoryLoading && allCategories.length > 0">
+        <div class="invite-category-label">Or pick an existing category:</div>
+        <div class="invite-category-pills">
+          <button
+            class="invite-category-pill"
+            *ngFor="let cat of allCategories"
+            (click)="confirmInviteCategory(cat)"
+          >{{ cat }}</button>
+        </div>
+      </div>
+
+      <!-- Custom input -->
+      <div class="invite-category-custom" *ngIf="!inviteCategoryLoading">
+        <div class="invite-category-label">Or type a new one:</div>
+        <div class="invite-category-input-wrap">
+          <input
+            class="input"
+            type="text"
+            [(ngModel)]="inviteCategoryCustom"
+            placeholder="e.g. Social, Study Group..."
+            (keydown.enter)="confirmInviteCategory(inviteCategoryCustom)"
+          />
+          <button
+            class="btn-primary btn-sm"
+            [disabled]="!inviteCategoryCustom.trim()"
+            (click)="confirmInviteCategory(inviteCategoryCustom)"
+          >Apply</button>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="skipInviteCategory()">Skip (No Category)</button>
       </div>
     </div>
   </div>

@@ -1320,7 +1320,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   // ── Notifications ──
   notifications: AppNotification[] = [];
-  notifFilter: 'all' | 'share' | 'reminder' = 'all';
+  notifFilter: 'all' | 'share' | 'reminder' | 'event_invite' = 'all';
   notifSearch = '';
 
   // ── Notifications sub-tab ──
@@ -1328,87 +1328,157 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   // ── Add Friend ──
   friendSearch = '';
-  friendSearchResults: { username: string; displayName: string; mutual: number }[] = [];
-  friends: { username: string; displayName: string; mutual: number }[] = [];
+  friendNickname = '';
+  friendSearchResults: { email: string; displayName: string; nickname: string }[] = [];
+  friends: { email: string; displayName: string; nickname: string }[] = [];
   friendRequestsSent: Set<string> = new Set();
   friendSearchLoading = false;
+  friendSearchError = '';
 
-  // Mock user pool for demo
+  private readonly FRIENDS_KEY = () => `agenda_friends_${this.userEmail}`;
+
+  // Mock user pool for demo (simulates other users in the system)
   private readonly MOCK_USERS = [
-    { username: 'alex_j',      displayName: 'Alex Johnson',    mutual: 3 },
-    { username: 'priya_s',     displayName: 'Priya Sharma',    mutual: 1 },
-    { username: 'marcus_t',    displayName: 'Marcus Thompson', mutual: 5 },
-    { username: 'lisa_m',      displayName: 'Lisa Martinez',   mutual: 0 },
-    { username: 'derek_w',     displayName: 'Derek Williams',  mutual: 2 },
-    { username: 'sarah_k',     displayName: 'Sarah Kim',       mutual: 4 },
-    { username: 'tom_r',       displayName: 'Tom Rivera',      mutual: 1 },
-    { username: 'nina_p',      displayName: 'Nina Patel',      mutual: 6 },
-    { username: 'james_o',     displayName: 'James O\'Brien',  mutual: 0 },
-    { username: 'chloe_b',     displayName: 'Chloe Bennett',   mutual: 2 },
+    { email: 'alex.johnson@school.edu',    displayName: 'Alex Johnson' },
+    { email: 'priya.sharma@gmail.com',     displayName: 'Priya Sharma' },
+    { email: 'marcus.t@outlook.com',       displayName: 'Marcus Thompson' },
+    { email: 'lisa.martinez@school.edu',   displayName: 'Lisa Martinez' },
+    { email: 'derek.w@yahoo.com',          displayName: 'Derek Williams' },
+    { email: 'sarah.kim@school.edu',       displayName: 'Sarah Kim' },
+    { email: 'tom.rivera@gmail.com',       displayName: 'Tom Rivera' },
+    { email: 'nina.patel@outlook.com',     displayName: 'Nina Patel' },
+    { email: 'james.obrien@school.edu',    displayName: 'James O\'Brien' },
+    { email: 'chloe.bennett@gmail.com',    displayName: 'Chloe Bennett' },
   ];
+
+  loadFriends() {
+    try {
+      const raw = localStorage.getItem(this.FRIENDS_KEY());
+      this.friends = raw ? JSON.parse(raw) : [];
+    } catch { this.friends = []; }
+  }
+
+  private persistFriends() {
+    localStorage.setItem(this.FRIENDS_KEY(), JSON.stringify(this.friends));
+  }
 
   searchFriends() {
     const q = this.friendSearch.trim().toLowerCase();
+    this.friendSearchError = '';
     if (!q) { this.friendSearchResults = []; return; }
+
+    // Validate email-like input
+    const isEmailQuery = q.includes('@');
+
     this.friendSearchLoading = true;
     // Simulate async search
     setTimeout(() => {
-      const friendUsernames = new Set(this.friends.map(f => f.username));
-      this.friendSearchResults = this.MOCK_USERS.filter(u =>
-        (u.username.includes(q) || u.displayName.toLowerCase().includes(q)) &&
-        !friendUsernames.has(u.username)
-      );
+      const friendEmails = new Set(this.friends.map(f => f.email));
+      this.friendSearchResults = this.MOCK_USERS
+        .filter(u =>
+          u.email.toLowerCase().includes(q) &&
+          !friendEmails.has(u.email) &&
+          u.email !== this.userEmail
+        )
+        .map(u => ({ email: u.email, displayName: u.displayName, nickname: '' }));
+
+      // If the query looks like a full email that isn't in mock users, show it as an option
+      if (isEmailQuery && this.friendSearchResults.length === 0) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (emailRegex.test(q) && q !== this.userEmail && !friendEmails.has(q)) {
+          this.friendSearchResults = [{ email: q, displayName: q.split('@')[0], nickname: '' }];
+        }
+      }
+
       this.friendSearchLoading = false;
     }, 300);
   }
 
-  sendFriendRequest(username: string) {
-    this.friendRequestsSent.add(username);
-    // Find the mock user to get their display name / email
-    const user = this.MOCK_USERS.find(u => u.username === username);
-    // Simulate: the target user sends a friend request notification back to the current user (demo)
-    const mockEmail = `${username}@demo.com`;
-    const displayName = user?.displayName ?? username;
+  sendFriendRequest(email: string) {
+    const nickname = this.friendNickname.trim();
+    if (!nickname) {
+      this.friendSearchError = 'Please enter a nickname for this friend.';
+      return;
+    }
+    this.friendSearchError = '';
+    this.friendRequestsSent.add(email);
+
+    // Find the mock user to get their display name
+    const user = this.MOCK_USERS.find(u => u.email === email);
+    const displayName = user?.displayName ?? email.split('@')[0];
+
+    // Add directly to friends list with the nickname
+    const alreadyFriend = this.friends.some(f => f.email === email);
+    if (!alreadyFriend) {
+      this.friends.push({ email, displayName, nickname });
+      this.persistFriends();
+    }
+
+    // Remove from search results
+    this.friendSearchResults = this.friendSearchResults.filter(u => u.email !== email);
+    this.friendNickname = '';
+
+    // Simulate a notification
     const incomingNotif: AppNotification = {
       id: Date.now().toString() + Math.random().toString(36).slice(2),
       recipientEmail: this.userEmail,
       type: 'friend_request',
-      title: `${displayName} wants to be your friend`,
-      body: `From: ${mockEmail}`,
-      eventId: username,        // reuse eventId to store sender username
+      title: `Friend added: ${nickname} (${displayName})`,
+      body: `Email: ${email}`,
+      eventId: email,
       eventDate: '',
-      senderEmail: mockEmail,
+      senderEmail: email,
       read: false,
       createdAt: new Date().toISOString(),
-      status: 'pending',
+      status: 'accepted',
     };
     this.notifications = [incomingNotif, ...this.notifications];
   }
 
-  acceptFriendRequest(user: { username: string; displayName: string; mutual: number }) {
-    this.friends.push(user);
-    this.friendRequestsSent.delete(user.username);
-    this.friendSearchResults = this.friendSearchResults.filter(u => u.username !== user.username);
+  acceptFriendRequest(user: { email: string; displayName: string; nickname: string }) {
+    const alreadyFriend = this.friends.some(f => f.email === user.email);
+    if (!alreadyFriend) {
+      this.friends.push(user);
+      this.persistFriends();
+    }
+    this.friendRequestsSent.delete(user.email);
+    this.friendSearchResults = this.friendSearchResults.filter(u => u.email !== user.email);
   }
 
-  removeFriend(username: string) {
-    this.friends = this.friends.filter(f => f.username !== username);
+  removeFriend(email: string) {
+    this.friends = this.friends.filter(f => f.email !== email);
+    this.persistFriends();
+  }
+
+  /** Update a friend's nickname. */
+  updateFriendNickname(email: string, newNickname: string) {
+    const friend = this.friends.find(f => f.email === email);
+    if (friend && newNickname.trim()) {
+      friend.nickname = newNickname.trim();
+      this.persistFriends();
+    }
+  }
+
+  /** Get friend display (nickname or email) for sharing UI. */
+  getFriendLabel(email: string): string {
+    const friend = this.friends.find(f => f.email === email);
+    return friend ? `${friend.nickname} (${friend.email})` : email;
   }
 
   /** Accept an incoming friend-request notification. */
   acceptFriendNotif(n: AppNotification) {
     n.status = 'accepted';
     n.read = true;
-    // Add to friends list if not already there
-    const username = n.eventId; // stored in eventId
-    const mockUser = this.MOCK_USERS.find(u => u.username === username);
-    const alreadyFriend = this.friends.some(f => f.username === username);
+    const email = n.eventId; // stored in eventId
+    const mockUser = this.MOCK_USERS.find(u => u.email === email);
+    const alreadyFriend = this.friends.some(f => f.email === email);
     if (!alreadyFriend) {
       this.friends.push({
-        username,
-        displayName: mockUser?.displayName ?? username,
-        mutual: mockUser?.mutual ?? 0,
+        email,
+        displayName: mockUser?.displayName ?? email.split('@')[0],
+        nickname: mockUser?.displayName?.split(' ')[0] ?? email.split('@')[0],
       });
+      this.persistFriends();
     }
     this.notificationsService.markRead(n.id).catch(() => {});
   }
@@ -1679,7 +1749,10 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         dateStr,
         label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
         isToday: dateStr === this.today,
-        events: this.events.filter(e => e.date === dateStr),
+        events: this.events.filter(e => e.date === dateStr).map(e => ({
+          ...e,
+          color: this.getCategoryColor(e.category) || e.color,
+        })),
       });
     }
     return days;
@@ -1688,7 +1761,10 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   // Day view
   viewDayInput = this.today;
   get viewDayEvents(): CalendarEvent[] {
-    return this.events.filter(e => e.date === this.viewDayInput);
+    return this.events.filter(e => e.date === this.viewDayInput).map(e => ({
+      ...e,
+      color: this.getCategoryColor(e.category) || e.color,
+    }));
   }
   get viewDayLabel(): string {
     const d = new Date(this.viewDayInput + 'T00:00:00');
@@ -1748,12 +1824,16 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayEvents = this.events.filter((e) => e.date === dateStr).map(e => ({
+        ...e,
+        color: this.getCategoryColor(e.category) || e.color,
+      }));
       cells.push({
         day: d,
         dateStr,
         isToday: dateStr === this.today,
         isPast: dateStr < this.today,
-        events: this.events.filter((e) => e.date === dateStr),
+        events: dayEvents,
       });
     }
 
@@ -1789,6 +1869,50 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     '#8b5cf6', '#d946ef', '#14b8a6', '#64748b', '#1a1a2e',
   ];
   selectedColor = '#6c63ff';
+
+  // ── Category color map: assigns a unique color to each category ──
+  readonly categoryColors: { [category: string]: string } = {
+    'AP Calculus BC': '#6c63ff',
+    'AP English Lit': '#ec4899',
+    'AP US History': '#f59e0b',
+    'AP Chemistry': '#3b82f6',
+    'Spanish III': '#10b981',
+    'PE / Health': '#22c55e',
+    'Robotics Club': '#ef4444',
+    'Debate Team': '#764ba2',
+    'Orchestra': '#d946ef',
+    'Soccer': '#14b8a6',
+    'Track & Field': '#f97316',
+    'NHS': '#0ea5e9',
+    'School': '#64748b',
+    'Clients': '#e11d48',
+    'Gym': '#8b5cf6',
+    'Nutrition': '#22c55e',
+    'Admin': '#f59e0b',
+    'Personal': '#06b6d4',
+  };
+
+  // Palette used to auto-assign colors to new/unknown categories
+  private readonly categoryColorPalette = [
+    '#6c63ff', '#ec4899', '#f59e0b', '#3b82f6', '#10b981',
+    '#ef4444', '#764ba2', '#d946ef', '#14b8a6', '#f97316',
+    '#0ea5e9', '#8b5cf6', '#22c55e', '#e11d48', '#06b6d4',
+    '#84cc16', '#64748b', '#a3e635', '#65a30d', '#1a1a2e',
+  ];
+
+  /** Returns a consistent color for a given category. Auto-assigns one if not yet mapped. */
+  getCategoryColor(category: string): string {
+    if (!category) return '#64748b'; // default gray for uncategorized
+    if (this.categoryColors[category]) return this.categoryColors[category];
+    // Auto-assign based on hash of category name for consistency
+    let hash = 0;
+    for (let i = 0; i < category.length; i++) {
+      hash = category.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const idx = Math.abs(hash) % this.categoryColorPalette.length;
+    this.categoryColors[category] = this.categoryColorPalette[idx];
+    return this.categoryColors[category];
+  }
 
   // ── Category & sharing state ──
   activeCategoryFilter = ''; // '' = show all
@@ -1955,6 +2079,11 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   get categoryTabTree(): CategoryNode[] {
     return this.categoryTreeService.buildTree(this.allCategoryPaths);
+  }
+
+  /** Events that have no category assigned. */
+  get unassignedEvents(): CalendarEvent[] {
+    return this.events.filter(e => !e.category);
   }
 
   toggleCatNode(path: string) {
@@ -2183,6 +2312,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.loadHistory();
     this.loadSavedCategories();
     this.loadAiConversations();
+    this.loadFriends();
     await this.loadEventsFromDb(user.email);
     this.loadNotifications(user.email);
   }
@@ -2248,7 +2378,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   private showProactiveBanner(reminders: { title: string; body: string }[]) {
     const todayStr = new Date().toISOString().split('T')[0];
-    const todayEvents = this.events.filter(e => e.date === todayStr);
+    const todayEvents = this.events.filter(e => e.date === todayStr).sort((a, b) => a.startTime.localeCompare(b.startTime));
     const upcomingEvents = this.events.filter(e => e.date > todayStr);
 
     // Build the always-present greeting line
@@ -2258,35 +2388,88 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
     const items: { title: string; body: string }[] = [];
 
-    // 1. Greeting + today summary
+    // 1. Personalized greeting + today summary with context
     if (todayEvents.length === 0) {
-      items.push({
-        title: `${greeting}, ${name}!`,
-        body: `You have nothing scheduled today — enjoy the free day.`,
-      });
+      // Check if yesterday was busy — personalize the "free day" message
+      const yesterday = new Date(todayStr + 'T00:00:00');
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const yesterdayCount = this.events.filter(e => e.date === yesterdayStr).length;
+
+      if (yesterdayCount >= 4) {
+        items.push({
+          title: `${greeting}, ${name}!`,
+          body: `Nothing scheduled today after ${yesterdayCount} events yesterday — a well-deserved break.`,
+        });
+      } else {
+        items.push({
+          title: `${greeting}, ${name}!`,
+          body: `You have nothing scheduled today — enjoy the free day.`,
+        });
+      }
     } else {
       const first = todayEvents[0];
+      // Calculate total scheduled hours for context
+      const totalMin = todayEvents.reduce((sum, e) => {
+        const s = e.startTime.split(':').map(Number);
+        const en = e.endTime.split(':').map(Number);
+        return sum + Math.max((en[0] * 60 + en[1]) - (s[0] * 60 + s[1]), 0);
+      }, 0);
+      const totalHours = Math.round(totalMin / 60 * 10) / 10;
+
+      // Detect the dominant category for today
+      const catCounts: Record<string, number> = {};
+      todayEvents.forEach(e => { if (e.category) catCounts[e.category] = (catCounts[e.category] ?? 0) + 1; });
+      const topCategory = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0];
+      const catNote = topCategory && topCategory[1] >= 2
+        ? ` Mostly ${topCategory[0].toLowerCase()} today.`
+        : '';
+
       items.push({
         title: `${greeting}, ${name}!`,
-        body: `You have ${todayEvents.length} event${todayEvents.length !== 1 ? 's' : ''} today. First up: ${first.title} at ${this.formatTime(first.startTime)}.`,
+        body: `${todayEvents.length} event${todayEvents.length !== 1 ? 's' : ''} today (~${totalHours}h).${catNote} First up: ${first.title} at ${this.formatTime(first.startTime)}.`,
       });
     }
 
-    // 2. Next upcoming event (if not today)
-    const nextUp = upcomingEvents.sort((a, b) => a.date.localeCompare(b.date))[0];
+    // 2. Next upcoming event with personalized context
+    const nextUp = upcomingEvents.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))[0];
     if (nextUp) {
       const daysUntil = Math.ceil(
         (new Date(nextUp.date + 'T00:00:00').getTime() - new Date(todayStr + 'T00:00:00').getTime())
         / (1000 * 60 * 60 * 24)
       );
       const when = daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`;
+
+      // Check how many events share that same day for context
+      const sameDayCount = upcomingEvents.filter(e => e.date === nextUp.date).length;
+      const contextNote = sameDayCount > 1 ? ` (${sameDayCount} events that day)` : '';
+
       items.push({
         title: `Coming up ${when}`,
-        body: `${nextUp.title} on ${this.formatDate(nextUp.date)} at ${this.formatTime(nextUp.startTime)}.`,
+        body: `${nextUp.title} on ${this.formatDate(nextUp.date)} at ${this.formatTime(nextUp.startTime)}${contextNote}.`,
       });
     }
 
-    // 3. AI prep reminders (if any)
+    // 3. Week-at-a-glance insight (only if we have upcoming events)
+    if (upcomingEvents.length > 0) {
+      const weekEnd = new Date(todayStr + 'T00:00:00');
+      weekEnd.setDate(weekEnd.getDate() + 7);
+      const weekEndStr = weekEnd.toISOString().split('T')[0];
+      const thisWeekEvents = this.events.filter(e => e.date >= todayStr && e.date < weekEndStr);
+
+      if (thisWeekEvents.length >= 5) {
+        const daysWithEvents = new Set(thisWeekEvents.map(e => e.date)).size;
+        const freeDaysThisWeek = 7 - daysWithEvents;
+        if (freeDaysThisWeek <= 1) {
+          items.push({
+            title: `Busy week ahead`,
+            body: `${thisWeekEvents.length} events across ${daysWithEvents} days this week. Only ${freeDaysThisWeek} free day${freeDaysThisWeek !== 1 ? 's' : ''} — pace yourself.`,
+          });
+        }
+      }
+    }
+
+    // 4. AI prep reminders (if any)
     for (const r of reminders) {
       items.push({ title: r.title, body: r.body });
     }
@@ -2294,9 +2477,9 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.loginBannerItems = items;
     this.showLoginBanner = true;
 
-    // Auto-dismiss after 12 seconds
+    // Auto-dismiss after 15 seconds (a bit longer since there's more useful info)
     if (this.loginBannerTimer) clearTimeout(this.loginBannerTimer);
-    this.loginBannerTimer = setTimeout(() => { this.showLoginBanner = false; }, 12000);
+    this.loginBannerTimer = setTimeout(() => { this.showLoginBanner = false; }, 15000);
   }
 
   scrollToYearMonth(idx: number) {
@@ -2448,7 +2631,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   // ── Top-right notification panel ──
   showNotifPanel = false;
-  notifPanelFilter: 'all' | 'share' | 'reminder' = 'all';
+  notifPanelFilter: 'all' | 'share' | 'reminder' | 'event_invite' = 'all';
 
   /** Notifications shown in the top-right panel (max 20, filtered by type). */
   get panelNotifications(): AppNotification[] {
@@ -2524,8 +2707,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.form = {
       title: '',
       date: this.today,
-      startTime: '09:00',
-      endTime: '10:00',
+      startTime: '',
+      endTime: '',
       description: '',
       category: this.activeCategoryFilter || '',
       sharedWith: [],
@@ -2597,6 +2780,18 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       this.scheduleError = 'Please select a date.';
       return;
     }
+    const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!this.form.startTime || !timeRegex.test(this.form.startTime)) {
+      this.scheduleError = 'Please enter a valid start time (HH:MM).';
+      return;
+    }
+    if (!this.form.endTime || !timeRegex.test(this.form.endTime)) {
+      this.scheduleError = 'Please enter a valid end time (HH:MM).';
+      return;
+    }
+    // Normalize single-digit hour (e.g. "9:00" → "09:00")
+    this.form.startTime = this.form.startTime.padStart(5, '0');
+    this.form.endTime = this.form.endTime.padStart(5, '0');
     if (this.form.startTime >= this.form.endTime) {
       this.scheduleError = 'End time must be after start time.';
       return;
@@ -2628,8 +2823,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       this.overlapManualDate = '';
       this.overlapManualError = '';
       this.overlapFinalDate = '';
-      this.overlapTimeStart = '09:00';
-      this.overlapTimeEnd = '10:00';
+      this.overlapTimeStart = '';
+      this.overlapTimeEnd = '';
       this.overlapTimeError = '';
       return;
     }
@@ -3275,10 +3470,13 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   /** Events filtered by the active category pill (or all if none selected).
    *  Selecting a parent path also includes all descendant paths. */
   get filteredEvents(): CalendarEvent[] {
-    if (!this.activeCategoryFilter) return this.events;
-    return this.events.filter(e =>
-      this.categoryTreeService.isUnderPath(e.category, this.activeCategoryFilter)
-    );
+    const base = this.activeCategoryFilter
+      ? this.events.filter(e => this.categoryTreeService.isUnderPath(e.category, this.activeCategoryFilter))
+      : this.events;
+    return base.map(e => ({
+      ...e,
+      color: this.getCategoryColor(e.category) || e.color,
+    }));
   }
 
   setCategoryFilter(cat: string) {
@@ -3315,33 +3513,37 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       ? this.events.filter(e => e.category === this.shareTargetEvent!.category)
       : [this.shareTargetEvent];
 
-    // Optimistic update
-    this.events = this.events.map(e => {
-      if (targets.find(t => t.id === e.id)) {
-        const already = e.sharedWith.includes(email);
-        return already ? e : { ...e, sharedWith: [...e.sharedWith, email] };
-      }
-      return e;
-    });
-
-    // Persist each updated event to DB
-    const updated = this.events.filter(e => targets.find(t => t.id === e.id));
-    for (const ev of updated) {
-      this.eventsService.updateEvent(ev).catch(err =>
-        console.error('[Dashboard] Failed to persist share:', err)
-      );
-    }
-
     const label = this.shareCategoryOnly && this.shareTargetEvent.category
       ? `all "${this.shareTargetEvent.category}" events (${targets.length})`
       : `"${this.shareTargetEvent.title}"`;
-    this.shareSuccess = `Shared ${label} with ${email}.`;
+
+    // Send an event invitation (pending) instead of immediately sharing
+    try {
+      const n = await this.notificationsService.create({
+        recipientEmail: email,
+        type: 'event_invite',
+        title: `${this.userEmail} invited you to ${label}`,
+        body: this.shareCategoryOnly
+          ? `Category: ${this.shareTargetEvent.category} (${targets.length} events)`
+          : `${formatDate2(this.shareTargetEvent.date)} · ${this.shareTargetEvent.startTime}–${this.shareTargetEvent.endTime}`,
+        eventId: this.shareTargetEvent.id,
+        eventDate: this.shareTargetEvent.date,
+        senderEmail: this.userEmail,
+        read: false,
+        status: 'pending',
+      });
+      // If the recipient is the current user (demo/testing), show it immediately
+      if (email === this.userEmail) {
+        this.notifications = [n, ...this.notifications];
+      }
+    } catch (err) {
+      console.warn('[Dashboard] Could not create event invite notification:', err);
+    }
+
+    this.shareSuccess = `Invitation sent to ${email} for ${label}. They'll need to accept it.`;
     this.shareEmail = '';
 
-    // Create a notification for the recipient
-    this.createShareNotification(email, this.shareTargetEvent, this.shareCategoryOnly);
-
-    setTimeout(() => this.closeShareModal(), 1800);
+    setTimeout(() => this.closeShareModal(), 2000);
   }
 
   removeShare(event: CalendarEvent, email: string) {
@@ -3353,6 +3555,187 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       this.eventsService.updateEvent(updated).catch(err =>
         console.error('[Dashboard] Failed to remove share:', err)
       );
+    }
+  }
+
+  /** Accept an event invitation — adds event to calendar with AI category suggestion, notifies the sender. */
+  async acceptInvite(n: AppNotification) {
+    n.status = 'accepted';
+    n.read = true;
+
+    // Persist the status change
+    this.notificationsService.updateStatus(n.id, 'accepted').catch(() => {});
+
+    // Find the original event from sharedWith listing or local events
+    const eventId = n.eventId;
+    let sourceEvent: CalendarEvent | undefined;
+    if (eventId) {
+      sourceEvent = this.events.find(e => e.id === eventId);
+    }
+
+    // If the event doesn't exist locally yet, create a copy on the user's calendar
+    if (sourceEvent) {
+      // Also update sharedWith so the relationship is tracked
+      if (!sourceEvent.sharedWith.includes(this.userEmail)) {
+        this.events = this.events.map(e => {
+          if (e.id === eventId) {
+            return { ...e, sharedWith: [...e.sharedWith, this.userEmail] };
+          }
+          return e;
+        });
+        const updated = this.events.find(e => e.id === eventId);
+        if (updated) {
+          this.eventsService.updateEvent(updated).catch(err =>
+            console.error('[Dashboard] Failed to persist invite accept:', err)
+          );
+        }
+      }
+
+      // Create a personal copy of the event on this user's calendar
+      const newEvent: Omit<CalendarEvent, 'id'> = {
+        title: sourceEvent.title,
+        date: sourceEvent.date,
+        startTime: sourceEvent.startTime,
+        endTime: sourceEvent.endTime,
+        description: sourceEvent.description || `Invited by ${n.senderEmail}`,
+        color: sourceEvent.color,
+        category: '', // Will be set by AI suggestion
+        sharedWith: [],
+      };
+
+      try {
+        const created = await this.eventsService.createEvent(newEvent, this.userEmail);
+        this.events = [...this.events, created];
+
+        // Open the AI category suggestion modal for the newly added event
+        this.openInviteCategoryModal(created);
+      } catch (err) {
+        console.error('[Dashboard] Failed to create accepted event copy:', err);
+      }
+    }
+
+    // Notify the sender that the invite was accepted
+    try {
+      const responseNotif = await this.notificationsService.create({
+        recipientEmail: n.senderEmail,
+        type: 'invite_response',
+        title: `${this.userEmail} accepted your event invitation`,
+        body: `They accepted the invite for "${n.title.replace(/^.*invited you to /, '')}"`,
+        eventId: n.eventId,
+        eventDate: n.eventDate,
+        senderEmail: this.userEmail,
+        read: false,
+        status: 'accepted',
+      });
+      // If the sender is the current user (demo/testing), show it immediately
+      if (n.senderEmail === this.userEmail) {
+        this.notifications = [responseNotif, ...this.notifications];
+      }
+    } catch (err) {
+      console.warn('[Dashboard] Could not notify sender of acceptance:', err);
+    }
+  }
+
+  // ── AI Category Suggestion Modal (for accepted invites) ──
+  showInviteCategoryModal = false;
+  inviteCategoryEvent: CalendarEvent | null = null;
+  inviteCategorySuggestion = '';
+  inviteCategoryCustom = '';
+  inviteCategoryLoading = false;
+
+  /** Open modal to let AI suggest a category for an accepted invite event. */
+  private async openInviteCategoryModal(event: CalendarEvent) {
+    this.inviteCategoryEvent = event;
+    this.inviteCategorySuggestion = '';
+    this.inviteCategoryCustom = '';
+    this.inviteCategoryLoading = true;
+    this.showInviteCategoryModal = true;
+
+    // Ask AI to suggest a category based on the event and the user's existing categories
+    try {
+      const existingCats = this.allCategories.length > 0
+        ? this.allCategories.join(', ')
+        : 'Personal, Work, School, Health, Social';
+
+      const prompt = `I just accepted an event invitation. The event is titled "${event.title}" on ${event.date} from ${event.startTime} to ${event.endTime}. Description: "${event.description || 'none'}". My existing calendar categories are: ${existingCats}. Which ONE category best fits this event? Reply with ONLY the category name, nothing else.`;
+
+      const { text } = await this.bedrockChat.sendMessage(prompt, this.events, []);
+      this.inviteCategorySuggestion = text.trim().replace(/["""]/g, '');
+    } catch (err) {
+      // Fallback — suggest based on simple heuristics
+      this.inviteCategorySuggestion = this.allCategories.length > 0
+        ? this.allCategories[0]
+        : 'Personal';
+      console.warn('[Dashboard] AI category suggestion failed, using fallback:', err);
+    } finally {
+      this.inviteCategoryLoading = false;
+    }
+  }
+
+  /** User accepts the AI-suggested category. */
+  async confirmInviteCategory(category: string) {
+    if (!this.inviteCategoryEvent || !category.trim()) return;
+    const cat = category.trim();
+
+    // Update the event with the chosen category
+    this.events = this.events.map(e =>
+      e.id === this.inviteCategoryEvent!.id ? { ...e, category: cat } : e
+    );
+    const updated = this.events.find(e => e.id === this.inviteCategoryEvent!.id);
+    if (updated) {
+      this.eventsService.updateEvent(updated).catch(err =>
+        console.error('[Dashboard] Failed to update invite event category:', err)
+      );
+    }
+
+    // Add to saved categories if it's a new one
+    if (cat && !this.savedCategories.includes(cat) && !this.allCategories.includes(cat)) {
+      this.savedCategories = [...this.savedCategories, cat].sort();
+      this.persistCategories();
+    }
+
+    this.closeInviteCategoryModal();
+  }
+
+  /** Skip categorization — leave it uncategorized. */
+  skipInviteCategory() {
+    this.closeInviteCategoryModal();
+  }
+
+  private closeInviteCategoryModal() {
+    this.showInviteCategoryModal = false;
+    this.inviteCategoryEvent = null;
+    this.inviteCategorySuggestion = '';
+    this.inviteCategoryCustom = '';
+  }
+
+  /** Decline an event invitation — notifies the sender. */
+  async declineInvite(n: AppNotification) {
+    n.status = 'rejected';
+    n.read = true;
+
+    // Persist the status change
+    this.notificationsService.updateStatus(n.id, 'rejected').catch(() => {});
+
+    // Notify the sender that the invite was declined
+    try {
+      const responseNotif = await this.notificationsService.create({
+        recipientEmail: n.senderEmail,
+        type: 'invite_response',
+        title: `${this.userEmail} declined your event invitation`,
+        body: `They declined the invite for "${n.title.replace(/^.*invited you to /, '')}"`,
+        eventId: n.eventId,
+        eventDate: n.eventDate,
+        senderEmail: this.userEmail,
+        read: false,
+        status: 'rejected',
+      });
+      // If the sender is the current user (demo/testing), show it immediately
+      if (n.senderEmail === this.userEmail) {
+        this.notifications = [responseNotif, ...this.notifications];
+      }
+    } catch (err) {
+      console.warn('[Dashboard] Could not notify sender of decline:', err);
     }
   }
 

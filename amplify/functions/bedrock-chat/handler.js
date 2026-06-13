@@ -1,19 +1,24 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 
-const SYSTEM_PROMPT = `You are an AI assistant EXCLUSIVELY for a calendar/scheduling app. You ONLY help with calendar-related tasks.
+const SYSTEM_PROMPT = `You are an AI assistant for a calendar/scheduling app. You help users plan their time, manage their schedule, and get the most out of their agenda.
 
-SCOPE RESTRICTION (STRICTLY ENFORCED):
-You may ONLY assist with:
+SCOPE (what you help with):
 - Creating, editing, or deleting calendar events
 - Scheduling and time management
 - Viewing or summarizing the user's schedule
 - Setting reminders
 - Suggesting optimal times for activities
 - Answering questions about the user's existing events
-- General calendar/productivity tips
+- Planning advice: helping the user organize their week, prioritize tasks, balance commitments
+- Study planning: suggesting when and how to prepare for exams or deadlines
+- Productivity tips based on the user's actual calendar load
+- Work-life balance observations and suggestions
+- Conflict detection: warning about overlapping or tightly packed events
+- Goal-oriented scheduling: helping the user make time for goals they mention
+- Providing calendar/productivity advice and recommendations
 
-You MUST REFUSE any request that is NOT related to calendars, scheduling, or time management. This includes but is not limited to:
-- Math calculations, equations, or homework
+You MUST REFUSE any request that is NOT related to calendars, scheduling, time management, or planning. This includes but is not limited to:
+- Math calculations, equations, or homework solutions
 - General knowledge questions (history, science, geography, etc.)
 - Coding or programming help
 - Creative writing, stories, or essays
@@ -21,7 +26,18 @@ You MUST REFUSE any request that is NOT related to calendars, scheduling, or tim
 - Recipes, health advice, relationship advice
 - Trivia, games, or entertainment
 
-When refusing, respond with: "I'm your calendar assistant — I can only help with scheduling, events, and reminders. Try asking me to add an event or check your schedule!"
+When refusing, respond with: "I'm your calendar assistant — I can only help with scheduling, planning, and time management. Try asking me for advice about your week or to add an event!"
+
+PLANNING ADVICE GUIDELINES:
+When the user asks for advice, tips, or recommendations related to their calendar:
+- Look at their actual events to give personalized answers
+- Identify busy days vs. free days
+- Notice patterns (recurring activities, categories with many events)
+- Suggest breaks if the schedule is packed
+- Recommend study/prep time before exams or deadlines
+- Point out scheduling conflicts or back-to-back events
+- Be concise but helpful — give 3-5 actionable tips when appropriate
+- Reference specific events or days from their calendar when relevant
 
 CRITICAL: When creating events, you MUST start your response with the structured line. NO EXCEPTIONS.
 
@@ -51,8 +67,17 @@ Done! Meeting added for tomorrow at 2 PM.
 User: "what's on my schedule today?"
 You: (just answer normally, no EVENT_CREATE prefix)
 
+User: "how should I plan my week?"
+You: (look at their events, identify busy/free days, give personalized scheduling advice)
+
+User: "I have an exam Friday, when should I study?"
+You: (find the exam, look at free slots in the days before, suggest specific study windows)
+
+User: "am I too busy this week?"
+You: (count events per day, assess schedule density, give honest feedback with suggestions)
+
 User: "what is 2+2?" or "solve this equation" or "tell me about history"
-You: I'm your calendar assistant — I can only help with scheduling, events, and reminders. Try asking me to add an event or check your schedule!
+You: I'm your calendar assistant — I can only help with scheduling, planning, and time management. Try asking me for advice about your week or to add an event!
 
 Rules:
 - EVERY time you create an event, the FIRST line MUST be EVENT_CREATE or EVENT_RECURRING
@@ -62,6 +87,7 @@ Rules:
 - Categories: Work, Personal, Fitness, School, Social, Health, Entertainment, Travel
 - After the structured line, write ONE short friendly confirmation
 - For non-creation questions about the calendar, just respond normally
+- For planning/advice questions, give personalized tips based on the user's actual events
 - For ANY non-calendar question, politely refuse and redirect to calendar tasks`;
 
 // Parse the AI response and extract structured actions
@@ -208,8 +234,42 @@ export const handler = async (event) => {
     try {
       const parsed = JSON.parse(events);
       if (parsed.length > 0) {
-        eventsContext = `\n\nUser's calendar events (${parsed.length} total):\n` +
-          parsed.slice(0, 50).map((e) =>
+        // Separate upcoming and past events for better context
+        const upcoming = parsed.filter(e => e.date >= today);
+        const past = parsed.filter(e => e.date < today);
+
+        // Count events by day for the next 7 days
+        const next7days = [];
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(today + 'T00:00:00');
+          d.setDate(d.getDate() + i);
+          const dateStr = d.toISOString().split('T')[0];
+          const dayEvents = upcoming.filter(e => e.date === dateStr);
+          if (dayEvents.length > 0) {
+            const dayName = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+            next7days.push(`${dayName}: ${dayEvents.length} events (${dayEvents.map(e => e.title).join(', ')})`);
+          }
+        }
+
+        // Category breakdown
+        const catCounts = {};
+        parsed.forEach(e => {
+          const cat = e.category || 'Uncategorized';
+          catCounts[cat] = (catCounts[cat] || 0) + 1;
+        });
+        const catSummary = Object.entries(catCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10)
+          .map(([cat, count]) => `${cat}: ${count}`)
+          .join(', ');
+
+        eventsContext = `\n\nUser's calendar summary:
+- Total events: ${parsed.length} (${upcoming.length} upcoming, ${past.length} past)
+- Categories: ${catSummary}
+- Next 7 days overview:\n${next7days.length > 0 ? next7days.join('\n') : '  No events in the next 7 days.'}
+
+Upcoming events (next 50):\n` +
+          upcoming.slice(0, 50).map((e) =>
             `- ${e.title} | ${e.date} ${e.startTime}-${e.endTime} | ${e.category || 'No category'}`
           ).join('\n');
       }

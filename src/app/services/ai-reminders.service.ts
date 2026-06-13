@@ -334,6 +334,78 @@ const SUGGESTION_PATTERNS: SuggestionPattern[] = [
       return null;
     },
   },
+  // Category-specific prep — if user has frequent fitness events, suggest warm-up
+  {
+    handler: (events, today) => {
+      const thisWeekStart = today;
+      const thisWeekEnd = (() => { const d = new Date(today + 'T00:00:00'); d.setDate(d.getDate() + 7); return d.toISOString().split('T')[0]; })();
+      const fitnessKeywords = /\b(gym|workout|training|strength|cardio|practice|run|yoga)\b/i;
+      const fitnessEvents = events.filter(e =>
+        e.date >= thisWeekStart && e.date <= thisWeekEnd &&
+        fitnessKeywords.test(e.title + ' ' + (e.category || ''))
+      );
+
+      if (fitnessEvents.length >= 3) {
+        const suggestions: ReminderSuggestion[] = [];
+        // Find the most common time for fitness events
+        const timeCounts: Record<string, number> = {};
+        fitnessEvents.forEach(e => { timeCounts[e.startTime] = (timeCounts[e.startTime] ?? 0) + 1; });
+        const commonTime = Object.entries(timeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '07:00';
+        const prepTime = addMinutes(commonTime, -30);
+
+        suggestions.push({
+          text: `Warm-up & hydrate before your workout`,
+          frequency: 'daily',
+          time: prepTime,
+          reason: `You have ${fitnessEvents.length} fitness sessions this week — a prep reminder helps you perform better`,
+        });
+        return suggestions;
+      }
+      return null;
+    },
+  },
+  // Transition time — suggest buffer when switching between different category events
+  {
+    handler: (events, today) => {
+      const todayEvents = events.filter(e => e.date === today).sort((a, b) => a.startTime.localeCompare(b.startTime));
+      const suggestions: ReminderSuggestion[] = [];
+
+      for (let i = 0; i < todayEvents.length - 1; i++) {
+        const current = todayEvents[i];
+        const next = todayEvents[i + 1];
+        // Different categories with a small gap — suggest transition time
+        if (current.category && next.category && current.category !== next.category) {
+          const gapMin = toMinutes(next.startTime) - toMinutes(current.endTime);
+          if (gapMin >= 15 && gapMin <= 45) {
+            suggestions.push({
+              text: `Transition: ${current.category} → ${next.category}`,
+              frequency: 'daily',
+              time: current.endTime,
+              reason: `${gapMin}-min gap between ${current.title} and ${next.title} — use it to mentally shift gears`,
+            });
+          }
+        }
+      }
+      return suggestions.length > 0 ? suggestions.slice(0, 2) : null; // max 2
+    },
+  },
+  // Evening recap — if user had a productive day (4+ events), suggest journaling
+  {
+    handler: (events, today) => {
+      const todayEvents = events.filter(e => e.date === today);
+      if (todayEvents.length >= 4) {
+        const lastEvent = todayEvents.sort((a, b) => b.endTime.localeCompare(a.endTime))[0];
+        const recapTime = addMinutes(lastEvent.endTime, 30);
+        return [{
+          text: `Daily recap: What went well today?`,
+          frequency: 'daily',
+          time: recapTime,
+          reason: `You had ${todayEvents.length} events today — a quick reflection helps track progress`,
+        }];
+      }
+      return null;
+    },
+  },
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

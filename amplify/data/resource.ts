@@ -34,6 +34,7 @@ const schema = a.schema({
       eventDate:      a.string(),
       senderEmail:    a.string(),
       read:           a.boolean(),
+      status:         a.string(),
     })
     .authorization((allow) => [allow.publicApiKey()]),
 

@@ -5,7 +5,7 @@ import type { Schema } from '../../../amplify/data/resource';
 export interface AppNotification {
   id: string;
   recipientEmail: string;
-  type: 'share' | 'reminder' | 'friend_request';
+  type: 'share' | 'reminder' | 'friend_request' | 'event_invite' | 'invite_response';
   title: string;
   body: string;
   eventId: string;
@@ -46,9 +46,14 @@ export class NotificationsService {
       eventDate:      n.eventDate || undefined,
       senderEmail:    n.senderEmail || undefined,
       read:           false,
+      status:         n.status || undefined,
     });
     if (errors?.length) throw new Error(errors[0].message);
     return this.toLocal(data!);
+  }
+
+  async updateStatus(id: string, status: 'accepted' | 'rejected'): Promise<void> {
+    await getClient().models.Notification.update({ id, status, read: true });
   }
 
   async markRead(id: string): Promise<void> {
@@ -68,7 +73,7 @@ export class NotificationsService {
     return {
       id:             r.id,
       recipientEmail: r.recipientEmail ?? '',
-      type:           (r.type ?? 'reminder') as 'share' | 'reminder' | 'friend_request',
+      type:           (r.type ?? 'reminder') as AppNotification['type'],
       title:          r.title ?? '',
       body:           r.body ?? '',
       eventId:        r.eventId ?? '',
@@ -76,7 +81,7 @@ export class NotificationsService {
       senderEmail:    r.senderEmail ?? '',
       read:           r.read ?? false,
       createdAt:      r.createdAt ?? undefined,
-      status:         undefined,
+      status:         (r.status as AppNotification['status']) ?? undefined,
     };
   }
 }
