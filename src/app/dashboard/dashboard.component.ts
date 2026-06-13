@@ -1871,7 +1871,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   selectedColor = '#6c63ff';
 
   // ── Category color map: assigns a unique color to each category ──
-  readonly categoryColors: { [category: string]: string } = {
+  categoryColors: { [category: string]: string } = {
     'AP Calculus BC': '#6c63ff',
     'AP English Lit': '#ec4899',
     'AP US History': '#f59e0b',
@@ -1912,6 +1912,42 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     const idx = Math.abs(hash) % this.categoryColorPalette.length;
     this.categoryColors[category] = this.categoryColorPalette[idx];
     return this.categoryColors[category];
+  }
+
+  /** Change a category's color and update all events using that category. */
+  pickCategoryColor(color: string) {
+    if (this.form.category) {
+      // Update the category color map
+      this.categoryColors[this.form.category] = color;
+      // Update all existing events in this category to use the new color
+      this.events = this.events.map(e =>
+        e.category === this.form.category ? { ...e, color } : e
+      );
+      this.showCategoryColorPicker = false;
+      // Persist color mapping
+      this.saveCategoryColors();
+    } else {
+      // No category selected — just update the standalone color
+      this.selectedColor = color;
+    }
+  }
+
+  /** Save category colors to localStorage for persistence. */
+  private saveCategoryColors() {
+    try {
+      localStorage.setItem('agenda_category_colors', JSON.stringify(this.categoryColors));
+    } catch { /* ignore */ }
+  }
+
+  /** Load category colors from localStorage. */
+  private loadCategoryColors() {
+    try {
+      const stored = localStorage.getItem('agenda_category_colors');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        Object.assign(this.categoryColors, parsed);
+      }
+    } catch { /* ignore */ }
   }
 
   // ── Category & sharing state ──
@@ -1981,6 +2017,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
 
   showCategoryPicker = false;
+  showCategoryColorPicker = false;
 
   closeCategoryPicker() {
     this.showCategoryPicker = false;
@@ -2096,6 +2133,30 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   isCatNodeExpanded(path: string): boolean {
     return this.expandedCatNodes.has(path);
+  }
+
+  // ── Category color picker (in categories tab) ──
+  catColorPickerPath = '';
+
+  toggleCatColorPicker(path: string) {
+    this.catColorPickerPath = this.catColorPickerPath === path ? '' : path;
+  }
+
+  setCategoryColorFromTree(path: string, color: string) {
+    this.categoryColors[path] = color;
+    // Update all events in this category to use the new color
+    this.events = this.events.map(e => {
+      if (e.category === path) {
+        const updated = { ...e, color };
+        this.eventsService.updateEvent(updated).catch(err =>
+          console.error('[Dashboard] Failed to update event color:', err)
+        );
+        return updated;
+      }
+      return e;
+    });
+    this.catColorPickerPath = '';
+    this.saveCategoryColors();
   }
 
   /** Count events under a category path (including descendants). */
@@ -2311,6 +2372,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.googleCalendarLinked = this.googleCalendarService.isLinked;
     this.loadHistory();
     this.loadSavedCategories();
+    this.loadCategoryColors();
     this.loadAiConversations();
     this.loadFriends();
     await this.loadEventsFromDb(user.email);
@@ -2718,6 +2780,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.selectedColor = '#6c63ff';
     this.scheduleError = '';
     this.scheduleSuccess = false;
+    this.showCategoryColorPicker = false;
     // Reset AI panel state
     this.showAiPanel = false;
     this.aiSuggestions = [];
@@ -2804,7 +2867,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       startTime: this.form.startTime,
       endTime: this.form.endTime,
       description: this.form.description.trim(),
-      color: this.selectedColor,
+      color: this.form.category ? this.getCategoryColor(this.form.category.trim()) : this.selectedColor,
       category: this.form.category.trim(),
       sharedWith: [...this.form.sharedWith],
     };
@@ -3423,9 +3486,10 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       this.changeError = 'End time must be after start time.'; return;
     }
     const before = this.events.find(e => e.id === this.selectedEventId);
+    const newColor = this.changeForm.category ? this.getCategoryColor(this.changeForm.category) : undefined;
     this.events = this.events.map(e =>
       e.id === this.selectedEventId
-        ? { ...e, date: this.changeForm.date, startTime: this.changeForm.startTime, endTime: this.changeForm.endTime, category: this.changeForm.category }
+        ? { ...e, date: this.changeForm.date, startTime: this.changeForm.startTime, endTime: this.changeForm.endTime, category: this.changeForm.category, ...(newColor ? { color: newColor } : {}) }
         : e
     ).sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
     const after = this.events.find(e => e.id === this.selectedEventId);

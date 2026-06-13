@@ -3893,6 +3893,85 @@
   border-color: #ef4444;
 }
 
+/* Category color dot (in tree) */
+.cat-node-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 2px solid rgba(0,0,0,0.1);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.cat-node-color-dot:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 0 3px rgba(108,99,255,0.2);
+}
+
+/* Category color picker (inline in tree) */
+.cat-node-color-picker {
+  padding: 8px 0 8px 34px;
+}
+.cat-node-color-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.cat-node-color-picker .color-picker {
+  gap: 6px;
+}
+.cat-node-color-picker .color-swatch {
+  width: 22px;
+  height: 22px;
+}
+
+/* Category color info row in schedule modal */
+.category-color-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-hover);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.category-color-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid rgba(0,0,0,0.1);
+}
+.category-color-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  flex: 1;
+}
+.category-color-text.muted {
+  font-style: italic;
+}
+.category-color-change-btn {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.category-color-change-btn:hover {
+  background: var(--accent-light);
+}
+.category-color-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  font-style: italic;
+}
+
 /* Rename button */
 .cat-node-rename {
   background: var(--bg-hover);
@@ -3903,6 +3982,18 @@
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
+}
+
+/* Color button */
+.cat-node-color {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.cat-node-color:hover {
+  background: #f59e0b;
+  color: #fff;
+  border-color: #f59e0b;
 }
 
 /* Inline rename input */

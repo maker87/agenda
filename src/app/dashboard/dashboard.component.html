@@ -1547,6 +1547,7 @@
 
         <!-- Name (show input when renaming, otherwise plain text) -->
         <ng-container *ngIf="renamingCatPath !== node.fullPath">
+          <span class="cat-node-color-dot" [style.background]="getCategoryColor(node.fullPath)" (click)="toggleCatColorPicker(node.fullPath)" title="Change color"></span>
           <span class="cat-node-name">{{ node.name }}</span>
         </ng-container>
         <ng-container *ngIf="renamingCatPath === node.fullPath">
@@ -1576,6 +1577,11 @@
             title="Rename category"
           >✏️</button>
           <button
+            class="cat-node-btn cat-node-color"
+            (click)="toggleCatColorPicker(node.fullPath)"
+            title="Change color"
+          >🎨</button>
+          <button
             class="cat-node-btn cat-node-add"
             (click)="startAddSubcategory(node.fullPath); expandedCatNodes.add(node.fullPath)"
             title="Add subcategory"
@@ -1591,6 +1597,21 @@
       <!-- Rename error -->
       <div class="cat-rename-error" *ngIf="renamingCatPath === node.fullPath && renameCatError">
         {{ renameCatError }}
+      </div>
+
+      <!-- Inline color picker for category -->
+      <div class="cat-node-color-picker" *ngIf="catColorPickerPath === node.fullPath">
+        <span class="cat-node-color-label">Pick a color for "{{ node.name }}" (applies to all its events):</span>
+        <div class="color-picker">
+          <button
+            type="button"
+            class="color-swatch"
+            *ngFor="let c of eventColors"
+            [style.background]="c"
+            [class.selected]="getCategoryColor(node.fullPath) === c"
+            (click)="setCategoryColorFromTree(node.fullPath, c)"
+          ></button>
+        </div>
       </div>
 
       <!-- Delete confirmation -->
@@ -2304,17 +2325,29 @@
       </div>
 
       <div class="field">
-        <label>Color</label>
-        <div class="color-picker">
+        <label>Event Color</label>
+        <div class="category-color-info" *ngIf="form.category">
+          <span class="category-color-dot" [style.background]="getCategoryColor(form.category)"></span>
+          <span class="category-color-text">Using <strong>{{ form.category }}</strong> category color</span>
+          <button type="button" class="category-color-change-btn" (click)="showCategoryColorPicker = !showCategoryColorPicker">Change</button>
+        </div>
+        <div class="category-color-info" *ngIf="!form.category">
+          <span class="category-color-dot" [style.background]="selectedColor"></span>
+          <span class="category-color-text muted">Select a category to assign a color, or pick one:</span>
+        </div>
+        <div class="color-picker" *ngIf="showCategoryColorPicker || !form.category">
           <button
             type="button"
             class="color-swatch"
             *ngFor="let c of eventColors"
             [style.background]="c"
-            [class.selected]="selectedColor === c"
-            (click)="selectedColor = c"
+            [class.selected]="(form.category ? getCategoryColor(form.category) : selectedColor) === c"
+            (click)="pickCategoryColor(c)"
           ></button>
         </div>
+        <p class="category-color-hint" *ngIf="showCategoryColorPicker && form.category">
+          Changing this color will update <strong>all</strong> events in "{{ form.category }}".
+        </p>
       </div>
 
       <!-- ── Share with ── -->
