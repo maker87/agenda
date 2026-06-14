@@ -184,6 +184,14 @@
         <span class="nav-icon">📊</span>
         Weekly Summary
       </button>
+      <button
+        class="nav-item"
+        [class.active]="activeTab === 'email'"
+        (click)="switchTab('email')"
+      >
+        <span class="nav-icon">📧</span>
+        Connect Email
+      </button>
     </nav>
 
     <div class="sidebar-footer">
@@ -1437,6 +1445,107 @@
       </div>
     </div>
 
+    <!-- ── CONNECT EMAIL TAB ── -->
+    <div *ngIf="activeTab === 'email'" class="tab-content">
+      <header class="page-header">
+        <div>
+          <h2 class="page-title">Connect Email</h2>
+          <p class="page-subtitle">Link your email to receive event invitations and reminders in your inbox</p>
+        </div>
+      </header>
+
+      <!-- Connected state -->
+      <div class="email-connected-card" *ngIf="emailConnected">
+        <div class="email-connected-icon">✅</div>
+        <div class="email-connected-body">
+          <h3 class="email-connected-title">Email Connected</h3>
+          <p class="email-connected-addr">{{ emailAddress }}</p>
+          <p class="email-connected-provider">Provider: {{ emailProvider === 'gmail' ? 'Gmail' : emailProvider === 'outlook' ? 'Outlook' : emailProvider === 'yahoo' ? 'Yahoo Mail' : 'Other (IMAP)' }}</p>
+        </div>
+        <button class="action-btn danger-btn" (click)="disconnectEmail()">Disconnect</button>
+      </div>
+
+      <!-- Connection form -->
+      <div *ngIf="!emailConnected" class="email-setup-container">
+
+        <!-- Success message -->
+        <div class="email-success-msg" *ngIf="emailSuccessMsg">
+          ✓ {{ emailSuccessMsg }}
+        </div>
+
+        <!-- Error message -->
+        <div class="error-msg" *ngIf="emailError">{{ emailError }}</div>
+
+        <!-- Step 1: Choose provider -->
+        <div class="email-step">
+          <h3 class="email-step-title">1. Choose your email provider</h3>
+          <div class="email-provider-grid">
+            <div class="email-provider-card" [class.selected]="emailProvider === 'gmail'" (click)="selectEmailProvider('gmail')">
+              <span class="email-provider-icon">📧</span>
+              <span class="email-provider-name">Gmail</span>
+            </div>
+            <div class="email-provider-card" [class.selected]="emailProvider === 'outlook'" (click)="selectEmailProvider('outlook')">
+              <span class="email-provider-icon">📬</span>
+              <span class="email-provider-name">Outlook</span>
+            </div>
+            <div class="email-provider-card" [class.selected]="emailProvider === 'yahoo'" (click)="selectEmailProvider('yahoo')">
+              <span class="email-provider-icon">📨</span>
+              <span class="email-provider-name">Yahoo Mail</span>
+            </div>
+            <div class="email-provider-card" [class.selected]="emailProvider === 'other'" (click)="selectEmailProvider('other')">
+              <span class="email-provider-icon">🔗</span>
+              <span class="email-provider-name">Other (IMAP)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Enter email -->
+        <div class="email-step" *ngIf="emailProvider">
+          <h3 class="email-step-title">2. Enter your email address</h3>
+          <div class="field">
+            <input
+              class="search-input"
+              type="email"
+              placeholder="your@email.com"
+              [(ngModel)]="emailAddress"
+              name="emailAddress"
+            />
+          </div>
+
+          <!-- Provider-specific instructions -->
+          <div class="email-instructions" *ngIf="emailProvider === 'gmail'">
+            <p><strong>Gmail setup:</strong> You'll be redirected to Google to authorize access. Make sure to allow "Read email" and "Send email" permissions.</p>
+          </div>
+          <div class="email-instructions" *ngIf="emailProvider === 'outlook'">
+            <p><strong>Outlook setup:</strong> You'll sign in with your Microsoft account. Works with Outlook.com, Hotmail, and Microsoft 365 accounts.</p>
+          </div>
+          <div class="email-instructions" *ngIf="emailProvider === 'yahoo'">
+            <p><strong>Yahoo setup:</strong> You'll need to generate an App Password in your Yahoo account security settings, then authorize here.</p>
+          </div>
+          <div class="email-instructions" *ngIf="emailProvider === 'other'">
+            <p><strong>IMAP setup:</strong> You'll need your IMAP server address, port, and an app-specific password. Check your provider's documentation.</p>
+          </div>
+
+          <button class="btn-primary" (click)="connectEmail()" [disabled]="emailConnecting" style="margin-top:12px">
+            <span *ngIf="!emailConnecting">Connect Email</span>
+            <span *ngIf="emailConnecting" class="spinner-dark"></span>
+            <span *ngIf="emailConnecting"> Connecting…</span>
+          </button>
+        </div>
+
+        <!-- Info section -->
+        <div class="email-info-card">
+          <h4 class="email-info-title">What connecting your email does:</h4>
+          <ul class="email-info-list">
+            <li>📩 Receive event reminders directly in your inbox</li>
+            <li>📤 Send event invitations via email to shared contacts</li>
+            <li>🔄 Sync email-based calendar invitations (ICS files)</li>
+            <li>🔒 Your credentials are encrypted and stored securely</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
     <!-- ── AI CHAT TAB ── -->
     <div *ngIf="activeTab === 'ai'" class="tab-content ai-tab">
       <header class="page-header">
@@ -2567,6 +2676,14 @@
         <div *ngIf="gcalCalendars.length === 0" class="gcal-picker-empty">
           No calendars found in your Google account.
         </div>
+      </div>
+
+      <!-- Import options -->
+      <div class="gcal-import-options" *ngIf="!gcalPickerLoading">
+        <label class="gcal-option-item">
+          <input type="checkbox" [(ngModel)]="gcalFutureOnly" name="gcalFutureOnly" />
+          <span>Only import events from today onwards (skip past events)</span>
+        </label>
       </div>
 
       <div class="error-msg" *ngIf="googleSyncError">{{ googleSyncError }}</div>

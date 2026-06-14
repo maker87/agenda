@@ -92,10 +92,12 @@ export class GoogleCalendarService {
 
   // ── Fetch events from one or more calendars ───────────────────────────────
 
-  async fetchEventsFromCalendars(calendarIds: string[]): Promise<GCalEvent[]> {
+  async fetchEventsFromCalendars(calendarIds: string[], futureOnly = false): Promise<GCalEvent[]> {
     const token = this.requireToken();
     const now  = new Date();
-    const tMin = new Date(now.getFullYear() - 1, 0, 1).toISOString();
+    const tMin = futureOnly
+      ? new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+      : new Date(now.getFullYear() - 1, 0, 1).toISOString();
     const tMax = new Date(now.getFullYear() + 2, 0, 1).toISOString();
 
     const allEvents: GCalEvent[] = [];

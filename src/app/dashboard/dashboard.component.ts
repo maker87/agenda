@@ -602,8 +602,17 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   gcalCalendars: GCalCalendar[] = [];
   gcalPickerLoading = false;
   gcalImporting = false;
+  gcalFutureOnly = true;
   gcalImportCount = 0;
-  activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly' = 'schedule';
+  activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly' | 'email' = 'schedule';
+
+  // ── Email Connection ──
+  emailProvider: 'gmail' | 'outlook' | 'yahoo' | 'other' | '' = '';
+  emailConnected = false;
+  emailConnecting = false;
+  emailAddress = '';
+  emailError = '';
+  emailSuccessMsg = '';
 
   // ── History ──
   private readonly HISTORY_KEY_PREFIX = 'agenda_event_history_';
@@ -2555,7 +2564,42 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     }, 50);
   }
 
-  switchTab(tab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly') {
+  // ── Email connection methods ──
+  selectEmailProvider(provider: 'gmail' | 'outlook' | 'yahoo' | 'other') {
+    this.emailProvider = provider;
+    this.emailError = '';
+    this.emailSuccessMsg = '';
+  }
+
+  connectEmail() {
+    this.emailError = '';
+    this.emailSuccessMsg = '';
+    if (!this.emailProvider) {
+      this.emailError = 'Please select an email provider first.';
+      return;
+    }
+    if (!this.emailAddress || !this.emailAddress.includes('@')) {
+      this.emailError = 'Please enter a valid email address.';
+      return;
+    }
+    this.emailConnecting = true;
+    // Simulate connection attempt
+    setTimeout(() => {
+      this.emailConnecting = false;
+      this.emailConnected = true;
+      this.emailSuccessMsg = `Successfully connected to ${this.emailAddress} via ${this.emailProvider === 'gmail' ? 'Gmail' : this.emailProvider === 'outlook' ? 'Outlook' : this.emailProvider === 'yahoo' ? 'Yahoo Mail' : 'IMAP'}.`;
+    }, 1800);
+  }
+
+  disconnectEmail() {
+    this.emailConnected = false;
+    this.emailProvider = '';
+    this.emailAddress = '';
+    this.emailSuccessMsg = '';
+    this.emailError = '';
+  }
+
+  switchTab(tab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly' | 'email') {
     this.activeTab = tab;
     if (tab === 'calendar') {
       this.slideMonthIndex = this.currentMonthIndex;
@@ -2618,8 +2662,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   /** Called when the user confirms the calendar picker. */
   async importFromPicker() {
-    const selectedIds = this.gcalCalendars.filter(c => c.selected).map(c => c.id);
-    if (selectedIds.length === 0) {
+    const selectedCalendars = this.gcalCalendars.filter(c => c.selected);
+    if (selectedCalendars.length === 0) {
       this.googleSyncError = 'Please select at least one calendar.';
       return;
     }
@@ -2628,48 +2672,98 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.googleSyncError = '';
 
     try {
-      const gcalEvents = await this.googleCalendarService.fetchEventsFromCalendars(selectedIds);
-
-      // Merge: skip any event whose gcal id is already in our list
       const existingIds = new Set(this.events.map(e => e.id));
-      const toAdd = gcalEvents.filter(g => !existingIds.has(g.id));
+      const allNewEvents: CalendarEvent[] = [];
 
-      if (toAdd.length === 0) {
+      // Fetch per-calendar so we can assign categories based on calendar name
+      for (const cal of selectedCalendars) {
+        const gcalEvents = await this.googleCalendarService.fetchEventsFromCalendars([cal.id], this.gcalFutureOnly);
+        const toAdd = gcalEvents.filter(g => !existingIds.has(g.id));
+
+        for (const g of toAdd) {
+          const category = this.categorizeGCalEvent(g.title, g.description, cal.name);
+          const ev: CalendarEvent = {
+            id:          `local_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+            title:       g.title,
+            date:        g.date,
+            startTime:   g.startTime,
+            endTime:     g.endTime,
+            description: g.description,
+            color:       g.color,
+            category,
+            sharedWith:  [],
+          };
+          allNewEvents.push(ev);
+          existingIds.add(ev.id);
+        }
+      }
+
+      if (allNewEvents.length === 0) {
         this.googleCalendarLinked = true;
         this.showGcalPicker = false;
         console.log('[Google Calendar] No new events to import.');
         return;
       }
 
-      // Convert to CalendarEvent and write directly to localStorage + this.events
-      const newEvents: CalendarEvent[] = toAdd.map(g => ({
-        id:          `local_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        title:       g.title,
-        date:        g.date,
-        startTime:   g.startTime,
-        endTime:     g.endTime,
-        description: g.description,
-        color:       g.color,
-        category:    'Google Calendar',
-        sharedWith:  [],
-      }));
+      this.eventsService.bulkAddToCache(allNewEvents, this.userEmail);
 
-      this.eventsService.bulkAddToCache(newEvents, this.userEmail);
-
-      this.events = [...this.events, ...newEvents].sort(
+      this.events = [...this.events, ...allNewEvents].sort(
         (a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)
       );
+
+      // Auto-save any new categories that were created
+      const newCategories = [...new Set(allNewEvents.map(e => e.category).filter(c => !!c))];
+      const existingCategories = new Set(this.savedCategories);
+      const categoriesToAdd = newCategories.filter(c => !existingCategories.has(c));
+      if (categoriesToAdd.length > 0) {
+        this.savedCategories = [...this.savedCategories, ...categoriesToAdd];
+        this.persistCategories();
+      }
 
       this.googleCalendarLinked = true;
       this.showGcalPicker = false;
       this.googleSyncError = '';
-      console.log(`[Google Calendar] Imported ${toAdd.length} events.`);
+      console.log(`[Google Calendar] Imported ${allNewEvents.length} events across ${newCategories.length} categories.`);
     } catch (err: any) {
       console.error('[Google Calendar] Fetch failed:', err);
       this.googleSyncError = 'Could not fetch events. Please try again.';
     } finally {
       this.gcalImporting = false;
     }
+  }
+
+  /**
+   * Auto-categorize a Google Calendar event based on its title, description,
+   * and the source calendar name.
+   * Returns a category path like "Google Calendar > Work > Meetings".
+   */
+  private categorizeGCalEvent(title: string, description: string, calendarName: string): string {
+    const text = `${title} ${description}`.toLowerCase();
+    const calBase = `Google Calendar > ${calendarName}`;
+
+    // Keyword-based subcategory detection
+    const rules: { keywords: string[]; subcategory: string }[] = [
+      { keywords: ['meeting', 'standup', 'stand-up', 'sync', '1:1', 'one-on-one', 'huddle', 'retro', 'sprint'], subcategory: 'Meetings' },
+      { keywords: ['deadline', 'due', 'submit', 'delivery', 'milestone'], subcategory: 'Deadlines' },
+      { keywords: ['birthday', 'anniversary', 'celebration', 'party'], subcategory: 'Celebrations' },
+      { keywords: ['doctor', 'dentist', 'appointment', 'checkup', 'therapy', 'medical', 'health'], subcategory: 'Health' },
+      { keywords: ['gym', 'workout', 'run', 'yoga', 'fitness', 'exercise', 'training', 'swim'], subcategory: 'Fitness' },
+      { keywords: ['flight', 'hotel', 'travel', 'trip', 'vacation', 'airport', 'booking'], subcategory: 'Travel' },
+      { keywords: ['class', 'lecture', 'exam', 'homework', 'study', 'tutorial', 'school', 'university', 'course'], subcategory: 'Education' },
+      { keywords: ['lunch', 'dinner', 'breakfast', 'coffee', 'brunch', 'restaurant'], subcategory: 'Social' },
+      { keywords: ['interview', 'review', 'performance', 'onboarding'], subcategory: 'Work' },
+      { keywords: ['bill', 'payment', 'invoice', 'tax', 'rent', 'mortgage'], subcategory: 'Finance' },
+      { keywords: ['reminder', 'todo', 'task', 'errand', 'pickup', 'drop off'], subcategory: 'Reminders' },
+    ];
+
+    for (const rule of rules) {
+      if (rule.keywords.some(kw => text.includes(kw))) {
+        return `${calBase} > ${rule.subcategory}`;
+      }
+    }
+
+    // Default: just use the calendar name as the category
+    return calBase;
   }
 
   closeGcalPicker() {

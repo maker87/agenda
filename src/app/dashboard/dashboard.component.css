@@ -4469,6 +4469,30 @@
   padding: 20px 0;
 }
 
+.gcal-import-options {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+
+.gcal-option-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary, #1f2937);
+  cursor: pointer;
+}
+
+.gcal-option-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent, #6c63ff);
+  cursor: pointer;
+}
+
 /* ── AI Scheduler Panel ── */
 .ai-scheduler-section {
   margin-bottom: 16px;
@@ -6296,4 +6320,157 @@
   color: var(--text-muted);
   padding: 12px 0;
   margin-bottom: 12px;
+}
+
+/* ── Connect Email Tab ── */
+.email-setup-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.email-step {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  padding: 22px 24px;
+}
+
+.email-step-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.email-provider-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.email-provider-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface-2);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.1s;
+}
+
+.email-provider-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(108, 99, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.email-provider-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15);
+}
+
+.email-provider-icon {
+  font-size: 32px;
+}
+
+.email-provider-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.email-instructions {
+  background: var(--bg-surface-3);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-top: 12px;
+}
+
+.email-instructions p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.email-connected-card {
+  background: var(--success-bg);
+  border: 1.5px solid var(--success-border);
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.email-connected-icon {
+  font-size: 36px;
+}
+
+.email-connected-body {
+  flex: 1;
+}
+
+.email-connected-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--success-text);
+}
+
+.email-connected-addr {
+  margin: 0 0 2px;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.email-connected-provider {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.email-info-card {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  padding: 22px 24px;
+}
+
+.email-info-title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.email-info-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.email-info-list li {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.email-success-msg {
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
 }

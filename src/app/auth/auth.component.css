@@ -189,6 +189,13 @@
   color: #4a42c0;
 }
 
+/* Forgot password link */
+.forgot-link {
+  text-align: right;
+  margin: -8px 0 16px;
+  font-size: 13px;
+}
+
 /* ── Demo accounts ── */
 .demo-accounts {
   margin-top: 20px;

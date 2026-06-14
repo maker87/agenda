@@ -3,9 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { MockAuthService } from '../services/mock-auth.service';
-import { signUp, confirmSignUp, signIn, resendSignUpCode, signOut } from 'aws-amplify/auth';
+import { signUp, confirmSignUp, signIn, resendSignUpCode, signOut, resetPassword, confirmResetPassword } from 'aws-amplify/auth';
 
-type AuthView = 'login' | 'signup' | 'confirm';
+type AuthView = 'login' | 'signup' | 'confirm' | 'forgot' | 'resetPassword';
 
 const AUTH_STATE_KEY = 'agenda_auth_pending';
 
@@ -64,6 +64,10 @@ export class AuthComponent implements OnInit {
         this.email = state.email;
         this.password = state.password || '';
         this.successMessage = `Enter the verification code sent to ${this.email}`;
+      } else if (state.view === 'resetPassword' && state.email) {
+        this.view = 'resetPassword';
+        this.email = state.email;
+        this.successMessage = `Enter the reset code sent to ${this.email}`;
       }
     } catch { /* ignore */ }
   }
@@ -77,7 +81,7 @@ export class AuthComponent implements OnInit {
     this.view = v;
     this.errorMessage = '';
     this.successMessage = '';
-    if (v !== 'confirm') {
+    if (v !== 'confirm' && v !== 'resetPassword') {
       this.clearAuthState();
     }
   }
@@ -269,6 +273,116 @@ export class AuthComponent implements OnInit {
     try {
       await resendSignUpCode({ username: this.email });
       this.successMessage = `New code sent to ${this.email}!`;
+    } catch (err: any) {
+      this.errorMessage = err?.message || 'Could not resend code. Please try again.';
+    }
+    this.resending = false;
+  }
+
+  // ── Forgot Password Flow ──
+
+  newPassword = '';
+  confirmNewPassword = '';
+  resetCode = '';
+
+  async onForgotPassword() {
+    if (!this.email) {
+      this.errorMessage = 'Please enter your email address.';
+      return;
+    }
+    this.loading = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    try {
+      const { nextStep } = await resetPassword({ username: this.email });
+      if (nextStep.resetPasswordStep === 'CONFIRM_RESET_PASSWORD_WITH_CODE') {
+        this.view = 'resetPassword';
+        this.successMessage = `Reset code sent to ${this.email}. Check your inbox!`;
+        this.saveAuthState();
+      } else if (nextStep.resetPasswordStep === 'DONE') {
+        this.successMessage = 'Password reset complete. Please sign in.';
+        this.view = 'login';
+      }
+    } catch (err: any) {
+      if (err?.name === 'UserNotFoundException') {
+        this.errorMessage = 'No account found with this email.';
+      } else if (err?.name === 'LimitExceededException') {
+        this.errorMessage = 'Too many attempts. Please try again later.';
+      } else {
+        this.errorMessage = err?.message || 'Could not send reset code. Please try again.';
+      }
+    }
+    this.loading = false;
+  }
+
+  async onConfirmResetPassword() {
+    if (!this.resetCode) {
+      this.errorMessage = 'Please enter the reset code.';
+      return;
+    }
+    if (!this.newPassword) {
+      this.errorMessage = 'Please enter a new password.';
+      return;
+    }
+    if (this.newPassword.length < 8) {
+      this.errorMessage = 'Password must be at least 8 characters.';
+      return;
+    }
+    if (this.newPassword !== this.confirmNewPassword) {
+      this.errorMessage = 'Passwords do not match.';
+      return;
+    }
+
+    this.loading = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    try {
+      await confirmResetPassword({
+        username: this.email,
+        confirmationCode: this.resetCode,
+        newPassword: this.newPassword,
+      });
+
+      // Auto sign-in with the new password
+      this.clearAuthState();
+      try {
+        await signOut();
+        const result = await signIn({ username: this.email, password: this.newPassword });
+        if (result.isSignedIn) {
+          sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email: this.email }));
+          this.router.navigate(['/dashboard']);
+          this.loading = false;
+          return;
+        }
+      } catch { /* ignore — fall through to login view */ }
+
+      this.successMessage = 'Password reset successful! Please sign in with your new password.';
+      this.password = '';
+      this.view = 'login';
+    } catch (err: any) {
+      if (err?.name === 'CodeMismatchException') {
+        this.errorMessage = 'Invalid code. Please check and try again.';
+      } else if (err?.name === 'ExpiredCodeException') {
+        this.errorMessage = 'Code expired. Please request a new one.';
+      } else if (err?.message?.toLowerCase().includes('password')) {
+        this.errorMessage = 'Password must include uppercase, lowercase, numbers, and a special character.';
+      } else {
+        this.errorMessage = err?.message || 'Password reset failed. Please try again.';
+      }
+    }
+    this.loading = false;
+  }
+
+  async resendResetCode() {
+    this.resending = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    try {
+      await resetPassword({ username: this.email });
+      this.successMessage = `New reset code sent to ${this.email}!`;
     } catch (err: any) {
       this.errorMessage = err?.message || 'Could not resend code. Please try again.';
     }

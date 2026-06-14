@@ -41,6 +41,10 @@
         />
       </div>
 
+      <p class="forgot-link">
+        <button type="button" class="link-btn" (click)="switchView('forgot')">Forgot password?</button>
+      </p>
+
       <div class="error-msg" *ngIf="errorMessage">{{ errorMessage }}</div>
 
       <button type="submit" class="btn-primary" [disabled]="loading">
@@ -178,6 +182,104 @@
       <p class="switch-link">
         Wrong email?
         <button type="button" class="link-btn" (click)="switchView('signup')">Go back</button>
+      </p>
+    </form>
+
+    <!-- Forgot Password Form — request reset code -->
+    <form *ngIf="view === 'forgot'" (ngSubmit)="onForgotPassword()" class="auth-form">
+      <h2>Forgot password?</h2>
+      <p class="form-subtitle">Enter your email and we'll send you a reset code</p>
+
+      <div class="field">
+        <label for="forgot-email">Email</label>
+        <input
+          id="forgot-email"
+          type="email"
+          [(ngModel)]="email"
+          name="email"
+          placeholder="you@example.com"
+          autocomplete="email"
+          required
+        />
+      </div>
+
+      <div class="success-msg" *ngIf="successMessage">{{ successMessage }}</div>
+      <div class="error-msg" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+      <button type="submit" class="btn-primary" [disabled]="loading">
+        <span *ngIf="!loading">Send Reset Code</span>
+        <span *ngIf="loading" class="spinner"></span>
+      </button>
+
+      <p class="switch-link">
+        Remember your password?
+        <button type="button" class="link-btn" (click)="switchView('login')">Sign in</button>
+      </p>
+    </form>
+
+    <!-- Reset Password Form — enter code + new password -->
+    <form *ngIf="view === 'resetPassword'" (ngSubmit)="onConfirmResetPassword()" class="auth-form">
+      <h2>Reset your password</h2>
+      <p class="form-subtitle">Enter the code sent to <strong>{{ email }}</strong></p>
+
+      <div class="success-msg" *ngIf="successMessage">{{ successMessage }}</div>
+
+      <div class="field">
+        <label for="reset-code">Reset Code</label>
+        <input
+          id="reset-code"
+          type="text"
+          [(ngModel)]="resetCode"
+          name="resetCode"
+          placeholder="Enter 6-digit code"
+          autocomplete="one-time-code"
+          maxlength="6"
+          required
+        />
+      </div>
+
+      <div class="field">
+        <label for="new-password">New Password</label>
+        <input
+          id="new-password"
+          type="password"
+          [(ngModel)]="newPassword"
+          name="newPassword"
+          placeholder="Min. 8 characters"
+          autocomplete="new-password"
+          required
+        />
+      </div>
+
+      <div class="field">
+        <label for="confirm-new-password">Confirm New Password</label>
+        <input
+          id="confirm-new-password"
+          type="password"
+          [(ngModel)]="confirmNewPassword"
+          name="confirmNewPassword"
+          placeholder="Repeat new password"
+          autocomplete="new-password"
+          required
+        />
+      </div>
+
+      <div class="error-msg" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+      <button type="submit" class="btn-primary" [disabled]="loading">
+        <span *ngIf="!loading">Reset Password &amp; Sign In</span>
+        <span *ngIf="loading" class="spinner"></span>
+      </button>
+
+      <p class="switch-link">
+        Didn't get the code?
+        <button type="button" class="link-btn" (click)="resendResetCode()" [disabled]="resending">
+          {{ resending ? 'Sending...' : 'Resend code' }}
+        </button>
+      </p>
+
+      <p class="switch-link">
+        <button type="button" class="link-btn" (click)="switchView('login')">Back to sign in</button>
       </p>
     </form>
   </div>
