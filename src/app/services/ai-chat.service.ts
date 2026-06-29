@@ -1340,6 +1340,9 @@ export class AiChatService {
         }
         return this.wizardMsg(`Say **yes** to add it, or **no** to change the date/time.`, draft);
       }
+
+      default:
+        return this.wizardMsg(`Something went wrong with the wizard. Say **cancel** to start over.`, null);
     }
   }
 
