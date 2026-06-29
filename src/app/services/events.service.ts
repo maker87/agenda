@@ -11,6 +11,7 @@ export interface CalendarEvent {
   description: string;
   color: string;
   category: string;
+  location?: string;
   sharedWith: string[];
 }
 
@@ -118,6 +119,7 @@ export class EventsService {
         description: event.description,
         color:       event.color,
         category:    event.category || undefined,
+        location:    event.location || undefined,
         sharedWith:  event.sharedWith?.length ? event.sharedWith : undefined,
         ownerEmail,
       });
@@ -160,6 +162,7 @@ export class EventsService {
         description: event.description,
         color:       event.color,
         category:    event.category || undefined,
+        location:    event.location || undefined,
         sharedWith:  event.sharedWith?.length ? event.sharedWith : undefined,
       });
       if (errors?.length) throw new Error(errors[0].message);
@@ -281,6 +284,7 @@ export class EventsService {
             startTime: entry.event.startTime, endTime: entry.event.endTime,
             description: entry.event.description, color: entry.event.color,
             category: entry.event.category || undefined,
+            location: entry.event.location || undefined,
             sharedWith: entry.event.sharedWith?.length ? entry.event.sharedWith : undefined,
             ownerEmail: entry.ownerEmail,
           });
@@ -294,6 +298,7 @@ export class EventsService {
             startTime: entry.event.startTime, endTime: entry.event.endTime,
             description: entry.event.description, color: entry.event.color,
             category: entry.event.category || undefined,
+            location: entry.event.location || undefined,
             sharedWith: entry.event.sharedWith?.length ? entry.event.sharedWith : undefined,
           });
           if (errors?.length) throw new Error(errors[0].message);
@@ -333,6 +338,7 @@ export class EventsService {
       description: record.description ?? '',
       color:       record.color ?? '#6c63ff',
       category:    record.category ?? '',
+      location:    record.location ?? '',
       sharedWith:  (record.sharedWith ?? []).filter((e): e is string => e !== null),
     };
   }

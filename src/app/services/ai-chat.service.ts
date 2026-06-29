@@ -24,7 +24,7 @@ export interface ChatAction {
 
 /** Tracks the in-progress event being built through the chat wizard. */
 export interface EventDraft {
-  step: 'title' | 'duration' | 'date' | 'confirm';
+  step: 'title' | 'duration' | 'date' | 'time' | 'category' | 'location' | 'description' | 'reminder' | 'invite' | 'confirm';
   title?: string;
   durationMin?: number;
   date?: string;
@@ -32,6 +32,8 @@ export interface EventDraft {
   endTime?: string;
   category?: string;
   description?: string;
+  location?: string;
+  reminderText?: string;
   color?: string;
   /** Suggested slots shown to the user so they can pick one. */
   suggestedSlots?: Array<{ date: string; startTime: string; endTime: string; reason: string }>;

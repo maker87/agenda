@@ -19,6 +19,7 @@ const schema = a.schema({
       color:       a.string(),
       ownerEmail:  a.string(),
       category:    a.string(),
+      location:    a.string(),
       sharedWith:  a.string().array(),
       reminderMinutes: a.integer(),
     })

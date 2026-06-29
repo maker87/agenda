@@ -14,6 +14,7 @@ export interface UserProfile {
   username: string;
   avatarUrl: string | null;
   language: string;
+  region: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -52,6 +53,7 @@ export class MockAuthService {
       username: email.split('@')[0],
       avatarUrl: null,
       language: 'en',
+      region: '',
     };
   }
 

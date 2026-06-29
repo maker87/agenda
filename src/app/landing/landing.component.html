@@ -27,27 +27,17 @@
         <span class="hero-gradient-text">Start owning it.</span>
       </h1>
       <p class="hero-subtitle">
-        Agenda uses AI to learn your habits, auto-schedule your life,
-        and remind you before you even forget. It's the last calendar you'll ever need.
+        Agenda finds free slots in your schedule and suggests the best event times,
+        imports from Google Calendar, and sends reminders — so you can focus on what matters.
       </p>
       <div class="hero-actions">
         <button class="hero-btn hero-btn-primary" (click)="goToSignup()">
           <span class="btn-shine"></span>
-          Start Free — No Credit Card
+          Get Started Free
         </button>
         <button class="hero-btn hero-btn-ghost" (click)="goToLogin()">
           I have an account →
         </button>
-      </div>
-      <div class="hero-social-proof">
-        <div class="avatar-stack">
-          <span class="stack-avatar" style="background:#6c63ff">A</span>
-          <span class="stack-avatar" style="background:#ec4899">M</span>
-          <span class="stack-avatar" style="background:#10b981">J</span>
-          <span class="stack-avatar" style="background:#f59e0b">K</span>
-          <span class="stack-avatar" style="background:#3b82f6">R</span>
-        </div>
-        <span class="proof-text">Join <strong>2,400+</strong> people who schedule smarter</span>
       </div>
     </div>
 
@@ -57,7 +47,7 @@
         <div class="phone-notch"></div>
         <div class="phone-screen">
           <div class="phone-header">
-            <span class="phone-date">Today, June 14</span>
+            <span class="phone-date">Today</span>
             <span class="phone-ai-badge">🤖 AI</span>
           </div>
           <div class="phone-events">
@@ -96,7 +86,7 @@
           </div>
           <div class="phone-ai-suggestion">
             <span class="ai-sparkle">✨</span>
-            <span class="ai-text">AI: "Move gym to 6 PM — traffic clears by then."</span>
+            <span class="ai-text">Best slot found: 3 PM is free with no conflicts.</span>
           </div>
         </div>
       </div>
@@ -106,95 +96,66 @@
         <span class="fc-text">Reminder in 15 min</span>
       </div>
       <div class="floating-card card-streak">
-        <span class="fc-icon">🔥</span>
-        <span class="fc-text">7 day streak!</span>
+        <span class="fc-icon">📅</span>
+        <span class="fc-text">3 events today</span>
       </div>
-    </div>
-  </section>
-
-  <!-- Marquee stats -->
-  <section class="stats-bar">
-    <div class="stat-item">
-      <span class="stat-number">2,400+</span>
-      <span class="stat-label">Active users</span>
-    </div>
-    <div class="stat-divider"></div>
-    <div class="stat-item">
-      <span class="stat-number">98%</span>
-      <span class="stat-label">On-time rate</span>
-    </div>
-    <div class="stat-divider"></div>
-    <div class="stat-item">
-      <span class="stat-number">4.9★</span>
-      <span class="stat-label">User rating</span>
-    </div>
-    <div class="stat-divider"></div>
-    <div class="stat-item">
-      <span class="stat-number">50K+</span>
-      <span class="stat-label">Events scheduled</span>
     </div>
   </section>
 
   <!-- Features Section -->
   <section class="features">
     <div class="features-header">
-      <span class="features-label">WHY AGENDA?</span>
-      <h2 class="features-title">Not just a calendar.<br/>Your personal time strategist.</h2>
+      <span class="features-label">FEATURES</span>
+      <h2 class="features-title">What Agenda can do for you</h2>
     </div>
     <div class="features-grid">
       <div class="feature-card feature-card-lg">
         <div class="feature-glow" style="--glow-color:#6c63ff"></div>
         <div class="feature-icon-wrap" style="background:linear-gradient(135deg,#6c63ff,#764ba2)">✨</div>
-        <h3>AI That Learns You</h3>
-        <p>It watches your patterns, suggests optimal times, and auto-blocks focus hours. Like a personal assistant that never sleeps.</p>
+        <h3>AI Scheduling Suggestions</h3>
+        <p>Agenda finds free slots in your calendar and suggests the best times for new events based on your event titles and availability.</p>
       </div>
       <div class="feature-card">
         <div class="feature-glow" style="--glow-color:#10b981"></div>
         <div class="feature-icon-wrap" style="background:linear-gradient(135deg,#10b981,#059669)">🔔</div>
-        <h3>Proactive Reminders</h3>
-        <p>Get nudged before you even think about forgetting. Context-aware, not just time-based.</p>
+        <h3>Event Reminders</h3>
+        <p>Set reminders before your events and get notified so you never miss an appointment.</p>
       </div>
       <div class="feature-card">
         <div class="feature-glow" style="--glow-color:#f59e0b"></div>
         <div class="feature-icon-wrap" style="background:linear-gradient(135deg,#f59e0b,#d97706)">📊</div>
-        <h3>Weekly Insights</h3>
-        <p>See where your time actually goes with beautiful breakdowns and productivity scores.</p>
+        <h3>Multiple Calendar Views</h3>
+        <p>Year, month, week, or day — see your schedule in the view that works best for you.</p>
       </div>
       <div class="feature-card">
         <div class="feature-glow" style="--glow-color:#3b82f6"></div>
         <div class="feature-icon-wrap" style="background:linear-gradient(135deg,#3b82f6,#2563eb)">🔗</div>
-        <h3>Google Calendar Sync</h3>
-        <p>One click to pull all your Google events in. Two-way sync, zero friction.</p>
+        <h3>Google Calendar Import</h3>
+        <p>Connect your Google Calendar to import events and keep everything visible in one place.</p>
       </div>
       <div class="feature-card">
         <div class="feature-glow" style="--glow-color:#ec4899"></div>
         <div class="feature-icon-wrap" style="background:linear-gradient(135deg,#ec4899,#db2777)">🏷️</div>
-        <h3>Smart Categories</h3>
-        <p>Nested tags, color codes, and auto-categorization make your calendar look magazine-worthy.</p>
+        <h3>Categories &amp; Colors</h3>
+        <p>Organize events with nested categories and color-coded labels for easy visual grouping.</p>
       </div>
       <div class="feature-card">
         <div class="feature-glow" style="--glow-color:#8b5cf6"></div>
         <div class="feature-icon-wrap" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)">👥</div>
-        <h3>Share &amp; Collab</h3>
-        <p>Share events, send invites, and keep everyone on the same page — effortlessly.</p>
+        <h3>Share &amp; Friends</h3>
+        <p>Share events with friends, send friend requests, and collaborate on scheduling together.</p>
       </div>
-    </div>
-  </section>
-
-  <!-- Testimonial -->
-  <section class="testimonial">
-    <div class="testimonial-card">
-      <div class="testimonial-quote">"</div>
-      <p class="testimonial-text">
-        I went from missing 3 meetings a week to literally never being late.
-        The AI suggestions are weirdly accurate — it knew I needed a break before my afternoon calls.
-      </p>
-      <div class="testimonial-author">
-        <div class="testimonial-avatar">A</div>
-        <div class="testimonial-info">
-          <span class="testimonial-name">Alex M.</span>
-          <span class="testimonial-role">Product Designer</span>
-        </div>
+      <div class="feature-card">
+        <div class="feature-glow" style="--glow-color:#ef4444"></div>
+        <div class="feature-icon-wrap" style="background:linear-gradient(135deg,#ef4444,#dc2626)">⚡</div>
+        <h3>Conflict Detection</h3>
+        <p>Automatically detects overlapping events and helps you reschedule with smart suggestions.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-glow" style="--glow-color:#14b8a6"></div>
+        <div class="feature-icon-wrap" style="background:linear-gradient(135deg,#14b8a6,#0d9488)">🕓</div>
+        <h3>Event History</h3>
+        <p>Track all changes to your schedule with full undo and restore support for added, changed, or deleted events.</p>
       </div>
     </div>
   </section>
@@ -203,13 +164,13 @@
   <section class="cta">
     <div class="cta-inner">
       <div class="cta-glow"></div>
-      <h2>Your time is your most valuable asset.</h2>
-      <p>Stop wasting it on scheduling chaos. Let Agenda handle the logistics.</p>
+      <h2>Ready to organize your schedule?</h2>
+      <p>Create a free account and start managing your time with Agenda.</p>
       <div class="cta-actions">
         <button class="hero-btn hero-btn-white" (click)="goToSignup()">
           Create Free Account
         </button>
-        <span class="cta-note">Free forever · No credit card · Setup in 30 seconds</span>
+        <span class="cta-note">Free to use · No credit card required</span>
       </div>
     </div>
   </section>
@@ -218,7 +179,11 @@
   <footer class="landing-footer">
     <div class="footer-inner">
       <span class="footer-brand">📅 Agenda</span>
-      <span class="footer-copy">&copy; 2026 Agenda. Built with ☕ and obsession.</span>
+      <div class="footer-links">
+        <a class="footer-link" (click)="goToTerms()" href="javascript:void(0)">Terms of Service</a>
+        <a class="footer-link" (click)="goToPrivacy()" href="javascript:void(0)">Privacy Policy</a>
+      </div>
+      <span class="footer-copy">&copy; 2026 Agenda. All rights reserved.</span>
     </div>
   </footer>
 </div>

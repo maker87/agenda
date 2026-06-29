@@ -44,25 +44,25 @@
   <!-- ── Notification slide-down panel ── -->
   <div class="notif-panel" *ngIf="showNotifPanel" (click)="$event.stopPropagation()">
     <div class="notif-panel-header">
-      <span class="notif-panel-title">Notifications</span>
+      <span class="notif-panel-title">{{ i18n.t('notifications') }}</span>
       <div class="notif-panel-actions">
-        <button class="notif-panel-mark-all" *ngIf="unreadCount > 0" (click)="markAllNotifsRead()">Mark all read</button>
+        <button class="notif-panel-mark-all" *ngIf="unreadCount > 0" (click)="markAllNotifsRead()">{{ i18n.t('markAllRead') }}</button>
         <button class="notif-panel-close" (click)="showNotifPanel = false" title="Close">✕</button>
       </div>
     </div>
 
     <!-- Filter pills -->
     <div class="notif-panel-filters">
-      <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'all'"      (click)="notifPanelFilter = 'all'">All</button>
-      <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'event_invite'" (click)="notifPanelFilter = 'event_invite'">Invites</button>
-      <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'share'"    (click)="notifPanelFilter = 'share'">Shared</button>
-      <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'reminder'" (click)="notifPanelFilter = 'reminder'">Reminders</button>
+      <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'all'"      (click)="notifPanelFilter = 'all'">{{ i18n.t('all') }}</button>
+      <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'event_invite'" (click)="notifPanelFilter = 'event_invite'">{{ i18n.t('invites') }}</button>
+      <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'share'"    (click)="notifPanelFilter = 'share'">{{ i18n.t('shared') }}</button>
+      <button class="notif-panel-pill" [class.active]="notifPanelFilter === 'reminder'" (click)="notifPanelFilter = 'reminder'">{{ i18n.t('reminders') }}</button>
     </div>
 
     <!-- Empty state -->
     <div class="notif-panel-empty" *ngIf="panelNotifications.length === 0">
       <span class="notif-panel-empty-icon">🔔</span>
-      <p>No notifications yet.</p>
+      <p>{{ i18n.t('noNotifications') }}</p>
     </div>
 
     <!-- Notification list -->
@@ -174,7 +174,7 @@
         (click)="switchTab('ai')"
       >
         <span class="nav-icon">✨</span>
-        AI Chat
+        {{ i18n.t('aiChat') }}
       </button>
       <button
         class="nav-item"
@@ -182,15 +182,7 @@
         (click)="switchTab('weekly')"
       >
         <span class="nav-icon">📊</span>
-        Weekly Summary
-      </button>
-      <button
-        class="nav-item"
-        [class.active]="activeTab === 'email'"
-        (click)="switchTab('email')"
-      >
-        <span class="nav-icon">📧</span>
-        Connect Email
+        {{ i18n.t('weeklySummary') }}
       </button>
     </nav>
 
@@ -223,8 +215,59 @@
         </div>
       </header>
 
+      <!-- Daily Goal Streak Widget -->
+      <div class="streak-widget" *ngIf="!streakDisabled">
+        <!-- Inactive for 7 days warning -->
+        <div class="streak-inactive-warning" *ngIf="streakInactiveWarning">
+          <p class="streak-inactive-msg">You haven't met your daily goal in over a week. Would you like to keep tracking or turn it off?</p>
+          <div class="streak-inactive-actions">
+            <button class="streak-inactive-btn keep" (click)="keepStreakTracking()">Keep tracking</button>
+            <button class="streak-inactive-btn cancel" (click)="cancelStreakTracking()">Turn off streaks</button>
+          </div>
+        </div>
+
+        <div class="streak-header">
+          <div class="streak-fire">
+            <span class="streak-fire-icon" [class.active]="currentStreak > 0">🔥</span>
+            <span class="streak-count">{{ currentStreak }}</span>
+            <span class="streak-label">{{ i18n.t('dayStreak') }}</span>
+          </div>
+          <div class="streak-stats">
+            <span class="streak-best">{{ i18n.t('best') }}: {{ longestStreak }} {{ i18n.t('days') }}</span>
+            <span class="streak-today" [class.met]="todayGoalMet" [class.not-met]="!todayGoalMet">
+              {{ todayGoalMet ? '✓ ' + i18n.t('todayGoalMet') : '○ ' + i18n.t('todayNotYet') }}
+            </span>
+          </div>
+        </div>
+        <div class="streak-dots">
+          <div
+            class="streak-dot-day"
+            *ngFor="let day of streakHistory"
+            [class.met]="day.met"
+            [class.not-met]="!day.met"
+            [title]="day.date + (day.met ? ' ✓' : ' ✗')"
+          >
+            <span class="streak-dot-indicator"></span>
+            <span class="streak-dot-label">{{ day.date.slice(8) }}</span>
+          </div>
+        </div>
+        <div class="streak-goal-setting">
+          <span class="streak-goal-label">{{ i18n.t('dailyGoal') }}:</span>
+          <button class="streak-goal-btn" (click)="updateDailyGoal(dailyGoal - 1)" [disabled]="dailyGoal <= 1">−</button>
+          <span class="streak-goal-value">{{ dailyGoal }} {{ dailyGoal > 1 ? i18n.t('eventsPerDay') : i18n.t('eventPerDay') }}</span>
+          <button class="streak-goal-btn" (click)="updateDailyGoal(dailyGoal + 1)">+</button>
+        </div>
+      </div>
+
+      <!-- Streak disabled notice -->
+      <div class="streak-widget streak-disabled-notice" *ngIf="streakDisabled">
+        <p>Streak tracking is turned off.</p>
+        <button class="streak-inactive-btn keep" (click)="reEnableStreakTracking()">Turn it back on</button>
+      </div>
+
       <!-- 4 Action Cards -->
       <div class="action-grid">
+
 
         <!-- 1. Link Google Calendar -->
         <div class="action-card" [class.action-card-linked]="googleCalendarLinked">
@@ -260,7 +303,7 @@
             <h3 class="action-title">{{ i18n.t('addNewEvent') }}</h3>
             <p class="action-desc">{{ i18n.t('scheduleEvent') }}</p>
           </div>
-          <button class="action-btn primary-btn" (click)="openScheduleModal()">Add</button>
+          <button class="action-btn primary-btn" (click)="openScheduleModal()">{{ i18n.t('save') }}</button>
         </div>
 
         <!-- 3. Delete Event -->
@@ -272,7 +315,7 @@
             <h3 class="action-title">{{ i18n.t('deleteEvent') }}</h3>
             <p class="action-desc">{{ i18n.t('searchRemove') }}</p>
           </div>
-          <button class="action-btn danger-btn" (click)="openDeleteModal()">Delete</button>
+          <button class="action-btn danger-btn" (click)="openDeleteModal()">{{ i18n.t('delete') }}</button>
         </div>
 
         <!-- 4. Change Event -->
@@ -284,7 +327,7 @@
             <h3 class="action-title">{{ i18n.t('changeEvent') }}</h3>
             <p class="action-desc">{{ i18n.t('searchUpdate') }}</p>
           </div>
-          <button class="action-btn warning-btn" (click)="openChangeModal()">Change</button>
+          <button class="action-btn warning-btn" (click)="openChangeModal()">{{ i18n.t('changeEvent') }}</button>
         </div>
 
       </div>
@@ -298,7 +341,7 @@
           <p class="page-subtitle">{{ i18n.t('allEvents') }}</p>
         </div>
         <button class="btn-primary" (click)="openScheduleModal()">
-          + New Event
+          {{ i18n.t('newEvent') }}
         </button>
       </header>
 
@@ -382,6 +425,9 @@
                 🕐 {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
               </div>
               <div class="event-desc" *ngIf="event.description">{{ event.description }}</div>
+              <a class="event-location-link" *ngIf="event.location" [href]="'https://www.google.com/maps/search/' + encodeLocation(event.location)" target="_blank" rel="noopener">
+                📍 {{ event.location }}
+              </a>
               <div class="event-shared" *ngIf="event.sharedWith.length > 0">
                 👥 Shared with {{ event.sharedWith.join(', ') }}
               </div>
@@ -412,6 +458,9 @@
                 📅 {{ formatDate(event.date) }} · {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
               </div>
               <div class="event-desc" *ngIf="event.description">{{ event.description }}</div>
+              <a class="event-location-link" *ngIf="event.location" [href]="'https://www.google.com/maps/search/' + encodeLocation(event.location)" target="_blank" rel="noopener">
+                📍 {{ event.location }}
+              </a>
               <div class="event-shared" *ngIf="event.sharedWith.length > 0">
                 👥 Shared with {{ event.sharedWith.join(', ') }}
               </div>
@@ -425,10 +474,10 @@
     <div *ngIf="activeTab === 'calendar'" class="tab-content calendar-tab">
       <header class="page-header">
         <div>
-          <h2 class="page-title">Calendar {{ currentYear }}</h2>
-          <p class="page-subtitle">Browse your events by year, month, week, or day</p>
+          <h2 class="page-title">{{ i18n.t('calendar') }} {{ currentYear }}</h2>
+          <p class="page-subtitle">{{ i18n.t('browseCalendar') }}</p>
         </div>
-        <button class="btn-primary" (click)="openScheduleModal()">+ New Event</button>
+        <button class="btn-primary" (click)="openScheduleModal()">{{ i18n.t('newEvent') }}</button>
       </header>
 
       <!-- View controls -->
@@ -441,6 +490,11 @@
         </select>
 
         <!-- Year jump dropdown -->
+        <div class="cal-input-group" *ngIf="calendarView === 'year'">
+          <button class="cal-year-nav-btn" (click)="prevYear()" aria-label="Previous year">←</button>
+          <span class="cal-year-label">{{ currentYear }}</span>
+          <button class="cal-year-nav-btn" (click)="nextYear()" aria-label="Next year">→</button>
+        </div>
         <div class="cal-input-group" *ngIf="calendarView === 'year'">
           <label class="cal-input-label">Jump to</label>
           <select class="cal-text-input" (change)="scrollToYearMonth(+$any($event.target).value)" name="yearJump">
@@ -661,11 +715,11 @@
     <div *ngIf="activeTab === 'history'" class="tab-content">
       <header class="page-header">
         <div>
-          <h2 class="page-title">History</h2>
-          <p class="page-subtitle">Events you added, changed, or deleted — all history is automatically cleared after 7 days</p>
+          <h2 class="page-title">{{ i18n.t('history') }}</h2>
+          <p class="page-subtitle">{{ i18n.t('added') }}, {{ i18n.t('changed') }}, {{ i18n.t('deleted') }}</p>
         </div>
         <button class="btn-danger" *ngIf="history.length > 0" (click)="clearHistory()" style="font-size:13px;padding:8px 16px">
-          Clear All
+          {{ i18n.t('clearAll') }}
         </button>
       </header>
 
@@ -1208,8 +1262,18 @@
 
       <header class="page-header">
         <div>
-          <h2 class="page-title">Profile</h2>
-          <p class="page-subtitle">Manage your account settings</p>
+          <h2 class="page-title">{{ i18n.t('profile') }}</h2>
+          <p class="page-subtitle">{{ i18n.t('manageAccount') }}</p>
+        </div>
+        <div class="profile-save-area">
+          <p class="profile-save-success" *ngIf="profileSaveMsg">✓ {{ profileSaveMsg }}</p>
+          <button
+            class="btn-primary profile-save-changes-btn"
+            *ngIf="profileHasChanges"
+            (click)="saveProfile()"
+          >
+            💾 {{ i18n.t('saveChanges') }}
+          </button>
         </div>
       </header>
 
@@ -1287,7 +1351,6 @@
                 placeholder="Enter username"
                 maxlength="32"
               />
-              <button class="btn-primary profile-save-btn" (click)="saveUsername()">Save</button>
             </div>
             <p class="profile-field-success" *ngIf="profileUsernameMsg">✓ {{ profileUsernameMsg }}</p>
             <p class="profile-field-error" *ngIf="profileUsernameError">{{ profileUsernameError }}</p>
@@ -1298,11 +1361,11 @@
         <div class="profile-card">
           <div class="profile-card-header">
             <span class="profile-card-icon">🔒</span>
-            <h3 class="profile-card-title">Change Password</h3>
+            <h3 class="profile-card-title">{{ i18n.t('changePassword') }}</h3>
           </div>
           <div class="profile-field-stack">
             <div class="profile-field-group">
-              <label class="profile-label">Current Password</label>
+              <label class="profile-label">{{ i18n.t('currentPassword') }}</label>
               <input
                 class="profile-input"
                 type="password"
@@ -1312,7 +1375,7 @@
               />
             </div>
             <div class="profile-field-group">
-              <label class="profile-label">New Password</label>
+              <label class="profile-label">{{ i18n.t('newPassword') }}</label>
               <input
                 class="profile-input"
                 type="password"
@@ -1322,7 +1385,7 @@
               />
             </div>
             <div class="profile-field-group">
-              <label class="profile-label">Confirm New Password</label>
+              <label class="profile-label">{{ i18n.t('confirmPassword') }}</label>
               <input
                 class="profile-input"
                 type="password"
@@ -1333,7 +1396,7 @@
             </div>
             <p class="profile-field-success" *ngIf="profilePasswordMsg">✓ {{ profilePasswordMsg }}</p>
             <p class="profile-field-error" *ngIf="profilePasswordError">{{ profilePasswordError }}</p>
-            <button class="btn-primary" style="align-self:flex-start" (click)="savePassword()">Update Password</button>
+            <button class="btn-primary" style="align-self:flex-start" (click)="savePassword()">{{ i18n.t('updatePassword') }}</button>
           </div>
         </div>
 
@@ -1344,12 +1407,13 @@
             <h3 class="profile-card-title">Language</h3>
           </div>
           <div class="profile-field-group">
-            <label class="profile-label" for="profileLanguage">Display Language</label>
+            <label class="profile-label" for="profileLanguage">{{ i18n.t('displayLanguage') }}</label>
             <select
               id="profileLanguage"
               class="profile-input profile-select"
               [(ngModel)]="profileLanguage"
-              (change)="saveLanguage()"
+              (ngModelChange)="saveLanguage()"
+              name="profileLanguage"
             >
               <option *ngFor="let lang of LANGUAGES" [value]="lang.code">{{ lang.label }}</option>
             </select>
@@ -1359,7 +1423,7 @@
         <!-- ── Sign Out card ── -->
         <div class="profile-card profile-card-signout">
           <button class="btn-secondary profile-signout-btn" (click)="logout()">
-            <span>⎋</span> Sign Out
+            <span>⎋</span> {{ i18n.t('signOut') }}
           </button>
         </div>
 
@@ -1367,11 +1431,11 @@
         <div class="profile-card profile-card-danger">
           <div class="profile-card-header">
             <span class="profile-card-icon">⚠️</span>
-            <h3 class="profile-card-title profile-danger-title">Delete Account</h3>
+            <h3 class="profile-card-title profile-danger-title">{{ i18n.t('deleteAccount') }}</h3>
           </div>
           <div *ngIf="!profileDeleteConfirm">
             <p class="profile-field-hint">This will permanently delete your account and all your data. This action cannot be undone.</p>
-            <button class="btn-danger" (click)="confirmDeleteAccount()">Delete My Account</button>
+            <button class="btn-danger" (click)="confirmDeleteAccount()">{{ i18n.t('deleteMyAccount') }}</button>
           </div>
           <div *ngIf="profileDeleteConfirm" class="profile-delete-confirm">
             <p class="profile-delete-warning">Enter your password to confirm deletion.</p>
@@ -1384,8 +1448,8 @@
             />
             <p class="profile-field-error" *ngIf="profileDeleteError">{{ profileDeleteError }}</p>
             <div class="profile-delete-actions">
-              <button class="btn-secondary" (click)="cancelDeleteAccount()">Cancel</button>
-              <button class="btn-danger" (click)="executeDeleteAccount()">Yes, Delete My Account</button>
+              <button class="btn-secondary" (click)="cancelDeleteAccount()">{{ i18n.t('cancel') }}</button>
+              <button class="btn-danger" (click)="executeDeleteAccount()">{{ i18n.t('yesDelete') }}</button>
             </div>
           </div>
         </div>
@@ -1397,8 +1461,8 @@
     <div *ngIf="activeTab === 'weekly'" class="tab-content">
       <header class="page-header">
         <div>
-          <h2 class="page-title">Weekly Summary</h2>
-          <p class="page-subtitle">Your next 7 days at a glance with AI suggestions</p>
+          <h2 class="page-title">{{ i18n.t('weeklySummary') }}</h2>
+          <p class="page-subtitle">{{ i18n.t('browseCalendar') }}</p>
         </div>
         <button class="btn-primary" (click)="getWeeklyAiSuggestions()" [disabled]="weeklyAiLoading">
           {{ weeklyAiLoading ? 'Loading...' : '✨ Refresh Tips' }}
@@ -1445,113 +1509,12 @@
       </div>
     </div>
 
-    <!-- ── CONNECT EMAIL TAB ── -->
-    <div *ngIf="activeTab === 'email'" class="tab-content">
-      <header class="page-header">
-        <div>
-          <h2 class="page-title">Connect Email</h2>
-          <p class="page-subtitle">Link your email to receive event invitations and reminders in your inbox</p>
-        </div>
-      </header>
-
-      <!-- Connected state -->
-      <div class="email-connected-card" *ngIf="emailConnected">
-        <div class="email-connected-icon">✅</div>
-        <div class="email-connected-body">
-          <h3 class="email-connected-title">Email Connected</h3>
-          <p class="email-connected-addr">{{ emailAddress }}</p>
-          <p class="email-connected-provider">Provider: {{ emailProvider === 'gmail' ? 'Gmail' : emailProvider === 'outlook' ? 'Outlook' : emailProvider === 'yahoo' ? 'Yahoo Mail' : 'Other (IMAP)' }}</p>
-        </div>
-        <button class="action-btn danger-btn" (click)="disconnectEmail()">Disconnect</button>
-      </div>
-
-      <!-- Connection form -->
-      <div *ngIf="!emailConnected" class="email-setup-container">
-
-        <!-- Success message -->
-        <div class="email-success-msg" *ngIf="emailSuccessMsg">
-          ✓ {{ emailSuccessMsg }}
-        </div>
-
-        <!-- Error message -->
-        <div class="error-msg" *ngIf="emailError">{{ emailError }}</div>
-
-        <!-- Step 1: Choose provider -->
-        <div class="email-step">
-          <h3 class="email-step-title">1. Choose your email provider</h3>
-          <div class="email-provider-grid">
-            <div class="email-provider-card" [class.selected]="emailProvider === 'gmail'" (click)="selectEmailProvider('gmail')">
-              <span class="email-provider-icon">📧</span>
-              <span class="email-provider-name">Gmail</span>
-            </div>
-            <div class="email-provider-card" [class.selected]="emailProvider === 'outlook'" (click)="selectEmailProvider('outlook')">
-              <span class="email-provider-icon">📬</span>
-              <span class="email-provider-name">Outlook</span>
-            </div>
-            <div class="email-provider-card" [class.selected]="emailProvider === 'yahoo'" (click)="selectEmailProvider('yahoo')">
-              <span class="email-provider-icon">📨</span>
-              <span class="email-provider-name">Yahoo Mail</span>
-            </div>
-            <div class="email-provider-card" [class.selected]="emailProvider === 'other'" (click)="selectEmailProvider('other')">
-              <span class="email-provider-icon">🔗</span>
-              <span class="email-provider-name">Other (IMAP)</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Step 2: Enter email -->
-        <div class="email-step" *ngIf="emailProvider">
-          <h3 class="email-step-title">2. Enter your email address</h3>
-          <div class="field">
-            <input
-              class="search-input"
-              type="email"
-              placeholder="your@email.com"
-              [(ngModel)]="emailAddress"
-              name="emailAddress"
-            />
-          </div>
-
-          <!-- Provider-specific instructions -->
-          <div class="email-instructions" *ngIf="emailProvider === 'gmail'">
-            <p><strong>Gmail setup:</strong> You'll be redirected to Google to authorize access. Make sure to allow "Read email" and "Send email" permissions.</p>
-          </div>
-          <div class="email-instructions" *ngIf="emailProvider === 'outlook'">
-            <p><strong>Outlook setup:</strong> You'll sign in with your Microsoft account. Works with Outlook.com, Hotmail, and Microsoft 365 accounts.</p>
-          </div>
-          <div class="email-instructions" *ngIf="emailProvider === 'yahoo'">
-            <p><strong>Yahoo setup:</strong> You'll need to generate an App Password in your Yahoo account security settings, then authorize here.</p>
-          </div>
-          <div class="email-instructions" *ngIf="emailProvider === 'other'">
-            <p><strong>IMAP setup:</strong> You'll need your IMAP server address, port, and an app-specific password. Check your provider's documentation.</p>
-          </div>
-
-          <button class="btn-primary" (click)="connectEmail()" [disabled]="emailConnecting" style="margin-top:12px">
-            <span *ngIf="!emailConnecting">Connect Email</span>
-            <span *ngIf="emailConnecting" class="spinner-dark"></span>
-            <span *ngIf="emailConnecting"> Connecting…</span>
-          </button>
-        </div>
-
-        <!-- Info section -->
-        <div class="email-info-card">
-          <h4 class="email-info-title">What connecting your email does:</h4>
-          <ul class="email-info-list">
-            <li>📩 Receive event reminders directly in your inbox</li>
-            <li>📤 Send event invitations via email to shared contacts</li>
-            <li>🔄 Sync email-based calendar invitations (ICS files)</li>
-            <li>🔒 Your credentials are encrypted and stored securely</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-
     <!-- ── AI CHAT TAB ── -->
     <div *ngIf="activeTab === 'ai'" class="tab-content ai-tab">
       <header class="page-header">
         <div>
-          <h2 class="page-title">AI Assistant</h2>
-          <p class="page-subtitle">Chat with your AI scheduling assistant</p>
+          <h2 class="page-title">{{ i18n.t('aiAssistant') }}</h2>
+          <p class="page-subtitle">{{ i18n.t('askSchedule') }}</p>
         </div>
         <button class="btn-primary" (click)="startNewAiConversation()">+ New Chat</button>
       </header>
@@ -1838,8 +1801,8 @@
 
       <div class="error-msg" *ngIf="deleteError">{{ deleteError }}</div>
       <div class="modal-actions">
-        <button class="btn-secondary" (click)="closeDeleteModal()">Cancel</button>
-        <button class="btn-danger" (click)="confirmDelete()" [disabled]="!selectedEventId">Delete Event</button>
+        <button class="btn-secondary" (click)="closeDeleteModal()">{{ i18n.t('cancel') }}</button>
+        <button class="btn-danger" (click)="confirmDelete()" [disabled]="!selectedEventId">{{ i18n.t('deleteEventBtn') }}</button>
       </div>
     </div>
   </div>
@@ -1938,8 +1901,8 @@
         </ng-container>
 
         <div class="modal-actions">
-          <button class="btn-secondary" (click)="closeChangeModal()">Cancel</button>
-          <button class="btn-warning" (click)="proceedToChange()" [disabled]="!selectedEventId">Next →</button>
+          <button class="btn-secondary" (click)="closeChangeModal()">{{ i18n.t('cancel') }}</button>
+          <button class="btn-warning" (click)="proceedToChange()" [disabled]="!selectedEventId">{{ i18n.t('next') }} →</button>
         </div>
       </ng-container>
 
@@ -2053,14 +2016,14 @@
 
         <div class="error-msg" *ngIf="changeError">{{ changeError }}</div>
         <div class="modal-actions">
-          <button class="btn-secondary" (click)="changeStep = 'search'; closeChangeCategoryPicker()">← Back</button>
-          <button class="btn-warning" (click)="confirmChange()">Save Changes</button>
+          <button class="btn-secondary" (click)="changeStep = 'search'; closeChangeCategoryPicker()">← {{ i18n.t('back') }}</button>
+          <button class="btn-warning" (click)="confirmChange()">{{ i18n.t('saveChanges') }}</button>
         </div>
       </ng-container>
 
       <!-- Step 3: success -->
       <div *ngIf="changeStep === 'done'" class="success-banner" style="padding:32px 24px;text-align:center">
-        ✓ Event updated successfully!
+        ✓ {{ i18n.t('eventUpdated') }}
       </div>
 
     </div>
@@ -2085,6 +2048,9 @@
     🕐 {{ formatTime(popupEvent.startTime) }} – {{ formatTime(popupEvent.endTime) }}
   </div>
   <div class="event-popup-desc" *ngIf="popupEvent.description">{{ popupEvent.description }}</div>
+  <a class="event-location-link" *ngIf="popupEvent.location" [href]="'https://www.google.com/maps/search/' + encodeLocation(popupEvent.location)" target="_blank" rel="noopener">
+    📍 {{ popupEvent.location }}
+  </a>
 </div>
 
 <!-- ── DAY DETAIL PANEL ── -->
@@ -2364,7 +2330,7 @@
     </div>
 
     <div *ngIf="scheduleSuccess" class="success-banner">
-      ✓ Event scheduled successfully!
+      ✓ {{ i18n.t('eventScheduled') }}
     </div>
 
     <form (ngSubmit)="submitSchedule()" class="modal-form" [class.picker-open]="showCategoryPicker" *ngIf="!scheduleSuccess">
@@ -2432,6 +2398,27 @@
           placeholder="Optional notes about this event..."
           rows="3"
         ></textarea>
+      </div>
+
+      <div class="field">
+        <label for="event-location">Location</label>
+        <div class="location-input-wrap">
+          <span class="location-input-icon">📍</span>
+          <input
+            id="event-location"
+            type="text"
+            [(ngModel)]="form.location"
+            name="location"
+            placeholder="Add a location…"
+          />
+        </div>
+        <a
+          *ngIf="form.location.trim()"
+          class="location-maps-link"
+          [href]="'https://www.google.com/maps/search/' + encodeLocation(form.location)"
+          target="_blank"
+          rel="noopener"
+        >Open in Google Maps ↗</a>
       </div>
 
       <div class="field">
@@ -2581,65 +2568,13 @@
         </p>
       </div>
 
-      <!-- ── Share with ── -->
-      <div class="field form-share-field">
-        <label>Share with</label>
-
-        <!-- Chips for already-added recipients -->
-        <div class="form-share-chips" *ngIf="form.sharedWith.length > 0">
-          <span class="form-share-chip" *ngFor="let email of form.sharedWith">
-            <span class="form-share-chip-avatar">{{ email[0].toUpperCase() }}</span>
-            {{ email }}
-            <button type="button" class="form-share-chip-remove" (click)="removeFormShareEmail(email)" title="Remove">✕</button>
-          </span>
-        </div>
-
-        <!-- Input + suggestions -->
-        <div class="form-share-input-wrap">
-          <input
-            type="email"
-            class="form-share-input"
-            [(ngModel)]="formShareInput"
-            name="formShareInput"
-            placeholder="Type an email and press Enter…"
-            (ngModelChange)="onFormShareInput()"
-            (keydown)="onFormShareKeydown($event)"
-            autocomplete="off"
-          />
-          <button
-            type="button"
-            class="form-share-add-btn"
-            (click)="addFormShareEmail()"
-            [disabled]="!formShareInput.trim().includes('@')"
-            title="Add"
-          >Add</button>
-        </div>
-
-        <!-- Suggestion dropdown -->
-        <div class="form-share-suggestions" *ngIf="formShareSuggestions.length > 0">
-          <button
-            type="button"
-            class="form-share-suggestion"
-            *ngFor="let s of formShareSuggestions"
-            (click)="addFormShareEmail(s)"
-          >
-            <span class="form-share-sug-avatar">{{ s[0].toUpperCase() }}</span>
-            {{ s }}
-          </button>
-        </div>
-
-        <p class="form-share-hint" *ngIf="form.sharedWith.length === 0 && !formShareInput">
-          Optional — they'll get a notification when the event is created.
-        </p>
-      </div>
-
       <div class="error-msg" *ngIf="scheduleError">{{ scheduleError }}</div>
 
       <!-- AI scheduling handled by the floating chat -->
 
       <div class="modal-actions">
-        <button type="button" class="btn-secondary" (click)="closeModal()">Cancel</button>
-        <button type="submit" class="btn-primary">Schedule Event</button>
+        <button type="button" class="btn-secondary" (click)="closeModal()">{{ i18n.t('cancel') }}</button>
+        <button type="submit" class="btn-primary">{{ i18n.t('scheduleEventBtn') }}</button>
       </div>
     </form>
   </div>
@@ -2759,8 +2694,8 @@
       <div class="success-banner" *ngIf="shareSuccess">✓ {{ shareSuccess }}</div>
 
       <div class="modal-actions" *ngIf="!shareSuccess">
-        <button class="btn-secondary" (click)="closeShareModal()">Cancel</button>
-        <button class="btn-primary" (click)="confirmShare()">Share</button>
+        <button class="btn-secondary" (click)="closeShareModal()">{{ i18n.t('cancel') }}</button>
+        <button class="btn-primary" (click)="confirmShare()">{{ i18n.t('shareEvent') }}</button>
       </div>
     </div>
   </div>
@@ -2800,8 +2735,8 @@
       <div class="success-banner" *ngIf="reminderSuccess">✓ {{ reminderSuccess }}</div>
 
       <div class="modal-actions" *ngIf="!reminderSuccess">
-        <button class="btn-secondary" (click)="closeReminderModal()">Cancel</button>
-        <button class="btn-primary" (click)="confirmReminder()">Set Reminder</button>
+        <button class="btn-secondary" (click)="closeReminderModal()">{{ i18n.t('cancel') }}</button>
+        <button class="btn-primary" (click)="confirmReminder()">{{ i18n.t('setReminder') }}</button>
       </div>
     </div>
   </div>

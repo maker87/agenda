@@ -22,6 +22,7 @@ interface CalendarEvent {
   description: string;
   color: string;
   category: string;
+  location?: string;
   sharedWith: string[];
 }
 
@@ -42,6 +43,7 @@ interface ScheduleForm {
   endTime: string;
   description: string;
   category: string;
+  location: string;
   sharedWith: string[];  // emails to share with at creation time
 }
 
@@ -400,7 +402,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   userEmail = '';
 
   // ── Profile panel ──
-  profile: UserProfile = { email: '', username: '', avatarUrl: null, language: 'en' };
+  profile: UserProfile = { email: '', username: '', avatarUrl: null, language: 'en', region: '' };
 
   // Animal avatar options
   readonly ANIMAL_AVATARS = [
@@ -445,6 +447,20 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   profileDeletePassword = '';
   profileDeleteError = '';
 
+  // Profile change tracking
+  profileSaveMsg = '';
+  private originalUsername = '';
+  private originalLanguage = 'en';
+  private originalAvatarUrl: string | null = null;
+
+  get profileHasChanges(): boolean {
+    return (
+      this.profileUsernameInput.trim() !== this.originalUsername ||
+      this.profileLanguage !== this.originalLanguage ||
+      this.profileAvatarPreview !== this.originalAvatarUrl
+    );
+  }
+
   readonly LANGUAGES = [
     { code: 'en', label: 'English' },
     { code: 'es', label: 'Español' },
@@ -477,23 +493,46 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.profilePasswordMsg = '';
     this.profilePasswordError = '';
     this.profileAvatarMsg = '';
+    this.profileSaveMsg = '';
     this.profileDeleteConfirm = false;
     this.profileDeletePassword = '';
     this.profileDeleteError = '';
     this.showAnimalPicker = false;
+    // Store original values for change detection
+    this.originalUsername = this.profile.username;
+    this.originalLanguage = this.profile.language;
+    this.originalAvatarUrl = this.profile.avatarUrl;
     this.activeTab = 'profile';
   }
 
-  saveUsername() {
+  saveProfile() {
     this.profileUsernameMsg = '';
     this.profileUsernameError = '';
+    this.profileSaveMsg = '';
+
+    // Validate username
     const name = this.profileUsernameInput.trim();
     if (!name) { this.profileUsernameError = 'Username cannot be empty.'; return; }
     if (name.length < 3) { this.profileUsernameError = 'Username must be at least 3 characters.'; return; }
+
+    // Apply all changes
     this.profile.username = name;
+    this.profile.language = this.profileLanguage;
+    this.profile.avatarUrl = this.profileAvatarPreview;
     this.mockAuth.saveProfile(this.profile);
-    this.profileUsernameMsg = 'Username updated.';
-    setTimeout(() => { this.profileUsernameMsg = ''; }, 3000);
+    this.i18n.setLanguage(this.profileLanguage);
+
+    // Update original values so the button hides
+    this.originalUsername = name;
+    this.originalLanguage = this.profileLanguage;
+    this.originalAvatarUrl = this.profileAvatarPreview;
+
+    this.profileSaveMsg = 'Profile saved successfully.';
+    setTimeout(() => { this.profileSaveMsg = ''; }, 3000);
+  }
+
+  saveUsername() {
+    this.saveProfile();
   }
 
   savePassword() {
@@ -522,21 +561,15 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     reader.onload = (e) => {
       const result = e.target?.result as string;
       this.profileAvatarPreview = result;
-      this.profile.avatarUrl = result;
-      this.mockAuth.saveProfile(this.profile);
-      this.profileAvatarMsg = 'Avatar updated.';
-      setTimeout(() => { this.profileAvatarMsg = ''; }, 3000);
+      this.profileAvatarMsg = '';
     };
     reader.readAsDataURL(file);
   }
 
   removeAvatar() {
     this.profileAvatarPreview = null;
-    this.profile.avatarUrl = null;
-    this.mockAuth.saveProfile(this.profile);
-    this.profileAvatarMsg = 'Avatar removed.';
+    this.profileAvatarMsg = '';
     this.showAnimalPicker = false;
-    setTimeout(() => { this.profileAvatarMsg = ''; }, 3000);
   }
 
   selectAnimalAvatar(emoji: string) {
@@ -560,17 +593,12 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     ctx.fillText(emoji, 64, 68);
     const dataUrl = canvas.toDataURL('image/png');
     this.profileAvatarPreview = dataUrl;
-    this.profile.avatarUrl = dataUrl;
-    this.mockAuth.saveProfile(this.profile);
-    this.profileAvatarMsg = 'Avatar updated.';
+    this.profileAvatarMsg = '';
     this.showAnimalPicker = false;
-    setTimeout(() => { this.profileAvatarMsg = ''; }, 3000);
   }
 
   saveLanguage() {
-    this.profile.language = this.profileLanguage;
-    this.mockAuth.saveProfile(this.profile);
-    this.i18n.setLanguage(this.profileLanguage);
+    // Language change is now tracked by profileHasChanges and saved via saveProfile()
   }
 
   confirmDeleteAccount() {
@@ -604,15 +632,149 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   gcalImporting = false;
   gcalFutureOnly = true;
   gcalImportCount = 0;
-  activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly' | 'email' = 'schedule';
+  activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly' = 'schedule';
 
-  // ── Email Connection ──
-  emailProvider: 'gmail' | 'outlook' | 'yahoo' | 'other' | '' = '';
-  emailConnected = false;
-  emailConnecting = false;
-  emailAddress = '';
-  emailError = '';
-  emailSuccessMsg = '';
+  // ── Daily Goal Streak ──
+  dailyGoal = 1; // minimum events per day to count as "goal met"
+  currentStreak = 0;
+  longestStreak = 0;
+  streakHistory: { date: string; met: boolean }[] = []; // last 14 days
+  todayGoalMet = false;
+  streakInactiveWarning = false; // true when user missed 7+ consecutive days
+  streakDisabled = false; // true if user chose to cancel streak tracking
+
+  private readonly STREAK_KEY_PREFIX = 'agenda_streak_';
+
+  private computeStreak() {
+    // If streak tracking is disabled, skip computation
+    if (this.streakDisabled) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const days: { date: string; met: boolean }[] = [];
+    let streak = 0;
+    let longest = 0;
+    let tempStreak = 0;
+
+    // Check last 14 days
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const eventsOnDay = this.events.filter(e => e.date === dateStr);
+      const met = eventsOnDay.length >= this.dailyGoal;
+      days.push({ date: dateStr, met });
+
+      if (met) {
+        tempStreak++;
+        if (tempStreak > longest) longest = tempStreak;
+      } else {
+        tempStreak = 0;
+      }
+    }
+
+    // Current streak: count backwards from today/yesterday
+    streak = 0;
+    for (let i = 0; i >= -13; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      // Skip today if it hasn't been met yet (don't break streak for an incomplete today)
+      if (i === 0) {
+        const todayEvts = this.events.filter(e => e.date === dateStr);
+        this.todayGoalMet = todayEvts.length >= this.dailyGoal;
+        if (this.todayGoalMet) {
+          streak++;
+        }
+        continue;
+      }
+      const eventsOnDay = this.events.filter(e => e.date === dateStr);
+      if (eventsOnDay.length >= this.dailyGoal) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    this.currentStreak = streak;
+    this.longestStreak = Math.max(longest, this.loadLongestStreak());
+    this.streakHistory = days;
+    this.saveLongestStreak(this.longestStreak);
+
+    // Detect 7+ consecutive days of inactivity (not meeting goal)
+    this.streakInactiveWarning = this.checkInactiveForWeek(days) && !this.wasInactiveDismissedRecently();
+  }
+
+  /** Returns true if the last 7 days were all NOT met */
+  private checkInactiveForWeek(days: { date: string; met: boolean }[]): boolean {
+    if (days.length < 7) return false;
+    const lastSevenDays = days.slice(-7);
+    return lastSevenDays.every(d => !d.met);
+  }
+
+  /** User chooses to cancel/disable streak tracking */
+  cancelStreakTracking() {
+    this.streakDisabled = true;
+    this.streakInactiveWarning = false;
+    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_disabled';
+    localStorage.setItem(key, 'true');
+  }
+
+  /** User chooses to keep streak tracking despite inactivity */
+  keepStreakTracking() {
+    this.streakInactiveWarning = false;
+    // Save a dismissal timestamp so we don't nag again until next week of inactivity
+    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_dismiss';
+    localStorage.setItem(key, new Date().toISOString().split('T')[0]);
+  }
+
+  /** Re-enable streak tracking after it was cancelled */
+  reEnableStreakTracking() {
+    this.streakDisabled = false;
+    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_disabled';
+    localStorage.removeItem(key);
+    this.computeStreak();
+  }
+
+  private loadStreakDisabled(): boolean {
+    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_disabled';
+    return localStorage.getItem(key) === 'true';
+  }
+
+  private wasInactiveDismissedRecently(): boolean {
+    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_dismiss';
+    const val = localStorage.getItem(key);
+    if (!val) return false;
+    const dismissDate = new Date(val);
+    const now = new Date();
+    const daysSinceDismiss = Math.floor((now.getTime() - dismissDate.getTime()) / (1000 * 60 * 60 * 24));
+    return daysSinceDismiss < 7; // Don't show again for another week
+  }
+
+  private loadLongestStreak(): number {
+    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_longest';
+    const val = localStorage.getItem(key);
+    return val ? parseInt(val, 10) : 0;
+  }
+
+  private saveLongestStreak(n: number) {
+    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_longest';
+    localStorage.setItem(key, String(n));
+  }
+
+  updateDailyGoal(newGoal: number) {
+    this.dailyGoal = Math.max(1, newGoal);
+    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_goal';
+    localStorage.setItem(key, String(this.dailyGoal));
+    this.computeStreak();
+  }
+
+  private loadDailyGoal() {
+    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_goal';
+    const val = localStorage.getItem(key);
+    if (val) this.dailyGoal = Math.max(1, parseInt(val, 10));
+    // Load disabled state
+    this.streakDisabled = this.loadStreakDisabled();
+  }
 
   // ── History ──
   private readonly HISTORY_KEY_PREFIX = 'agenda_event_history_';
@@ -1125,7 +1287,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       .trim();
 
     if (stripped.length > 1) {
-      this.chatEventDraft = { step: 'date' as any, title: stripped };
+      this.chatEventDraft = { step: 'date', title: stripped };
       this.addAssistantMsg(`Got it — **"${stripped}"**. What date? (e.g. "tomorrow", "next Monday", "June 20")`);
     } else {
       this.chatEventDraft = { step: 'title' };
@@ -1149,11 +1311,11 @@ export class DashboardComponent implements OnInit, AfterViewInit {
           this.addAssistantMsg('Please give the event a name (at least 2 characters).');
           return;
         }
-        this.chatEventDraft = { ...draft, step: 'date' as any, title: text.trim() };
+        this.chatEventDraft = { ...draft, step: 'date', title: text.trim() };
         this.addAssistantMsg(`**"${text.trim()}"** — got it. What date? (e.g. "tomorrow", "next Monday", "June 20")`);
         break;
 
-      case 'date' as any:
+      case 'date':
         // Parse the date
         const todayStr = new Date().toISOString().split('T')[0];
         const parsed = this.parseDateFromText(lower, todayStr);
@@ -1161,21 +1323,21 @@ export class DashboardComponent implements OnInit, AfterViewInit {
           this.addAssistantMsg(`I couldn't understand that date. Try "tomorrow", "next Monday", "June 20", or "2026-06-15".`);
           return;
         }
-        this.chatEventDraft = { ...draft, step: 'time' as any, date: parsed };
+        this.chatEventDraft = { ...draft, step: 'time', date: parsed };
         this.addAssistantMsg(`📅 ${this.formatDate(parsed)}. What time? (e.g. "2pm to 4pm", "10:00-11:30", "at 3pm for 1 hour")`);
         break;
 
-      case 'time' as any:
+      case 'time':
         const times = this.parseTimesFromText(lower);
         if (!times) {
           this.addAssistantMsg(`I couldn't parse that time. Try "2pm to 4pm", "10:00-11:30", or "at 3pm for 1 hour".`);
           return;
         }
-        this.chatEventDraft = { ...draft, step: 'category' as any, startTime: times.start, endTime: times.end };
-        this.addAssistantMsg(`🕐 ${this.formatTime(times.start)} – ${this.formatTime(times.end)}. What category? (e.g. Work, Personal, Fitness, School, Social, Health) Or say "skip" to auto-pick.`);
+        this.chatEventDraft = { ...draft, step: 'category', startTime: times.start, endTime: times.end };
+        this.addAssistantMsg(`🕐 ${this.formatTime(times.start)} – ${this.formatTime(times.end)}.\n\nNow a few optional questions to make this event perfect. You can **skip** any of them.\n\n🏷️ What category? (Work, Personal, Fitness, School, Social, Health) or **skip**`);
         break;
 
-      case 'category' as any:
+      case 'category':
         let category = text.trim();
         if (/skip|auto|none|no/i.test(lower)) {
           // Auto-detect from title
@@ -1191,14 +1353,51 @@ export class DashboardComponent implements OnInit, AfterViewInit {
             if (regex.test(draft.title || '')) { category = cat; break; }
           }
         }
-        this.chatEventDraft = { ...draft, step: 'description' as any, category };
-        this.addAssistantMsg(`🏷️ ${category}. Any description? (Or say "no" to skip)`);
+        this.chatEventDraft = { ...draft, step: 'location', category };
+        this.addAssistantMsg(`🏷️ ${category}.\n\n📍 Where is it? (e.g. "Room 204", "Zoom", "Central Park") or **skip**`);
         break;
 
-      case 'description' as any:
-        const description = /no|skip|none|nope/i.test(lower) ? '' : text.trim();
-        // All info collected — create the event!
+      case 'location':
+        const location = /skip|no|none|nope/i.test(lower) ? '' : text.trim();
+        this.chatEventDraft = { ...draft, step: 'description', location };
+        this.addAssistantMsg(`${location ? '📍 ' + location + '.' : '📍 No location.'}\n\n📝 Any notes or description? or **skip**`);
+        break;
+
+      case 'description':
+        const description = /skip|no|none|nope/i.test(lower) ? '' : text.trim();
+        this.chatEventDraft = { ...draft, step: 'reminder', description };
+        this.addAssistantMsg(`${description ? '📝 Noted.' : '📝 No description.'}\n\n🔔 Want a reminder? (e.g. "15 min before", "1 hour before", "day before") or **skip**`);
+        break;
+
+      case 'reminder':
+        const reminderText = /skip|no|none|nope/i.test(lower) ? '' : text.trim();
+        this.chatEventDraft = { ...draft, step: 'invite', reminderText };
+        this.addAssistantMsg(`${reminderText ? '🔔 Reminder: ' + reminderText + '.' : '🔔 No reminder.'}\n\n👥 Invite anyone? (type emails separated by commas) or **skip**`);
+        break;
+
+      case 'invite':
+        const inviteText = /skip|no|none|nope/i.test(lower) ? '' : text.trim();
+        const sharedWith = inviteText
+          ? inviteText.split(',').map((e: string) => e.trim()).filter((e: string) => e.includes('@'))
+          : [];
+        // Show final summary and create
         this.chatEventDraft = null;
+        const loc = draft.location || '';
+        const desc = draft.description || '';
+        const reminder = draft.reminderText || '';
+        const summaryLines = [
+          `📌 **${draft.title}**`,
+          `📅 ${this.formatDate(draft.date!)}`,
+          `🕐 ${this.formatTime(draft.startTime!)} – ${this.formatTime(draft.endTime!)}`,
+          `🏷️ ${draft.category || 'Personal'}`,
+        ];
+        if (loc) summaryLines.push(`📍 ${loc}`);
+        if (desc) summaryLines.push(`📝 ${desc}`);
+        if (reminder) summaryLines.push(`🔔 ${reminder}`);
+        if (sharedWith.length) summaryLines.push(`👥 ${sharedWith.join(', ')}`);
+
+        this.addAssistantMsg(`Here's your event:\n\n${summaryLines.join('\n')}\n\nAdding it now…`);
+
         this.createEventFromChat({
           title: draft.title,
           date: draft.date,
@@ -1206,9 +1405,17 @@ export class DashboardComponent implements OnInit, AfterViewInit {
           endTime: draft.endTime,
           category: draft.category || 'Personal',
           color: '#6c63ff',
-          description,
-          sharedWith: [],
+          description: [desc, loc ? `Location: ${loc}` : ''].filter(Boolean).join('\n'),
+          sharedWith,
         });
+
+        // Create a reminder notification if requested
+        if (reminder) {
+          this.createAiReminder(
+            `Reminder: ${draft.title}`,
+            `${reminder} — ${this.formatDate(draft.date!)} at ${this.formatTime(draft.startTime!)}`
+          );
+        }
         break;
     }
   }
@@ -1820,10 +2027,11 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   // All 12 months (used by jump dropdown)
   get calendarMonths() {
+    const realYear = new Date().getFullYear();
     return this.monthNames.map((name, monthIdx) => ({
       name,
       monthIdx,
-      isCurrent: monthIdx === this.currentMonthIndex,
+      isCurrent: this.currentYear === realYear && monthIdx === this.currentMonthIndex,
       weeks: this.buildWeeks(this.currentYear, monthIdx),
     }));
   }
@@ -1866,6 +2074,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     endTime: '10:00',
     description: '',
     category: '',
+    location: '',
     sharedWith: [],
   };
 
@@ -2390,6 +2599,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.loadFriends();
     await this.loadEventsFromDb(user.email);
     this.loadNotifications(user.email);
+    this.loadDailyGoal();
+    this.computeStreak();
   }
 
   ngAfterViewInit() {
@@ -2415,6 +2626,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       this.events = [...synced, ...uniqueShared];
       this.dbLoading = false;
       this.dbError = this.eventsService.syncWarning ?? '';
+      this.computeStreak();
       this.showProactiveBanner(await this.runProactiveReminders());
     });
 
@@ -2564,42 +2776,15 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     }, 50);
   }
 
-  // ── Email connection methods ──
-  selectEmailProvider(provider: 'gmail' | 'outlook' | 'yahoo' | 'other') {
-    this.emailProvider = provider;
-    this.emailError = '';
-    this.emailSuccessMsg = '';
+  prevYear() {
+    this.currentYear--;
   }
 
-  connectEmail() {
-    this.emailError = '';
-    this.emailSuccessMsg = '';
-    if (!this.emailProvider) {
-      this.emailError = 'Please select an email provider first.';
-      return;
-    }
-    if (!this.emailAddress || !this.emailAddress.includes('@')) {
-      this.emailError = 'Please enter a valid email address.';
-      return;
-    }
-    this.emailConnecting = true;
-    // Simulate connection attempt
-    setTimeout(() => {
-      this.emailConnecting = false;
-      this.emailConnected = true;
-      this.emailSuccessMsg = `Successfully connected to ${this.emailAddress} via ${this.emailProvider === 'gmail' ? 'Gmail' : this.emailProvider === 'outlook' ? 'Outlook' : this.emailProvider === 'yahoo' ? 'Yahoo Mail' : 'IMAP'}.`;
-    }, 1800);
+  nextYear() {
+    this.currentYear++;
   }
 
-  disconnectEmail() {
-    this.emailConnected = false;
-    this.emailProvider = '';
-    this.emailAddress = '';
-    this.emailSuccessMsg = '';
-    this.emailError = '';
-  }
-
-  switchTab(tab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly' | 'email') {
+  switchTab(tab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly') {
     this.activeTab = tab;
     if (tab === 'calendar') {
       this.slideMonthIndex = this.currentMonthIndex;
@@ -2871,6 +3056,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       endTime: '',
       description: '',
       category: this.activeCategoryFilter || '',
+      location: '',
       sharedWith: [],
     };
     this.formShareInput = '';
@@ -2885,6 +3071,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.aiError = '';
     this.aiLoading = false;
     this.showScheduleModal = true;
+    this.initLocationAutocomplete();
   }
 
   // ── AI Scheduler methods ──────────────────────────────────────────────────
@@ -2967,6 +3154,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       description: this.form.description.trim(),
       color: this.form.category ? this.getCategoryColor(this.form.category.trim()) : this.selectedColor,
       category: this.form.category.trim(),
+      location: this.form.location.trim(),
       sharedWith: [...this.form.sharedWith],
     };
 
@@ -3403,6 +3591,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       endTime: '10:00',
       description: '',
       category: this.activeCategoryFilter || '',
+      location: '',
       sharedWith: [],
     };
     this.formShareInput = '';
@@ -3416,6 +3605,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.aiError = '';
     this.aiLoading = false;
     this.showScheduleModal = true;
+    this.initLocationAutocomplete();
   }
 
   editEventFromPanel(ev: CalendarEvent) {
@@ -4220,6 +4410,20 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     const ampm = h >= 12 ? 'PM' : 'AM';
     const hour = h % 12 || 12;
     return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
+  }
+
+  encodeLocation(location: string): string {
+    return encodeURIComponent(location);
+  }
+
+  getLocationMapsUrl(location: string): string {
+    return `https://www.google.com/maps/search/${encodeURIComponent(location)}`;
+  }
+
+  /** Initialize Google Places Autocomplete on the location input. */
+  private initLocationAutocomplete() {
+    // Plain text input — no autocomplete API needed.
+    // The location is linked to Google Maps via a simple URL when displayed.
   }
 
   get userInitial(): string {
