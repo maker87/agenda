@@ -8,8 +8,10 @@ import { CategoryCountPipe } from '../pipes/category-count.pipe';
 import { NotificationsService, AppNotification } from '../services/notifications.service';
 import { CategoryTreeService, CategoryNode, CATEGORY_SEP } from '../services/category-tree.service';
 import { GoogleCalendarService, GCalEvent, GCalCalendar } from '../services/google-calendar.service';
+import { HolidaysService } from '../services/holidays.service';
 import { AiSchedulerService, AiSuggestion } from '../services/ai-scheduler.service';
 import { AiChatService, ChatMessage, EventDraft, getProactiveReminders } from '../services/ai-chat.service';
+import { AiOrganizeService, OrganizedEvent, OrganizeResult } from '../services/ai-organize.service';
 import { BedrockChatService, ChatAction as BedrockAction } from '../services/bedrock-chat.service';
 import { I18nService } from '../services/i18n.service';
 
@@ -47,6 +49,9 @@ interface ScheduleForm {
   category: string;
   location: string;
   sharedWith: string[];  // emails to share with at creation time
+  repeatType: 'none' | 'weekly' | 'multiday';  // recurring type
+  repeatDays: boolean[];  // [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
+  repeatUntil: string;    // end date for weekly recurrence (YYYY-MM-DD)
 }
 
 // Helper to build a date string relative to today
@@ -437,6 +442,11 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   profileNewPassword = '';
   profileConfirmPassword = '';
   profileLanguage = 'en';
+  profileCountry = '';
+  profileRegion = '';
+  profileRegionMsg = '';
+  availableCountries: { code: string; name: string }[] = [];
+  availableRegions: string[] = [];
   profileAvatarPreview: string | null = null;
 
   // Profile feedback
@@ -504,6 +514,12 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.originalUsername = this.profile.username;
     this.originalLanguage = this.profile.language;
     this.originalAvatarUrl = this.profile.avatarUrl;
+    // Region/holidays
+    this.availableCountries = this.holidaysService.getCountries();
+    this.profileCountry = this.profile.region?.split(':')[0] ?? '';
+    this.profileRegion = this.profile.region?.split(':')[1] ?? '';
+    this.availableRegions = this.profileCountry ? this.holidaysService.getRegions(this.profileCountry) : [];
+    this.profileRegionMsg = '';
     this.activeTab = 'profile';
   }
 
@@ -601,6 +617,62 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   saveLanguage() {
     // Language change is now tracked by profileHasChanges and saved via saveProfile()
+  }
+
+  onCountryChange() {
+    this.availableRegions = this.profileCountry ? this.holidaysService.getRegions(this.profileCountry) : [];
+    this.profileRegion = '';
+    this.profileRegionMsg = '';
+  }
+
+  saveRegionAndLoadHolidays() {
+    if (!this.profileCountry) return;
+
+    // Save region to profile (stored as "CC:Region")
+    this.profile.region = this.profileRegion
+      ? `${this.profileCountry}:${this.profileRegion}`
+      : this.profileCountry;
+    this.mockAuth.saveProfile(this.profile);
+
+    // Remove any previously-added holiday events
+    this.events = this.events.filter(e => e.category !== 'Holidays');
+    // Also clean from localStorage
+    const cacheWithoutHolidays = this.events;
+    this.eventsService.bulkAddToCache([], this.userEmail); // we'll re-add below
+
+    // Generate holidays for this year and next year
+    const thisYear = new Date().getFullYear();
+    const holidays = [
+      ...this.holidaysService.getHolidays(this.profileCountry, this.profileRegion, thisYear),
+      ...this.holidaysService.getHolidays(this.profileCountry, this.profileRegion, thisYear + 1),
+    ];
+
+    // Convert to CalendarEvent
+    const newEvents: CalendarEvent[] = holidays.map(h => ({
+      id: `holiday_${h.date}_${h.title.replace(/\s/g, '_')}`,
+      title: h.title,
+      date: h.date,
+      startTime: '00:00',
+      endTime: '23:59',
+      description: h.type === 'national' ? 'National Holiday' : 'Regional Holiday',
+      color: '#ef4444',
+      category: 'Holidays',
+      sharedWith: [],
+    }));
+
+    // Merge into events
+    const existingIds = new Set(cacheWithoutHolidays.map(e => e.id));
+    const toAdd = newEvents.filter(e => !existingIds.has(e.id));
+    this.events = [...cacheWithoutHolidays, ...toAdd].sort(
+      (a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)
+    );
+
+    // Persist to localStorage
+    this.eventsService.bulkAddToCache(this.events, this.userEmail);
+
+    const countryName = this.availableCountries.find(c => c.code === this.profileCountry)?.name ?? this.profileCountry;
+    const regionLabel = this.profileRegion ? ` (${this.profileRegion})` : '';
+    this.profileRegionMsg = `Added ${toAdd.length} holidays for ${countryName}${regionLabel}.`;
   }
 
   confirmDeleteAccount() {
@@ -733,6 +805,127 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   historySearch = '';
   historyRestoreMsg = '';
   showScheduleModal = false;
+
+  // ── AI Organize ──
+  showOrganizeModal = false;
+  organizeInput = '';
+  organizeLoading = false;
+  organizeError = '';
+  organizeResult: OrganizeResult | null = null;
+  organizePreview: OrganizedEvent[] = [];
+  organizeAccepted = false;
+  organizeRemovedIndexes = new Set<number>();
+
+  openOrganizeModal() {
+    this.organizeInput = '';
+    this.organizeLoading = false;
+    this.organizeError = '';
+    this.organizeResult = null;
+    this.organizePreview = [];
+    this.organizeAccepted = false;
+    this.organizeRemovedIndexes = new Set();
+    this.showOrganizeModal = true;
+  }
+
+  closeOrganizeModal() {
+    this.showOrganizeModal = false;
+  }
+
+  async submitOrganize() {
+    const input = this.organizeInput.trim();
+    if (!input) {
+      this.organizeError = 'Please describe your schedule or activities.';
+      return;
+    }
+    this.organizeLoading = true;
+    this.organizeError = '';
+    this.organizeResult = null;
+    this.organizePreview = [];
+    this.organizeRemovedIndexes = new Set();
+
+    try {
+      const result = await this.aiOrganize.organize(
+        input,
+        this.events,
+        this.allCategories,
+      );
+      this.organizeResult = result;
+      this.organizePreview = result.events;
+      if (result.events.length === 0) {
+        this.organizeError = 'Could not parse any events from your description. Try being more specific with times and days.';
+      }
+    } catch (err: any) {
+      this.organizeError = err?.message || 'Something went wrong. Please try again.';
+    } finally {
+      this.organizeLoading = false;
+    }
+  }
+
+  removeOrganizedEvent(index: number) {
+    this.organizeRemovedIndexes.add(index);
+  }
+
+  resetOrganizePreview() {
+    this.organizeResult = null;
+    this.organizePreview = [];
+    this.organizeRemovedIndexes = new Set<number>();
+  }
+
+  get organizeVisibleEvents(): OrganizedEvent[] {
+    return this.organizePreview.filter((_, i) => !this.organizeRemovedIndexes.has(i));
+  }
+
+  async acceptOrganizedEvents() {
+    const eventsToAdd = this.organizeVisibleEvents;
+    if (eventsToAdd.length === 0) return;
+
+    const newEvents: CalendarEvent[] = eventsToAdd.map((ev, i) => ({
+      id: `${Date.now()}_org_${i}`,
+      title: ev.title,
+      date: ev.date,
+      startTime: ev.startTime,
+      endTime: ev.endTime,
+      description: ev.description || '',
+      color: ev.color || '#6c63ff',
+      category: ev.category || '',
+      sharedWith: [],
+    }));
+
+    // Add categories to saved list
+    if (this.organizeResult?.categories) {
+      for (const cat of this.organizeResult.categories) {
+        if (cat && !this.savedCategories.includes(cat)) {
+          this.savedCategories = [...this.savedCategories, cat];
+        }
+      }
+      this.persistCategories();
+    }
+
+    // Optimistically update UI
+    this.events = [...this.events, ...newEvents].sort(
+      (a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)
+    );
+    for (const ev of newEvents) {
+      this.recordHistory('added', ev);
+    }
+
+    this.organizeAccepted = true;
+
+    // Persist to DB in background
+    try {
+      const toCreate = newEvents.map(({ id: _id, ...rest }) => rest);
+      const saved = await this.eventsService.seedEvents(toCreate, this.userEmail);
+      const savedMap = new Map(saved.map((s, i) => [newEvents[i].id, s]));
+      this.events = this.events.map(e => savedMap.get(e.id) || e);
+    } catch (err) {
+      console.error('[AiOrganize] Failed to persist events:', err);
+    }
+
+    setTimeout(() => {
+      this.showOrganizeModal = false;
+      this.organizeAccepted = false;
+    }, 1500);
+  }
 
   // ── AI Chat ──
   chatMessages: ChatMessage[] = [];
@@ -2031,7 +2224,12 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     category: '',
     location: '',
     sharedWith: [],
+    repeatType: 'none',
+    repeatDays: [false, false, false, false, false, false, false],
+    repeatUntil: '',
   };
+
+  dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   isMultiDay = false;
 
@@ -2535,8 +2733,10 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     private notificationsService: NotificationsService,
     private categoryTreeService: CategoryTreeService,
     private googleCalendarService: GoogleCalendarService,
+    private holidaysService: HolidaysService,
     private aiScheduler: AiSchedulerService,
     private aiChatService: AiChatService,
+    private aiOrganize: AiOrganizeService,
     private bedrockChat: BedrockChatService,
     public i18n: I18nService,
   ) {}
@@ -3016,6 +3216,9 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       category: this.activeCategoryFilter || '',
       location: '',
       sharedWith: [],
+      repeatType: 'none',
+      repeatDays: [false, false, false, false, false, false, false],
+      repeatUntil: '',
     };
     this.isMultiDay = false;
     this.formShareInput = '';
@@ -3100,7 +3303,60 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.form.startTime = this.form.startTime.padStart(5, '0');
     this.form.endTime = this.form.endTime.padStart(5, '0');
 
-    if (this.isMultiDay) {
+    if (this.form.startTime >= this.form.endTime) {
+      this.scheduleError = 'End time must be after start time.';
+      return;
+    }
+
+    // ── Weekly recurring: generate events for each selected day until repeatUntil ──
+    if (this.form.repeatType === 'weekly') {
+      if (!this.form.repeatDays.some(d => d)) {
+        this.scheduleError = 'Please select at least one day of the week.';
+        return;
+      }
+      if (!this.form.repeatUntil) {
+        this.scheduleError = 'Please select an end date for the recurring event.';
+        return;
+      }
+      if (this.form.repeatUntil < this.form.date) {
+        this.scheduleError = 'Repeat until date must be after the start date.';
+        return;
+      }
+
+      const events: CalendarEvent[] = [];
+      const start = new Date(this.form.date + 'T00:00:00');
+      const end = new Date(this.form.repeatUntil + 'T00:00:00');
+      const cur = new Date(start);
+
+      while (cur <= end) {
+        if (this.form.repeatDays[cur.getDay()]) {
+          events.push({
+            id: `${Date.now()}_${events.length}`,
+            title: this.form.title.trim(),
+            date: cur.toISOString().split('T')[0],
+            startTime: this.form.startTime,
+            endTime: this.form.endTime,
+            description: this.form.description.trim(),
+            color: this.form.category ? this.getCategoryColor(this.form.category.trim()) : this.selectedColor,
+            category: this.form.category.trim(),
+            location: this.form.location.trim(),
+            sharedWith: [...this.form.sharedWith],
+          });
+        }
+        cur.setDate(cur.getDate() + 1);
+      }
+
+      if (events.length === 0) {
+        this.scheduleError = 'No events would be created with the selected days and date range.';
+        return;
+      }
+
+      this.addMultipleEventsAndClose(events);
+      return;
+    }
+
+    // ── Multi-day: create one event for each day in the range ──
+    if (this.form.repeatType === 'multiday') {
       if (!this.form.endDate) {
         this.scheduleError = 'Please select an end date.';
         return;
@@ -3109,9 +3365,40 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         this.scheduleError = 'End date must be on or after the start date.';
         return;
       }
-    } else {
-      if (this.form.startTime >= this.form.endTime) {
-        this.scheduleError = 'End time must be after start time.';
+
+      const events: CalendarEvent[] = [];
+      const start = new Date(this.form.date + 'T00:00:00');
+      const end = new Date(this.form.endDate + 'T00:00:00');
+      const cur = new Date(start);
+
+      while (cur <= end) {
+        events.push({
+          id: `${Date.now()}_${events.length}`,
+          title: this.form.title.trim(),
+          date: cur.toISOString().split('T')[0],
+          startTime: this.form.startTime,
+          endTime: this.form.endTime,
+          description: this.form.description.trim(),
+          color: this.form.category ? this.getCategoryColor(this.form.category.trim()) : this.selectedColor,
+          category: this.form.category.trim(),
+          location: this.form.location.trim(),
+          sharedWith: [...this.form.sharedWith],
+        });
+        cur.setDate(cur.getDate() + 1);
+      }
+
+      this.addMultipleEventsAndClose(events);
+      return;
+    }
+
+    // ── Single event (default) ──
+    if (this.isMultiDay) {
+      if (!this.form.endDate) {
+        this.scheduleError = 'Please select an end date.';
+        return;
+      }
+      if (this.form.endDate < this.form.date) {
+        this.scheduleError = 'End date must be on or after the start date.';
         return;
       }
     }
@@ -3178,6 +3465,33 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       }
     } catch (err) {
       console.error('[Dashboard] Failed to save event to DB:', err);
+    }
+  }
+
+  /** Add multiple events at once (for recurring/multi-day). */
+  private async addMultipleEventsAndClose(events: CalendarEvent[]) {
+    // Optimistically update the UI
+    this.events = [...this.events, ...events].sort(
+      (a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)
+    );
+    for (const ev of events) {
+      this.recordHistory('added', ev);
+    }
+    this.scheduleSuccess = true;
+    setTimeout(() => {
+      this.showScheduleModal = false;
+      this.scheduleSuccess = false;
+    }, 1200);
+
+    // Persist to DB in chunks
+    try {
+      const toCreate = events.map(({ id: _id, ...rest }) => rest);
+      const saved = await this.eventsService.seedEvents(toCreate, this.userEmail);
+      // Replace temp IDs with real DB IDs
+      const savedMap = new Map(saved.map((s, i) => [events[i].id, s]));
+      this.events = this.events.map(e => savedMap.get(e.id) || e);
+    } catch (err) {
+      console.error('[Dashboard] Failed to save recurring events to DB:', err);
     }
   }
 
@@ -3566,6 +3880,9 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       category: this.activeCategoryFilter || '',
       location: '',
       sharedWith: [],
+      repeatType: 'none',
+      repeatDays: [false, false, false, false, false, false, false],
+      repeatUntil: '',
     };
     this.isMultiDay = false;
     this.formShareInput = '';

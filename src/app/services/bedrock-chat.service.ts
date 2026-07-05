@@ -3,6 +3,7 @@ import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../../amplify/data/resource';
 import { CalendarEvent } from './events.service';
 import { ChatMessage } from './ai-chat.service';
+import { I18nService } from './i18n.service';
 
 export interface ChatAction {
   type: 'create_event' | 'create_recurring' | 'create_reminder' | 'navigate';
@@ -27,6 +28,8 @@ function getClient() {
 @Injectable({ providedIn: 'root' })
 export class BedrockChatService {
 
+  constructor(private i18n: I18nService) {}
+
   /**
    * Send a message to Claude via the Bedrock Lambda.
    * Returns the AI's response text and any parsed actions.
@@ -37,6 +40,7 @@ export class BedrockChatService {
     conversationHistory: ChatMessage[],
   ): Promise<{ text: string; actions: ChatAction[] }> {
     const today = new Date().toISOString().split('T')[0];
+    const lang = this.i18n.getLanguage();
 
     // Trim events to essential fields to save tokens
     const trimmedEvents = events.slice(0, 50).map(e => ({
@@ -53,9 +57,14 @@ export class BedrockChatService {
       text: m.text,
     }));
 
+    // Prepend language instruction to the message so the AI responds in the user's language
+    const langInstruction = lang !== 'en'
+      ? `[IMPORTANT: Respond in ${this.getLanguageName(lang)}. Do NOT respond in English.]\n\n`
+      : '';
+
     try {
       const { data, errors } = await getClient().queries.chat({
-        message,
+        message: langInstruction + message,
         events: JSON.stringify(trimmedEvents),
         today,
         conversationHistory: JSON.stringify(history),
@@ -77,6 +86,16 @@ export class BedrockChatService {
         actions: [],
       };
     }
+  }
+
+  private getLanguageName(code: string): string {
+    const map: Record<string, string> = {
+      en: 'English', es: 'Spanish', fr: 'French', de: 'German',
+      pt: 'Portuguese', zh: 'Chinese', ja: 'Japanese', ar: 'Arabic',
+      hi: 'Hindi', ko: 'Korean', it: 'Italian', ru: 'Russian',
+      nl: 'Dutch', sv: 'Swedish', pl: 'Polish', tr: 'Turkish',
+    };
+    return map[code] || 'English';
   }
 
   /**

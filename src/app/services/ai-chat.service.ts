@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { CalendarEvent } from './events.service';
 import { AiRemindersService, Reminder, ReminderSuggestion } from './ai-reminders.service';
 import { AiSchedulerService } from './ai-scheduler.service';
+import { I18nService, LangCode } from './i18n.service';
 
 export interface ChatMessage {
   id: string;
@@ -24,7 +25,7 @@ export interface ChatAction {
 
 /** Tracks the in-progress event being built through the chat wizard. */
 export interface EventDraft {
-  step: 'title' | 'duration' | 'date' | 'time' | 'category' | 'location' | 'description' | 'reminder' | 'invite' | 'confirm';
+  step: 'title' | 'duration' | 'date' | 'time' | 'endtime' | 'category' | 'location' | 'description' | 'reminder' | 'invite' | 'confirm';
   title?: string;
   durationMin?: number;
   date?: string;
@@ -205,16 +206,29 @@ function startOfWeek(dateStr: string): string {
   return d.toISOString().split('T')[0];
 }
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+// Locale mapping for date/time formatting
+const LANG_TO_LOCALE: Record<string, string> = {
+  en: 'en-US', es: 'es-ES', fr: 'fr-FR', de: 'de-DE', pt: 'pt-BR',
+  zh: 'zh-CN', ja: 'ja-JP', ar: 'ar-SA', hi: 'hi-IN', ko: 'ko-KR',
+  it: 'it-IT', ru: 'ru-RU', nl: 'nl-NL', sv: 'sv-SE', pl: 'pl-PL', tr: 'tr-TR',
+};
+
+/** Module-level language state — set before each reply to avoid threading lang through every call */
+let _currentLang = 'en';
+
+function getLocale(lang?: string): string {
+  return LANG_TO_LOCALE[lang || _currentLang] || 'en-US';
 }
 
-function formatTime(hhmm: string): string {
+function formatDate(dateStr: string, lang?: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString(getLocale(lang), { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function formatTime(hhmm: string, lang?: string): string {
   const [h, m] = hhmm.split(':').map(Number);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hour = h % 12 || 12;
-  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
+  const d = new Date(2000, 0, 1, h, m);
+  return d.toLocaleTimeString(getLocale(lang), { hour: 'numeric', minute: '2-digit' });
 }
 
 function eventsInRange(events: CalendarEvent[], from: string, to: string): CalendarEvent[] {
@@ -576,6 +590,7 @@ export class AiChatService {
   constructor(
     private remindersService: AiRemindersService,
     private scheduler: AiSchedulerService,
+    private i18n: I18nService,
   ) {}
 
   private detectIntent(text: string): string {
@@ -583,6 +598,49 @@ export class AiChatService {
       if (intent.patterns.some(p => p.test(text))) return intent.name;
     }
     return 'unknown';
+  }
+
+  /** Get current language code for locale-aware formatting */
+  private get lang(): string {
+    return this.i18n.getLanguage();
+  }
+
+  /** Translate common AI phrases to the current language */
+  private translateAiText(text: string): string {
+    const lang = this.lang;
+    if (lang === 'en') return text;
+
+    const phrases: Record<string, Record<string, string>> = {
+      'How can I help you?': { es: '¿Cómo puedo ayudarte?', fr: 'Comment puis-je vous aider ?', de: 'Wie kann ich helfen?', pt: 'Como posso ajudar?', it: 'Come posso aiutarti?', zh: '有什么我可以帮你的吗？', ja: 'どうお手伝いしましょうか？', ko: '무엇을 도와드릴까요?', ar: 'كيف يمكنني مساعدتك؟', hi: 'मैं आपकी कैसे मदद कर सकता हूं?', ru: 'Чем могу помочь?', nl: 'Hoe kan ik je helpen?', sv: 'Hur kan jag hjälpa dig?', pl: 'Jak mogę Ci pomóc?', tr: 'Size nasıl yardımcı olabilirim?' },
+      'Good morning': { es: 'Buenos días', fr: 'Bonjour', de: 'Guten Morgen', pt: 'Bom dia', it: 'Buongiorno', zh: '早上好', ja: 'おはようございます', ko: '좋은 아침이에요', ar: 'صباح الخير', hi: 'सुप्रभात', ru: 'Доброе утро', nl: 'Goedemorgen', sv: 'God morgon', pl: 'Dzień dobry', tr: 'Günaydın' },
+      'Good afternoon': { es: 'Buenas tardes', fr: 'Bon après-midi', de: 'Guten Tag', pt: 'Boa tarde', it: 'Buon pomeriggio', zh: '下午好', ja: 'こんにちは', ko: '좋은 오후에요', ar: 'مساء الخير', hi: 'नमस्ते', ru: 'Добрый день', nl: 'Goedemiddag', sv: 'God eftermiddag', pl: 'Dzień dobry', tr: 'İyi öğleden sonralar' },
+      'Good evening': { es: 'Buenas noches', fr: 'Bonsoir', de: 'Guten Abend', pt: 'Boa noite', it: 'Buonasera', zh: '晚上好', ja: 'こんばんは', ko: '좋은 저녁이에요', ar: 'مساء الخير', hi: 'शुभ संध्या', ru: 'Добрый вечер', nl: 'Goedenavond', sv: 'God kväll', pl: 'Dobry wieczór', tr: 'İyi akşamlar' },
+      'today': { es: 'hoy', fr: "aujourd'hui", de: 'heute', pt: 'hoje', it: 'oggi', zh: '今天', ja: '今日', ko: '오늘', ar: 'اليوم', hi: 'आज', ru: 'сегодня', nl: 'vandaag', sv: 'idag', pl: 'dziś', tr: 'bugün' },
+      'tomorrow': { es: 'mañana', fr: 'demain', de: 'morgen', pt: 'amanhã', it: 'domani', zh: '明天', ja: '明日', ko: '내일', ar: 'غداً', hi: 'कल', ru: 'завтра', nl: 'morgen', sv: 'imorgon', pl: 'jutro', tr: 'yarın' },
+      'this week': { es: 'esta semana', fr: 'cette semaine', de: 'diese Woche', pt: 'esta semana', it: 'questa settimana', zh: '本周', ja: '今週', ko: '이번 주', ar: 'هذا الأسبوع', hi: 'इस सप्ताह', ru: 'на этой неделе', nl: 'deze week', sv: 'den här veckan', pl: 'w tym tygodniu', tr: 'bu hafta' },
+      'next week': { es: 'la próxima semana', fr: 'la semaine prochaine', de: 'nächste Woche', pt: 'próxima semana', it: 'la prossima settimana', zh: '下周', ja: '来週', ko: '다음 주', ar: 'الأسبوع القادم', hi: 'अगले सप्ताह', ru: 'на следующей неделе', nl: 'volgende week', sv: 'nästa vecka', pl: 'w przyszłym tygodniu', tr: 'gelecek hafta' },
+      'event': { es: 'evento', fr: 'événement', de: 'Ereignis', pt: 'evento', it: 'evento', zh: '事件', ja: '予定', ko: '일정', ar: 'حدث', hi: 'इवेंट', ru: 'событие', nl: 'evenement', sv: 'händelse', pl: 'wydarzenie', tr: 'etkinlik' },
+      'events': { es: 'eventos', fr: 'événements', de: 'Ereignisse', pt: 'eventos', it: 'eventi', zh: '事件', ja: '予定', ko: '일정', ar: 'أحداث', hi: 'इवेंट्स', ru: 'событий', nl: 'evenementen', sv: 'händelser', pl: 'wydarzeń', tr: 'etkinlik' },
+      'Enjoy the free day!': { es: '¡Disfruta el día libre!', fr: 'Profitez de la journée libre !', de: 'Genieße den freien Tag!', pt: 'Aproveite o dia livre!', it: 'Goditi la giornata libera!', zh: '享受空闲的一天！', ja: '自由な一日を楽しんでください！', ko: '자유로운 하루를 즐기세요!', ar: 'استمتع بيومك الحر!', hi: 'खाली दिन का आनंद लें!', ru: 'Наслаждайтесь свободным днём!', nl: 'Geniet van de vrije dag!', sv: 'Njut av den lediga dagen!', pl: 'Ciesz się wolnym dniem!', tr: 'Boş gününün tadını çıkar!' },
+      'Happy to help!': { es: '¡Con gusto!', fr: 'Avec plaisir !', de: 'Gerne!', pt: 'Com prazer!', it: 'Felice di aiutare!', zh: '很高兴能帮到你！', ja: 'お役に立てて嬉しいです！', ko: '도움이 되어 기뻐요!', ar: 'سعيد بالمساعدة!', hi: 'मदद करके खुशी हुई!', ru: 'Рад помочь!', nl: 'Graag gedaan!', sv: 'Glad att jag kunde hjälpa!', pl: 'Cieszę się, że mogłem pomóc!', tr: 'Yardımcı olmaktan mutluluk duyarım!' },
+      'Anytime! Let me know if you need anything else.': { es: '¡Cuando quieras! Avísame si necesitas algo más.', fr: "N'hésitez pas si vous avez besoin d'autre chose.", de: 'Jederzeit! Sag mir, wenn du noch etwas brauchst.', pt: 'A qualquer hora! Me avise se precisar de mais alguma coisa.', it: 'Quando vuoi! Fammi sapere se hai bisogno di altro.', zh: '随时为你效劳！如果还需要其他帮助请告诉我。', ja: 'いつでもどうぞ！他に何かあれば教えてください。', ko: '언제든지요! 다른 것이 필요하시면 알려주세요.', ar: 'في أي وقت! أخبرني إذا كنت بحاجة لأي شيء آخر.', hi: 'कभी भी! अगर कुछ और चाहिए तो बताइए।', ru: 'Всегда пожалуйста! Обращайтесь, если что-то ещё нужно.', nl: 'Altijd! Laat me weten als je nog iets nodig hebt.', sv: 'När som helst! Hör av dig om du behöver något mer.', pl: 'Zawsze! Daj znać jeśli potrzebujesz czegoś jeszcze.', tr: 'Her zaman! Başka bir şeye ihtiyacın olursa haber ver.' },
+      "You're welcome! Anything else I can help with?": { es: '¡De nada! ¿Algo más en lo que pueda ayudar?', fr: 'De rien ! Autre chose ?', de: 'Bitte! Kann ich sonst noch helfen?', pt: 'De nada! Algo mais em que eu possa ajudar?', it: 'Prego! Posso aiutarti con qualcos altro?', zh: '不客气！还有什么我可以帮忙的吗？', ja: 'どういたしまして！他にお手伝いできることはありますか？', ko: '천만에요! 다른 도움이 필요하신가요?', ar: 'على الرحب والسعة! هل هناك شيء آخر يمكنني المساعدة فيه؟', hi: 'कोई बात नहीं! और कुछ मदद कर सकता हूं?', ru: 'Пожалуйста! Могу ещё чем-то помочь?', nl: 'Graag gedaan! Kan ik nog ergens mee helpen?', sv: 'Varsågod! Kan jag hjälpa med något mer?', pl: 'Nie ma za co! Czy mogę jeszcze w czymś pomóc?', tr: 'Rica ederim! Başka yardımcı olabileceğim bir şey var mı?' },
+      'Glad I could help!': { es: '¡Me alegra haber podido ayudar!', fr: 'Content de pouvoir aider !', de: 'Freut mich, dass ich helfen konnte!', pt: 'Fico feliz em ter ajudado!', it: 'Contento di aver potuto aiutare!', zh: '很高兴能帮到你！', ja: 'お役に立てて良かったです！', ko: '도움이 되어서 기뻐요!', ar: 'سعيد أنني استطعت المساعدة!', hi: 'खुशी है कि मैं मदद कर पाया!', ru: 'Рад, что смог помочь!', nl: 'Blij dat ik kon helpen!', sv: 'Glad att jag kunde hjälpa!', pl: 'Cieszę się, że mogłem pomóc!', tr: 'Yardımcı olabildiğime sevindim!' },
+      "Sure! Let's add a new event. What's the title?": { es: '¡Claro! Vamos a agregar un nuevo evento. ¿Cuál es el título?', fr: "Bien sûr ! Ajoutons un nouvel événement. Quel est le titre ?", de: 'Klar! Lass uns ein neues Ereignis hinzufügen. Wie lautet der Titel?', pt: 'Claro! Vamos adicionar um novo evento. Qual é o título?', it: "Certo! Aggiungiamo un nuovo evento. Qual è il titolo?", zh: '当然！让我们添加一个新事件。标题是什么？', ja: 'もちろん！新しい予定を追加しましょう。タイトルは何ですか？', ko: '물론이죠! 새 일정을 추가합시다. 제목이 무엇인가요?', ar: 'بالطبع! لنضف حدثاً جديداً. ما هو العنوان؟', hi: 'ज़रूर! चलिए एक नया इवेंट जोड़ते हैं। शीर्षक क्या है?', ru: 'Конечно! Давайте добавим новое событие. Какое название?', nl: 'Natuurlijk! Laten we een nieuw evenement toevoegen. Wat is de titel?', sv: 'Visst! Låt oss lägga till en ny händelse. Vad är titeln?', pl: 'Jasne! Dodajmy nowe wydarzenie. Jaki jest tytuł?', tr: 'Tabii! Yeni bir etkinlik ekleyelim. Başlık ne?' },
+      'You have nothing scheduled for today': { es: 'No tienes nada programado para hoy', fr: "Vous n'avez rien de prévu aujourd'hui", de: 'Du hast heute nichts geplant', pt: 'Você não tem nada agendado para hoje', it: 'Non hai nulla in programma per oggi', zh: '你今天没有安排', ja: '今日は予定がありません', ko: '오늘 예정된 일정이 없습니다', ar: 'لا شيء مجدول لليوم', hi: 'आज के लिए कुछ निर्धारित नहीं है', ru: 'На сегодня ничего не запланировано', nl: 'Je hebt vandaag niets gepland', sv: 'Du har inget schemalagt idag', pl: 'Nie masz nic zaplanowanego na dziś', tr: 'Bugün için planlanmış bir şey yok' },
+      'Nothing scheduled for tomorrow': { es: 'Nada programado para mañana', fr: 'Rien de prévu pour demain', de: 'Morgen ist nichts geplant', pt: 'Nada agendado para amanhã', it: 'Niente in programma per domani', zh: '明天没有安排', ja: '明日は予定がありません', ko: '내일 예정된 것이 없습니다', ar: 'لا شيء مجدول لغد', hi: 'कल के लिए कुछ निर्धारित नहीं है', ru: 'На завтра ничего не запланировано', nl: 'Morgen niets gepland', sv: 'Inget schemalagt imorgon', pl: 'Nic nie zaplanowano na jutro', tr: 'Yarın için planlanmış bir şey yok' },
+      'Your calendar is clear this week. Time to add something!': { es: '¡Tu calendario está vacío esta semana. Es hora de agregar algo!', fr: 'Votre calendrier est vide cette semaine. Ajoutez quelque chose !', de: 'Dein Kalender ist diese Woche leer. Zeit, etwas hinzuzufügen!', pt: 'Seu calendário está vazio esta semana. Hora de adicionar algo!', it: 'Il tuo calendario è vuoto questa settimana. È ora di aggiungere qualcosa!', zh: '你这周日程是空的。是时候添加一些安排了！', ja: '今週のカレンダーは空です。何か追加しましょう！', ko: '이번 주 캘린더가 비어있습니다. 무언가를 추가하세요!', ar: 'تقويمك فارغ هذا الأسبوع. حان الوقت لإضافة شيء!', hi: 'इस सप्ताह आपका कैलेंडर खाली है। कुछ जोड़ने का समय है!', ru: 'Ваш календарь на этой неделе пуст. Самое время что-то добавить!', nl: 'Je kalender is deze week leeg. Tijd om iets toe te voegen!', sv: 'Din kalender är tom den här veckan. Dags att lägga till något!', pl: 'Twój kalendarz jest pusty w tym tygodniu. Czas coś dodać!', tr: 'Bu hafta takviminiz boş. Bir şeyler eklemenin zamanı!' },
+      'No upcoming events found. Time to add something to your calendar!': { es: 'No se encontraron eventos próximos. ¡Es hora de agregar algo!', fr: 'Aucun événement à venir. Ajoutez quelque chose !', de: 'Keine kommenden Ereignisse. Zeit, etwas hinzuzufügen!', pt: 'Nenhum evento futuro encontrado. Hora de adicionar algo!', it: 'Nessun evento in arrivo. È ora di aggiungere qualcosa!', zh: '没有找到即将到来的事件。是时候添加一些了！', ja: '今後の予定が見つかりません。何か追加しましょう！', ko: '예정된 일정이 없습니다. 무언가를 추가하세요!', ar: 'لم يتم العثور على أحداث قادمة. حان الوقت لإضافة شيء!', hi: 'कोई आगामी इवेंट नहीं मिला। कुछ जोड़ने का समय है!', ru: 'Предстоящих событий не найдено. Самое время что-то добавить!', nl: 'Geen aankomende evenementen gevonden. Tijd om iets toe te voegen!', sv: 'Inga kommande händelser hittades. Dags att lägga till något!', pl: 'Nie znaleziono nadchodzących wydarzeń. Czas coś dodać!', tr: 'Yaklaşan etkinlik bulunamadı. Takviminize bir şeyler eklemenin zamanı!' },
+    };
+
+    let result = text;
+    // Replace exact phrase matches
+    for (const [en, translations] of Object.entries(phrases)) {
+      if (translations[lang] && result.includes(en)) {
+        result = result.replace(en, translations[lang]);
+      }
+    }
+    return result;
   }
 
   /**
@@ -596,6 +654,9 @@ export class AiChatService {
     userEmail: string,
     draft?: EventDraft | null,
   ): { message: ChatMessage; draft: EventDraft | null } {
+    // Set module-level language so formatDate/formatTime use the correct locale
+    _currentLang = this.i18n.getLanguage();
+
     const intent = this.detectIntent(userText);
     const t = today();
     let text = '';
@@ -688,14 +749,15 @@ export class AiChatService {
             }
             text = `Got it — **"${quickTitle}"** (${parsed.durationMin} min). What date works? (e.g. "tomorrow", "next Monday", "July 15")`;
           } else {
-            // Only have title — ask for duration
-            newDraft = { step: 'duration', title: quickTitle };
-            text = `Got it — **"${quickTitle}"**. How long should it be? (e.g. "1 hour", "30 minutes", "2 hours")`;
+            // Only have title — no other details provided.
+            // Ask for date first (most natural question: "when?")
+            newDraft = { step: 'date', title: quickTitle };
+            text = `Got it — **"${quickTitle}"**. I'll need a few details to add this to your calendar:\n\n📅 **What date is it on?** (e.g. "tomorrow", "next Monday", "July 15")`;
           }
         } else {
           // No title found — start from the beginning
           newDraft = { step: 'title' };
-          text = `Sure! Let's add a new event. What's the title?`;
+          text = `Sure! Let's add a new event. I'll need a few details:\n\n📌 **What's the event called?** (e.g. "Work", "Dentist appointment", "Soccer practice")`;
         }
         break;
       }
@@ -1202,7 +1264,7 @@ export class AiChatService {
       message: {
         id: `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`,
         role: 'assistant',
-        text,
+        text: this.translateAiText(text),
         timestamp: new Date(),
         actions: actions.length > 0 ? actions : undefined,
       },
@@ -1242,11 +1304,12 @@ export class AiChatService {
       case 'title': {
         const title = userText.trim();
         if (title.length < 2) {
-          return this.wizardMsg('Please give the event a title (at least 2 characters).', draft);
+          return this.wizardMsg('Please give the event a name (at least 2 characters).', draft);
         }
+        // After getting the title, ask for the date
         return this.wizardMsg(
-          `Got it — **"${title}"**. How long should it be? (e.g. "1 hour", "30 minutes", "2 hours")`,
-          { ...draft, step: 'duration', title },
+          `Got it — **"${title}"**. 📅 **What date is it on?** (e.g. "tomorrow", "next Monday", "July 15")`,
+          { ...draft, step: 'date', title },
         );
       }
 
@@ -1345,55 +1408,125 @@ export class AiChatService {
 
         // No startTime yet — ask the user what time
         return this.wizardMsg(
-          `Got it — **${formatDate(parsedDate)}**. What time does it start? (e.g. "9am", "2:30pm", "14:00")`,
+          `Got it — **${formatDate(parsedDate)}**. 🕐 **What time?** You can say:\n• A range like **"9am to 5pm"**\n• Or just the start time like **"9am"** and I'll ask when it ends.`,
           { ...draft, step: 'time', date: parsedDate },
         );
       }
 
       case 'time': {
-        // Parse a time from user input
+        // Check if user provided a range like "9am to 5pm" or "9-5"
+        const rangeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:to|until|-)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+        if (rangeMatch) {
+          const startTime = this.parseTimeStr(rangeMatch[1], rangeMatch[2], rangeMatch[3]);
+          const endTime = this.parseTimeStr(rangeMatch[4], rangeMatch[5], rangeMatch[6]);
+          const durMin = (parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]))
+            - (parseInt(startTime.split(':')[0]) * 60 + parseInt(startTime.split(':')[1]));
+          return this.buildConfirmStep({ ...draft, durationMin: durMin }, draft.date!, startTime, endTime, t);
+        }
+
+        // Parse a single time
         const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
         if (!timeMatch) {
           return this.wizardMsg(
-            `I didn't catch that. What time does it start? (e.g. "9am", "2:30pm", "14:00")`,
+            `I didn't catch that. What time? You can say:\n• A range like **"9am to 5pm"**\n• Or just the start time like **"9am"** and I'll ask how long.`,
             draft,
           );
         }
         const startTime = this.parseTimeStr(timeMatch[1], timeMatch[2], timeMatch[3]);
-        const dur = draft.durationMin ?? 60;
-        const endTime = this.addMinutesToTime(startTime, dur);
-        return this.buildConfirmStep(draft, draft.date!, startTime, endTime, t);
+
+        // If we already have a duration, compute end and move on
+        if (draft.durationMin) {
+          const endTime = this.addMinutesToTime(startTime, draft.durationMin);
+          return this.buildConfirmStep(draft, draft.date!, startTime, endTime, t);
+        }
+
+        // No duration yet — ask for end time or duration
+        return this.wizardMsg(
+          `Starts at **${formatTime(startTime)}**. When does it end? (e.g. "5pm", "10:30am")\n\n_Or tell me how long: "1 hour", "8 hours", "30 minutes"._`,
+          { ...draft, step: 'endtime', startTime },
+        );
+      }
+
+      case 'endtime': {
+        // Try parsing as a duration first
+        const dur = this.parseDuration(lower);
+        if (dur) {
+          const endTime = this.addMinutesToTime(draft.startTime!, dur);
+          return this.buildConfirmStep({ ...draft, durationMin: dur }, draft.date!, draft.startTime!, endTime, t);
+        }
+
+        // Try parsing as a time
+        const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+        if (timeMatch) {
+          const endTime = this.parseTimeStr(timeMatch[1], timeMatch[2], timeMatch[3]);
+          const startMin = parseInt(draft.startTime!.split(':')[0]) * 60 + parseInt(draft.startTime!.split(':')[1]);
+          const endMin = parseInt(endTime.split(':')[0]) * 60 + parseInt(endTime.split(':')[1]);
+          if (endMin <= startMin) {
+            return this.wizardMsg(
+              `The end time needs to be after **${formatTime(draft.startTime!)}**. What time does it end?`,
+              draft,
+            );
+          }
+          const durationMin = endMin - startMin;
+          return this.buildConfirmStep({ ...draft, durationMin }, draft.date!, draft.startTime!, endTime, t);
+        }
+
+        return this.wizardMsg(
+          `I didn't catch that. When does it end? (e.g. "5pm", "10:30am") or how long is it? (e.g. "1 hour", "8 hours")`,
+          draft,
+        );
       }
 
       case 'category': {
         const inferred = inferCategory(draft.title ?? '');
-        if (/\b(skip|default|same|sure)\b/i.test(lower)) {
-          // Use the inferred category
+        if (/\b(skip|default|same|sure|none)\b/i.test(lower)) {
           const updated = { ...draft, category: inferred.category, color: inferred.color };
-          return this.askForDescription(updated, inferred);
+          return this.buildFinalConfirm(updated);
         }
-        // Use what the user typed as the category
         const category = userText.trim();
         if (category.length < 1) {
           return this.wizardMsg(`Please enter a category name, or type "skip" to use **${inferred.category}**.`, draft);
         }
         const updated = { ...draft, category, color: draft.color || inferred.color };
-        return this.askForDescription(updated, inferred);
+        return this.buildFinalConfirm(updated);
       }
 
       case 'description': {
         if (/\b(skip|none|no|nope|nothing|n\/a)\b/i.test(lower)) {
-          // No description
           const updated = { ...draft, description: '' };
           return this.buildFinalConfirm(updated);
         }
-        // Use what the user typed as the description
         const description = userText.trim();
         const updated = { ...draft, description };
         return this.buildFinalConfirm(updated);
       }
 
       case 'confirm': {
+        // Handle optional "category: ___" command
+        const catMatch = userText.match(/^categor(?:y|ie)?[:\s]+(.+)$/i);
+        if (catMatch) {
+          const newCat = catMatch[1].trim();
+          const updated = { ...draft, category: newCat };
+          return this.buildFinalConfirm(updated);
+        }
+
+        // Handle optional "description: ___" or "note: ___" command
+        const descMatch = userText.match(/^(?:description|desc|note|notes)[:\s]+(.+)$/i);
+        if (descMatch) {
+          const newDesc = descMatch[1].trim();
+          const updated = { ...draft, description: newDesc };
+          return this.buildFinalConfirm(updated);
+        }
+
+        // Handle optional "share: email" command
+        const shareMatch = userText.match(/^share[:\s]+(.+)$/i);
+        if (shareMatch) {
+          const email = shareMatch[1].trim().toLowerCase();
+          const existing = (draft as any).sharedWith ?? [];
+          const updated = { ...draft, sharedWith: [...existing, email] } as any;
+          return this.buildFinalConfirm(updated);
+        }
+
         if (/\b(yes|yeah|yep|sure|ok|okay|confirm|add it|do it|looks good|perfect|great|sounds good|yup|correct)\b/i.test(lower)) {
           // Directly return the confirm action — no second tap needed
           return {
@@ -1413,7 +1546,7 @@ export class AiChatService {
                   description: draft.description ?? '',
                   color:       draft.color ?? inferCategory(draft.title ?? '').color,
                   category:    draft.category ?? inferCategory(draft.title ?? '').category,
-                  sharedWith:  [],
+                  sharedWith:  (draft as any).sharedWith ?? [],
                 },
               }],
             },
@@ -1426,7 +1559,7 @@ export class AiChatService {
             { ...draft, step: 'date' },
           );
         }
-        return this.wizardMsg(`Say **yes** to add it, or **no** to change the date/time.`, draft);
+        return this.wizardMsg(`Say **yes** to add it, or you can:\n• **"category: Work"** to change category\n• **"description: some note"** to add details\n• **"share: friend@email.com"** to share it\n• **"change"** to pick a new date/time`, draft);
       }
 
       default:
@@ -1441,6 +1574,7 @@ export class AiChatService {
     events: CalendarEvent[],
     t: string,
   ): { message: ChatMessage; draft: EventDraft | null } {
+    _currentLang = this.i18n.getLanguage();
     if (slotIndex === -1) {
       // User wants to type a date manually
       return this.wizardMsg(
@@ -1463,33 +1597,23 @@ export class AiChatService {
     endTime: string,
     _t: string,
   ): { message: ChatMessage; draft: EventDraft | null } {
-    // Instead of going directly to confirm, ask for category first (unless already set)
+    // Go directly to final confirm — category/description/sharing are optional
     const inferred = inferCategory(draft.title ?? '');
-    const updated: EventDraft = { ...draft, date, startTime, endTime };
-
-    if (!draft.category) {
-      // Ask for category — offer the inferred one as default
-      return this.wizardMsg(
-        `Got it — **${formatDate(date)}** at **${formatTime(startTime)}–${formatTime(endTime)}**.\n\nWhat category should this go under? (e.g. "Work", "Personal", "Health", "School")\n\n_I'd suggest **${inferred.category}** based on the title. Type that, a different one, or "skip" to use my suggestion._`,
-        { ...updated, step: 'category', color: inferred.color },
-      );
-    }
-
-    // If category is already set, check description
-    if (draft.description === undefined || draft.description === null) {
-      return this.askForDescription(updated, inferred);
-    }
-
-    // Everything filled — go to final confirm
+    const updated: EventDraft = {
+      ...draft,
+      date,
+      startTime,
+      endTime,
+      category: draft.category || inferred.category,
+      color: draft.color || inferred.color,
+    };
     return this.buildFinalConfirm(updated);
   }
 
-  private askForDescription(draft: EventDraft, inferred: { category: string; color: string }): { message: ChatMessage; draft: EventDraft | null } {
-    const category = draft.category || inferred.category;
-    const color = draft.color || inferred.color;
+  private askForDescription(draft: EventDraft, _inferred: { category: string; color: string }): { message: ChatMessage; draft: EventDraft | null } {
     return this.wizardMsg(
-      `Any description or notes for this event? (e.g. "Meeting with client about Q3 goals")\n\n_Type "skip" or "none" if you don't need one._`,
-      { ...draft, step: 'description', category, color },
+      `Any description or notes? (e.g. "Meeting with client about Q3 goals")\n\n_Type "skip" or "none" if you don't need one._`,
+      { ...draft, step: 'description' },
     );
   }
 
@@ -1502,6 +1626,7 @@ export class AiChatService {
 
     const updated: EventDraft = { ...draft, step: 'confirm', category, color };
     const descLine = draft.description ? `\n📝 ${draft.description}` : '';
+    const shareLine = (draft as any).sharedWith?.length ? `\n👥 Shared with: ${(draft as any).sharedWith.join(', ')}` : '';
     const actions: ChatAction[] = [
       {
         label: '✅ Add to Calendar',
@@ -1514,7 +1639,7 @@ export class AiChatService {
           description: draft.description ?? '',
           color,
           category,
-          sharedWith:  [],
+          sharedWith:  (draft as any).sharedWith ?? [],
         },
       },
       { label: 'Change date/time', type: 'pick_slot', slotIndex: -1 },
@@ -1523,7 +1648,7 @@ export class AiChatService {
       message: {
         id: `msg_${Date.now()}_w`,
         role: 'assistant',
-        text: `Here's the event I'll create:\n\n📌 **${draft.title}**\n📅 ${formatDate(draft.date!)}\n🕐 ${formatTime(draft.startTime!)} – ${formatTime(draft.endTime!)}\n🏷️ ${category}${descLine}\n\nLooks good?`,
+        text: `Here's the event I'll create:\n\n📌 **${draft.title}**\n📅 ${formatDate(draft.date!)}\n🕐 ${formatTime(draft.startTime!)} – ${formatTime(draft.endTime!)}\n🏷️ ${category}${descLine}${shareLine}\n\nSay **yes** to add it, or you can optionally:\n• Say **"category: ___"** to change the category\n• Say **"description: ___"** to add a note\n• Say **"share: email@example.com"** to share it with someone\n• Say **"change"** to pick a different date/time`,
         timestamp: new Date(),
         actions,
       },
@@ -1536,7 +1661,7 @@ export class AiChatService {
       message: {
         id: `msg_${Date.now()}_w`,
         role: 'assistant',
-        text,
+        text: this.translateAiText(text),
         timestamp: new Date(),
       },
       draft,

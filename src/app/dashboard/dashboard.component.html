@@ -304,6 +304,18 @@
           <button class="action-btn warning-btn" (click)="openStreakModal()">New</button>
         </div>
 
+        <!-- 6. AI Organize -->
+        <div class="action-card action-card-ai" (click)="openOrganizeModal()" style="cursor:pointer">
+          <div class="action-icon" style="background:linear-gradient(135deg, #ede9fe, #e0e7ff)">
+            <span style="font-size:24px">🤖</span>
+          </div>
+          <div class="action-body">
+            <h3 class="action-title">AI Organize</h3>
+            <p class="action-desc">Describe your schedule and let AI create events &amp; categories</p>
+          </div>
+          <button class="action-btn primary-btn" (click)="openOrganizeModal()">Go</button>
+        </div>
+
       </div>
 
       <!-- Active Streaks section -->
@@ -1448,6 +1460,38 @@
               <option *ngFor="let lang of LANGUAGES" [value]="lang.code">{{ lang.label }}</option>
             </select>
           </div>
+
+          <!-- Region / Holidays -->
+          <div class="profile-field-group" style="margin-top:16px">
+            <label class="profile-label">Region (for holidays)</label>
+            <div class="profile-region-row">
+              <select
+                class="profile-input profile-select"
+                [(ngModel)]="profileCountry"
+                (ngModelChange)="onCountryChange()"
+                name="profileCountry"
+              >
+                <option value="">Select country…</option>
+                <option *ngFor="let c of availableCountries" [value]="c.code">{{ c.name }}</option>
+              </select>
+              <select
+                class="profile-input profile-select"
+                [(ngModel)]="profileRegion"
+                name="profileRegion"
+                *ngIf="availableRegions.length > 0"
+              >
+                <option value="">All (national only)</option>
+                <option *ngFor="let r of availableRegions" [value]="r">{{ r }}</option>
+              </select>
+            </div>
+            <button
+              class="btn-primary"
+              style="align-self:flex-start;margin-top:10px"
+              (click)="saveRegionAndLoadHolidays()"
+              [disabled]="!profileCountry"
+            >Update Holidays</button>
+            <p class="profile-field-success" *ngIf="profileRegionMsg">✓ {{ profileRegionMsg }}</p>
+          </div>
         </div>
 
         <!-- ── Sign Out card ── -->
@@ -2388,7 +2432,7 @@
             required
           />
         </div>
-        <div class="field" *ngIf="isMultiDay">
+        <div class="field" *ngIf="form.repeatType === 'multiday'">
           <label for="event-end-date">End Date</label>
           <input
             id="event-end-date"
@@ -2401,17 +2445,44 @@
         </div>
       </div>
 
-      <div class="field multi-day-toggle">
-        <label class="toggle-label">
-          <input
-            type="checkbox"
-            [(ngModel)]="isMultiDay"
-            name="isMultiDay"
-            class="toggle-checkbox"
-          />
-          <span class="toggle-switch"></span>
-          <span class="toggle-text">Multi-day event</span>
-        </label>
+      <!-- Repeat type selector -->
+      <div class="field">
+        <label>Repeat</label>
+        <div class="repeat-type-pills">
+          <button type="button" class="repeat-pill" [class.active]="form.repeatType === 'none'" (click)="form.repeatType = 'none'">One-time</button>
+          <button type="button" class="repeat-pill" [class.active]="form.repeatType === 'weekly'" (click)="form.repeatType = 'weekly'">Weekly</button>
+          <button type="button" class="repeat-pill" [class.active]="form.repeatType === 'multiday'" (click)="form.repeatType = 'multiday'">Multi-day</button>
+        </div>
+      </div>
+
+      <!-- Weekly: day selector + until date -->
+      <div class="field repeat-weekly-options" *ngIf="form.repeatType === 'weekly'">
+        <label>Repeat on</label>
+        <div class="repeat-day-grid">
+          <button
+            type="button"
+            class="repeat-day-btn"
+            *ngFor="let day of dayNames; let i = index"
+            [class.active]="form.repeatDays[i]"
+            (click)="form.repeatDays[i] = !form.repeatDays[i]"
+          >{{ day }}</button>
+        </div>
+        <label style="margin-top:12px">Until</label>
+        <input
+          type="date"
+          [(ngModel)]="form.repeatUntil"
+          name="repeatUntil"
+          [min]="form.date"
+          class="repeat-until-input"
+        />
+        <p class="repeat-hint" *ngIf="form.repeatDays.some(d => d) && form.repeatUntil">
+          Creates events every {{ form.repeatDays.map((d, i) => d ? dayNames[i] : '').filter(d => d).join(', ') }} from {{ form.date }} until {{ form.repeatUntil }}
+        </p>
+      </div>
+
+      <!-- Multi-day hint -->
+      <div class="field" *ngIf="form.repeatType === 'multiday'">
+        <p class="repeat-hint">The event will be created on each day from the start date to the end date with the same time.</p>
       </div>
 
       <div class="field-row">
@@ -2766,6 +2837,111 @@
         <button class="btn-secondary" (click)="closeShareModal()">{{ i18n.t('cancel') }}</button>
         <button class="btn-primary" (click)="confirmShare()">{{ i18n.t('shareEvent') }}</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── AI ORGANIZE MODAL ── -->
+<div class="modal-overlay" *ngIf="showOrganizeModal" (click)="closeOrganizeModal()">
+  <div class="modal organize-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>🤖 AI Organize</h3>
+      <button class="modal-close" (click)="closeOrganizeModal()">✕</button>
+    </div>
+
+    <!-- Success banner -->
+    <div class="success-banner" *ngIf="organizeAccepted">
+      ✓ {{ organizeVisibleEvents.length }} events added to your calendar!
+    </div>
+
+    <div class="modal-form" *ngIf="!organizeAccepted">
+
+      <!-- Input step -->
+      <div *ngIf="!organizeResult">
+        <div class="organize-intro">
+          <p>Describe your schedule, activities, or routine and the AI will create events and categories for you.</p>
+        </div>
+
+        <div class="field">
+          <label for="organize-input">Your schedule</label>
+          <textarea
+            id="organize-input"
+            [(ngModel)]="organizeInput"
+            name="organizeInput"
+            placeholder="e.g. I have soccer practice Mon/Wed/Fri 4-5:30pm, AP Calculus class every weekday 8-9am, piano lessons Tuesdays 3-4pm, and I work at the café on weekends 10am-3pm"
+            rows="5"
+            [disabled]="organizeLoading"
+          ></textarea>
+        </div>
+
+        <div class="organize-examples">
+          <span class="organize-examples-label">Try:</span>
+          <button class="organize-example-chip" (click)="organizeInput = 'Soccer practice Mon/Wed/Fri 4-5:30pm, Math tutoring Tuesdays 3-4pm, Work shift Sat/Sun 9am-3pm'">Sports + School + Work</button>
+          <button class="organize-example-chip" (click)="organizeInput = 'Gym every morning 6-7am, Team standup at 9:30am weekdays, Lunch with Sarah Thursday 12:30pm, Date night Friday 7pm'">Fitness + Work + Social</button>
+          <button class="organize-example-chip" (click)="organizeInput = 'AP Chemistry MWF 10-11am, Debate club Thursdays 3:30-5pm, Orchestra rehearsal Wednesdays 4-5:30pm, SAT prep Saturdays 10am-12pm'">Full student schedule</button>
+        </div>
+
+        <div class="organize-error" *ngIf="organizeError">{{ organizeError }}</div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="closeOrganizeModal()">Cancel</button>
+          <button class="btn-primary" (click)="submitOrganize()" [disabled]="organizeLoading">
+            <span *ngIf="!organizeLoading">✨ Organize</span>
+            <span *ngIf="organizeLoading" class="organize-loading">
+              <span class="spinner-inline"></span> Thinking...
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Preview step -->
+      <div *ngIf="organizeResult" class="organize-preview">
+        <div class="organize-summary">
+          <span class="organize-summary-icon">✨</span>
+          <span>{{ organizeResult.summary }}</span>
+        </div>
+
+        <!-- Categories created -->
+        <div class="organize-categories" *ngIf="organizeResult.categories.length > 0">
+          <span class="organize-cat-label">Categories:</span>
+          <span class="organize-cat-chip" *ngFor="let cat of organizeResult.categories">{{ cat }}</span>
+        </div>
+
+        <!-- Event list -->
+        <div class="organize-events-list">
+          <div
+            class="organize-event-item"
+            *ngFor="let ev of organizePreview; let i = index"
+            [class.removed]="organizeRemovedIndexes.has(i)"
+          >
+            <span class="organize-event-dot" [style.background]="ev.color"></span>
+            <div class="organize-event-info">
+              <span class="organize-event-title">{{ ev.title }}</span>
+              <span class="organize-event-meta">{{ ev.date }} · {{ ev.startTime }}–{{ ev.endTime }}</span>
+              <span class="organize-event-cat">{{ ev.category }}</span>
+            </div>
+            <button
+              class="organize-event-remove"
+              *ngIf="!organizeRemovedIndexes.has(i)"
+              (click)="removeOrganizedEvent(i)"
+              title="Remove this event"
+            >✕</button>
+            <span class="organize-event-removed-label" *ngIf="organizeRemovedIndexes.has(i)">Removed</span>
+          </div>
+        </div>
+
+        <div class="organize-event-count">
+          {{ organizeVisibleEvents.length }} of {{ organizePreview.length }} events will be added
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="resetOrganizePreview()">← Back</button>
+          <button class="btn-primary" (click)="acceptOrganizedEvents()" [disabled]="organizeVisibleEvents.length === 0">
+            ✓ Add {{ organizeVisibleEvents.length }} Events
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>

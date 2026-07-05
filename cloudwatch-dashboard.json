@@ -1,0 +1,64 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "CloudWatch Dashboard for DigitalAIAgenda App (Amplify Angular + Bedrock)",
+  "Parameters": {
+    "AppName": {
+      "Type": "String",
+      "Default": "digitalaiagenda",
+      "Description": "Name prefix for the dashboard"
+    },
+    "AmplifyBranch": {
+      "Type": "String",
+      "Default": "main",
+      "Description": "The Amplify branch name (main, dev, etc.)"
+    },
+    "LambdaFunctionName": {
+      "Type": "String",
+      "Description": "Name of the bedrock-chat Lambda function. Check Lambda console — typically: amplify-digitalaiagenda-<branch>-bedrock-chat-<hash>"
+    },
+    "AppSyncApiId": {
+      "Type": "String",
+      "Description": "AppSync GraphQL API ID. Check AppSync console → APIs → Settings"
+    },
+    "UserPoolId": {
+      "Type": "String",
+      "Description": "Cognito User Pool ID (e.g. us-east-1_XXXXXXXXX). Check Cognito console → User Pools"
+    },
+    "CalendarEventTableName": {
+      "Type": "String",
+      "Description": "DynamoDB table for CalendarEvent. Typically: CalendarEvent-<appsync-api-id>-NONE"
+    },
+    "NotificationTableName": {
+      "Type": "String",
+      "Description": "DynamoDB table for Notification. Typically: Notification-<appsync-api-id>-NONE"
+    },
+    "Region": {
+      "Type": "String",
+      "Default": "us-east-1",
+      "Description": "AWS region where resources are deployed"
+    }
+  },
+  "Resources": {
+    "AgendaDashboard": {
+      "Type": "AWS::CloudWatch::Dashboard",
+      "Properties": {
+        "DashboardName": { "Fn::Sub": "${AppName}-monitoring" },
+        "DashboardBody": {
+          "Fn::Sub": "{\"widgets\":[{\"height\":2,\"width\":24,\"y\":0,\"x\":0,\"type\":\"text\",\"properties\":{\"markdown\":\"# Agenda App Dashboard\\n---\",\"background\":\"transparent\"}},{\"height\":1,\"width\":24,\"y\":2,\"x\":0,\"type\":\"text\",\"properties\":{\"markdown\":\"## Lambda — bedrock-chat\",\"background\":\"transparent\"}},{\"height\":6,\"width\":6,\"y\":3,\"x\":0,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/Lambda\",\"Invocations\",\"FunctionName\",\"${LambdaFunctionName}\",{\"stat\":\"Sum\",\"color\":\"#2ca02c\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"Lambda Invocations\",\"period\":300}},{\"height\":6,\"width\":6,\"y\":3,\"x\":6,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/Lambda\",\"Errors\",\"FunctionName\",\"${LambdaFunctionName}\",{\"stat\":\"Sum\",\"color\":\"#d62728\"}],[\"AWS/Lambda\",\"Throttles\",\"FunctionName\",\"${LambdaFunctionName}\",{\"stat\":\"Sum\",\"color\":\"#ff7f0e\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"Lambda Errors & Throttles\",\"period\":300}},{\"height\":6,\"width\":6,\"y\":3,\"x\":12,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/Lambda\",\"Duration\",\"FunctionName\",\"${LambdaFunctionName}\",{\"stat\":\"Average\",\"color\":\"#1f77b4\"}],[\"AWS/Lambda\",\"Duration\",\"FunctionName\",\"${LambdaFunctionName}\",{\"stat\":\"p99\",\"color\":\"#9467bd\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"Lambda Duration (avg & p99)\",\"period\":300}},{\"height\":6,\"width\":6,\"y\":3,\"x\":18,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/Lambda\",\"ConcurrentExecutions\",\"FunctionName\",\"${LambdaFunctionName}\",{\"stat\":\"Maximum\",\"color\":\"#8c564b\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"Lambda Concurrent Executions\",\"period\":300}},{\"height\":1,\"width\":24,\"y\":9,\"x\":0,\"type\":\"text\",\"properties\":{\"markdown\":\"## AppSync — GraphQL API\",\"background\":\"transparent\"}},{\"height\":6,\"width\":8,\"y\":10,\"x\":0,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/AppSync\",\"4XXError\",\"GraphQLAPIId\",\"${AppSyncApiId}\",{\"stat\":\"Sum\",\"color\":\"#ff7f0e\"}],[\"AWS/AppSync\",\"5XXError\",\"GraphQLAPIId\",\"${AppSyncApiId}\",{\"stat\":\"Sum\",\"color\":\"#d62728\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"AppSync Errors (4XX / 5XX)\",\"period\":300}},{\"height\":6,\"width\":8,\"y\":10,\"x\":8,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/AppSync\",\"Latency\",\"GraphQLAPIId\",\"${AppSyncApiId}\",{\"stat\":\"Average\",\"color\":\"#1f77b4\"}],[\"AWS/AppSync\",\"Latency\",\"GraphQLAPIId\",\"${AppSyncApiId}\",{\"stat\":\"p99\",\"color\":\"#9467bd\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"AppSync Latency (avg & p99)\",\"period\":300}},{\"height\":6,\"width\":8,\"y\":10,\"x\":16,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/AppSync\",\"ConnectSuccess\",\"GraphQLAPIId\",\"${AppSyncApiId}\",{\"stat\":\"Sum\",\"color\":\"#2ca02c\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"AppSync Connect Success\",\"period\":300}},{\"height\":1,\"width\":24,\"y\":16,\"x\":0,\"type\":\"text\",\"properties\":{\"markdown\":\"## DynamoDB — CalendarEvent & Notification Tables\",\"background\":\"transparent\"}},{\"height\":6,\"width\":8,\"y\":17,\"x\":0,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/DynamoDB\",\"ConsumedReadCapacityUnits\",\"TableName\",\"${CalendarEventTableName}\",{\"stat\":\"Sum\",\"color\":\"#1f77b4\"}],[\"AWS/DynamoDB\",\"ConsumedReadCapacityUnits\",\"TableName\",\"${NotificationTableName}\",{\"stat\":\"Sum\",\"color\":\"#2ca02c\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"DynamoDB Read Capacity Consumed\",\"period\":300}},{\"height\":6,\"width\":8,\"y\":17,\"x\":8,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/DynamoDB\",\"ConsumedWriteCapacityUnits\",\"TableName\",\"${CalendarEventTableName}\",{\"stat\":\"Sum\",\"color\":\"#ff7f0e\"}],[\"AWS/DynamoDB\",\"ConsumedWriteCapacityUnits\",\"TableName\",\"${NotificationTableName}\",{\"stat\":\"Sum\",\"color\":\"#d62728\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"DynamoDB Write Capacity Consumed\",\"period\":300}},{\"height\":6,\"width\":8,\"y\":17,\"x\":16,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/DynamoDB\",\"ThrottledRequests\",\"TableName\",\"${CalendarEventTableName}\",{\"stat\":\"Sum\",\"color\":\"#d62728\"}],[\"AWS/DynamoDB\",\"ThrottledRequests\",\"TableName\",\"${NotificationTableName}\",{\"stat\":\"Sum\",\"color\":\"#ff7f0e\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"DynamoDB Throttled Requests\",\"period\":300}},{\"height\":1,\"width\":24,\"y\":23,\"x\":0,\"type\":\"text\",\"properties\":{\"markdown\":\"## Cognito — User Pool\",\"background\":\"transparent\"}},{\"height\":6,\"width\":8,\"y\":24,\"x\":0,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/Cognito\",\"SignUpSuccesses\",\"UserPool\",\"${UserPoolId}\",{\"stat\":\"Sum\",\"color\":\"#2ca02c\"}],[\"AWS/Cognito\",\"SignInSuccesses\",\"UserPool\",\"${UserPoolId}\",{\"stat\":\"Sum\",\"color\":\"#1f77b4\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"Cognito Sign-Up & Sign-In\",\"period\":300}},{\"height\":6,\"width\":8,\"y\":24,\"x\":8,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/Cognito\",\"TokenRefreshSuccesses\",\"UserPool\",\"${UserPoolId}\",{\"stat\":\"Sum\",\"color\":\"#9467bd\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"Cognito Token Refreshes\",\"period\":300}},{\"height\":6,\"width\":8,\"y\":24,\"x\":16,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/Cognito\",\"CallCount\",\"UserPool\",\"${UserPoolId}\",{\"stat\":\"Sum\",\"color\":\"#8c564b\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"Cognito API Call Count\",\"period\":300}},{\"height\":1,\"width\":24,\"y\":30,\"x\":0,\"type\":\"text\",\"properties\":{\"markdown\":\"## Amazon Bedrock — Nova Lite Model\",\"background\":\"transparent\"}},{\"height\":6,\"width\":8,\"y\":31,\"x\":0,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/Bedrock\",\"Invocations\",\"ModelId\",\"us.amazon.nova-lite-v1:0\",{\"stat\":\"Sum\",\"color\":\"#2ca02c\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"Bedrock Invocations\",\"period\":300}},{\"height\":6,\"width\":8,\"y\":31,\"x\":8,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/Bedrock\",\"InvocationLatency\",\"ModelId\",\"us.amazon.nova-lite-v1:0\",{\"stat\":\"Average\",\"color\":\"#1f77b4\"}],[\"AWS/Bedrock\",\"InvocationLatency\",\"ModelId\",\"us.amazon.nova-lite-v1:0\",{\"stat\":\"p99\",\"color\":\"#9467bd\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"Bedrock Latency (avg & p99)\",\"period\":300}},{\"height\":6,\"width\":8,\"y\":31,\"x\":16,\"type\":\"metric\",\"properties\":{\"metrics\":[[\"AWS/Bedrock\",\"InputTokenCount\",\"ModelId\",\"us.amazon.nova-lite-v1:0\",{\"stat\":\"Sum\",\"color\":\"#ff7f0e\"}],[\"AWS/Bedrock\",\"OutputTokenCount\",\"ModelId\",\"us.amazon.nova-lite-v1:0\",{\"stat\":\"Sum\",\"color\":\"#2ca02c\"}]],\"view\":\"timeSeries\",\"stacked\":false,\"region\":\"${Region}\",\"title\":\"Bedrock Token Usage (In/Out)\",\"period\":300}}]}"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "DashboardURL": {
+      "Description": "Direct link to the CloudWatch dashboard",
+      "Value": {
+        "Fn::Sub": "https://${Region}.console.aws.amazon.com/cloudwatch/home?region=${Region}#dashboards:name=${AppName}-monitoring"
+      }
+    },
+    "FindResourceNames": {
+      "Description": "Run these CLI commands to find your resource names",
+      "Value": "aws lambda list-functions --query \"Functions[?contains(FunctionName,'bedrock-chat')].FunctionName\" --output text | aws appsync list-graphql-apis --query \"graphqlApis[?contains(name,'digitalaiagenda')].apiId\" --output text | aws cognito-idp list-user-pools --max-results 10 --query \"UserPools[?contains(Name,'digitalaiagenda')].Id\" --output text | aws dynamodb list-tables --query \"TableNames[?contains(@,'CalendarEvent')]\" --output text"
+    }
+  }
+}
