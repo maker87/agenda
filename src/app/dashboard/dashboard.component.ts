@@ -2231,6 +2231,17 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+  get repeatHintVisible(): boolean {
+    return this.form.repeatDays.some(d => d) && !!this.form.repeatUntil;
+  }
+
+  get repeatDaysSummary(): string {
+    return this.form.repeatDays
+      .map((d, i) => d ? this.dayNames[i] : '')
+      .filter(d => d)
+      .join(', ');
+  }
+
   isMultiDay = false;
 
   events: CalendarEvent[] = [];

@@ -2475,8 +2475,8 @@
           [min]="form.date"
           class="repeat-until-input"
         />
-        <p class="repeat-hint" *ngIf="form.repeatDays.some(d => d) && form.repeatUntil">
-          Creates events every {{ form.repeatDays.map((d, i) => d ? dayNames[i] : '').filter(d => d).join(', ') }} from {{ form.date }} until {{ form.repeatUntil }}
+        <p class="repeat-hint" *ngIf="repeatHintVisible">
+          Creates events every {{ repeatDaysSummary }} from {{ form.date }} until {{ form.repeatUntil }}
         </p>
       </div>
 
