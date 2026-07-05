@@ -52,34 +52,6 @@
         <span *ngIf="loading" class="spinner"></span>
       </button>
 
-      <!-- Demo account quick-fill -->
-      <div class="demo-accounts">
-        <p class="demo-label">Try a demo account</p>
-        <div class="demo-btns">
-          <button type="button" class="demo-btn" (click)="fillDemo('demo@agenda.com', 'Demo1234!')">
-            <span class="demo-icon">👤</span>
-            <span class="demo-info">
-              <span class="demo-name">Demo</span>
-              <span class="demo-email">demo&#64;agenda.com</span>
-            </span>
-          </button>
-          <button type="button" class="demo-btn" (click)="fillDemo('alex.student@school.edu', 'Student1234!')">
-            <span class="demo-icon">🎓</span>
-            <span class="demo-info">
-              <span class="demo-name">Student</span>
-              <span class="demo-email">alex.student&#64;school.edu</span>
-            </span>
-          </button>
-          <button type="button" class="demo-btn" (click)="fillDemo('jordan.coach@fitlife.com', 'Coach1234!')">
-            <span class="demo-icon">💪</span>
-            <span class="demo-info">
-              <span class="demo-name">Coach</span>
-              <span class="demo-email">jordan.coach&#64;fitlife.com</span>
-            </span>
-          </button>
-        </div>
-      </div>
-
       <p class="switch-link">
         Don't have an account?
         <button type="button" class="link-btn" (click)="switchView('signup')">Sign up</button>

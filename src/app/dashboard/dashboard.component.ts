@@ -17,6 +17,7 @@ interface CalendarEvent {
   id: string;
   title: string;
   date: string;
+  endDate?: string;
   startTime: string;
   endTime: string;
   description: string;
@@ -39,6 +40,7 @@ interface HistoryEntry {
 interface ScheduleForm {
   title: string;
   date: string;
+  endDate: string;
   startTime: string;
   endTime: string;
   description: string;
@@ -634,146 +636,89 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   gcalImportCount = 0;
   activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly' = 'schedule';
 
-  // ── Daily Goal Streak ──
-  dailyGoal = 1; // minimum events per day to count as "goal met"
-  currentStreak = 0;
-  longestStreak = 0;
-  streakHistory: { date: string; met: boolean }[] = []; // last 14 days
-  todayGoalMet = false;
-  streakInactiveWarning = false; // true when user missed 7+ consecutive days
-  streakDisabled = false; // true if user chose to cancel streak tracking
+  // ── Streaks ──
+  private readonly STREAKS_KEY = 'agenda_streaks';
+  streaks: { id: string; name: string; checkedDays: string[] }[] = [];
+  showStreakModal = false;
+  streakFormName = '';
+  streakFormError = '';
 
-  private readonly STREAK_KEY_PREFIX = 'agenda_streak_';
+  loadStreaks() {
+    try {
+      const raw = localStorage.getItem(this.STREAKS_KEY);
+      this.streaks = raw ? JSON.parse(raw) : [];
+    } catch { this.streaks = []; }
+  }
 
-  private computeStreak() {
-    // If streak tracking is disabled, skip computation
-    if (this.streakDisabled) return;
+  private saveStreaks() {
+    localStorage.setItem(this.STREAKS_KEY, JSON.stringify(this.streaks));
+  }
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    const days: { date: string; met: boolean }[] = [];
-    let streak = 0;
-    let longest = 0;
-    let tempStreak = 0;
+  openStreakModal() {
+    this.showStreakModal = true;
+    this.streakFormName = '';
+    this.streakFormError = '';
+  }
 
-    // Check last 14 days
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date();
+  closeStreakModal() {
+    this.showStreakModal = false;
+  }
+
+  createStreak() {
+    const name = this.streakFormName.trim();
+    if (!name) { this.streakFormError = 'Give your streak a name.'; return; }
+    if (this.streaks.find(s => s.name === name)) { this.streakFormError = 'A streak with that name already exists.'; return; }
+    this.streaks = [...this.streaks, { id: `streak_${Date.now()}`, name, checkedDays: [] }];
+    this.saveStreaks();
+    this.closeStreakModal();
+  }
+
+  deleteStreak(id: string) {
+    this.streaks = this.streaks.filter(s => s.id !== id);
+    this.saveStreaks();
+  }
+
+  toggleStreakDay(streak: { id: string; name: string; checkedDays: string[] }, dateStr: string) {
+    if (dateStr > new Date().toISOString().split('T')[0]) return;
+    const idx = streak.checkedDays.indexOf(dateStr);
+    if (idx >= 0) {
+      streak.checkedDays = streak.checkedDays.filter(d => d !== dateStr);
+    } else {
+      streak.checkedDays = [...streak.checkedDays, dateStr].sort();
+    }
+    this.saveStreaks();
+  }
+
+  getStreakCount(streak: { checkedDays: string[] }): number {
+    const today = new Date().toISOString().split('T')[0];
+    const sorted = [...streak.checkedDays].sort().reverse();
+    if (sorted.length === 0) return 0;
+    let count = 0;
+    const cursor = new Date(today + 'T12:00:00');
+    // Allow starting from yesterday if today isn't checked
+    if (!sorted.includes(today) && sorted.length > 0) {
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    for (const day of sorted) {
+      const expected = cursor.toISOString().split('T')[0];
+      if (day === expected) { count++; cursor.setDate(cursor.getDate() - 1); }
+      else if (day < expected) break;
+    }
+    return count;
+  }
+
+  getStreakWeek(streak: { checkedDays: string[] }): { date: string; label: string; checked: boolean; isToday: boolean; isFuture: boolean }[] {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const days: { date: string; label: string; checked: boolean; isToday: boolean; isFuture: boolean }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
-      const eventsOnDay = this.events.filter(e => e.date === dateStr);
-      const met = eventsOnDay.length >= this.dailyGoal;
-      days.push({ date: dateStr, met });
-
-      if (met) {
-        tempStreak++;
-        if (tempStreak > longest) longest = tempStreak;
-      } else {
-        tempStreak = 0;
-      }
+      days.push({ date: dateStr, label: dayNames[d.getDay()], checked: streak.checkedDays.includes(dateStr), isToday: dateStr === todayStr, isFuture: dateStr > todayStr });
     }
-
-    // Current streak: count backwards from today/yesterday
-    streak = 0;
-    for (let i = 0; i >= -13; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      const dateStr = d.toISOString().split('T')[0];
-      // Skip today if it hasn't been met yet (don't break streak for an incomplete today)
-      if (i === 0) {
-        const todayEvts = this.events.filter(e => e.date === dateStr);
-        this.todayGoalMet = todayEvts.length >= this.dailyGoal;
-        if (this.todayGoalMet) {
-          streak++;
-        }
-        continue;
-      }
-      const eventsOnDay = this.events.filter(e => e.date === dateStr);
-      if (eventsOnDay.length >= this.dailyGoal) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-
-    this.currentStreak = streak;
-    this.longestStreak = Math.max(longest, this.loadLongestStreak());
-    this.streakHistory = days;
-    this.saveLongestStreak(this.longestStreak);
-
-    // Detect 7+ consecutive days of inactivity (not meeting goal)
-    this.streakInactiveWarning = this.checkInactiveForWeek(days) && !this.wasInactiveDismissedRecently();
-  }
-
-  /** Returns true if the last 7 days were all NOT met */
-  private checkInactiveForWeek(days: { date: string; met: boolean }[]): boolean {
-    if (days.length < 7) return false;
-    const lastSevenDays = days.slice(-7);
-    return lastSevenDays.every(d => !d.met);
-  }
-
-  /** User chooses to cancel/disable streak tracking */
-  cancelStreakTracking() {
-    this.streakDisabled = true;
-    this.streakInactiveWarning = false;
-    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_disabled';
-    localStorage.setItem(key, 'true');
-  }
-
-  /** User chooses to keep streak tracking despite inactivity */
-  keepStreakTracking() {
-    this.streakInactiveWarning = false;
-    // Save a dismissal timestamp so we don't nag again until next week of inactivity
-    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_dismiss';
-    localStorage.setItem(key, new Date().toISOString().split('T')[0]);
-  }
-
-  /** Re-enable streak tracking after it was cancelled */
-  reEnableStreakTracking() {
-    this.streakDisabled = false;
-    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_disabled';
-    localStorage.removeItem(key);
-    this.computeStreak();
-  }
-
-  private loadStreakDisabled(): boolean {
-    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_disabled';
-    return localStorage.getItem(key) === 'true';
-  }
-
-  private wasInactiveDismissedRecently(): boolean {
-    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_dismiss';
-    const val = localStorage.getItem(key);
-    if (!val) return false;
-    const dismissDate = new Date(val);
-    const now = new Date();
-    const daysSinceDismiss = Math.floor((now.getTime() - dismissDate.getTime()) / (1000 * 60 * 60 * 24));
-    return daysSinceDismiss < 7; // Don't show again for another week
-  }
-
-  private loadLongestStreak(): number {
-    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_longest';
-    const val = localStorage.getItem(key);
-    return val ? parseInt(val, 10) : 0;
-  }
-
-  private saveLongestStreak(n: number) {
-    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_longest';
-    localStorage.setItem(key, String(n));
-  }
-
-  updateDailyGoal(newGoal: number) {
-    this.dailyGoal = Math.max(1, newGoal);
-    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_goal';
-    localStorage.setItem(key, String(this.dailyGoal));
-    this.computeStreak();
-  }
-
-  private loadDailyGoal() {
-    const key = this.STREAK_KEY_PREFIX + this.userEmail + '_goal';
-    const val = localStorage.getItem(key);
-    if (val) this.dailyGoal = Math.max(1, parseInt(val, 10));
-    // Load disabled state
-    this.streakDisabled = this.loadStreakDisabled();
+    return days;
   }
 
   // ── History ──
@@ -1627,33 +1572,34 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     const user = this.MOCK_USERS.find(u => u.email === email);
     const displayName = user?.displayName ?? email.split('@')[0];
 
-    // Add directly to friends list with the nickname
-    const alreadyFriend = this.friends.some(f => f.email === email);
-    if (!alreadyFriend) {
-      this.friends.push({ email, displayName, nickname });
-      this.persistFriends();
-    }
+    // Store the pending request (not yet a friend — they need to accept)
+    this.pendingFriendRequests.push({ email, displayName, nickname });
 
     // Remove from search results
     this.friendSearchResults = this.friendSearchResults.filter(u => u.email !== email);
     this.friendNickname = '';
 
-    // Simulate a notification
-    const incomingNotif: AppNotification = {
-      id: Date.now().toString() + Math.random().toString(36).slice(2),
-      recipientEmail: this.userEmail,
-      type: 'friend_request',
-      title: `Friend added: ${nickname} (${displayName})`,
-      body: `Email: ${email}`,
-      eventId: email,
-      eventDate: '',
-      senderEmail: email,
-      read: false,
-      createdAt: new Date().toISOString(),
-      status: 'accepted',
-    };
-    this.notifications = [incomingNotif, ...this.notifications];
+    // Simulate: after a short delay, the other person "accepts" and sends back a friend request
+    setTimeout(() => {
+      const incomingNotif: AppNotification = {
+        id: Date.now().toString() + Math.random().toString(36).slice(2),
+        recipientEmail: this.userEmail,
+        type: 'friend_request',
+        title: `${displayName} accepted your friend request`,
+        body: `Email: ${email} — Accept to add them as a friend.`,
+        eventId: email,
+        eventDate: nickname, // store nickname in eventDate for later use
+        senderEmail: email,
+        read: false,
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+      };
+      this.notifications = [incomingNotif, ...this.notifications];
+    }, 1500);
   }
+
+  // Pending outgoing friend requests (waiting for the other person to accept)
+  pendingFriendRequests: { email: string; displayName: string; nickname: string }[] = [];
 
   acceptFriendRequest(user: { email: string; displayName: string; nickname: string }) {
     const alreadyFriend = this.friends.some(f => f.email === user.email);
@@ -1693,13 +1639,21 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     const mockUser = this.MOCK_USERS.find(u => u.email === email);
     const alreadyFriend = this.friends.some(f => f.email === email);
     if (!alreadyFriend) {
+      // Try to find the nickname from the pending request we sent
+      const pending = this.pendingFriendRequests.find(p => p.email === email);
+      const nickname = (pending?.nickname
+        ?? (n.eventDate || ''))
+        || mockUser?.displayName?.split(' ')[0]
+        || email.split('@')[0];
       this.friends.push({
         email,
         displayName: mockUser?.displayName ?? email.split('@')[0],
-        nickname: mockUser?.displayName?.split(' ')[0] ?? email.split('@')[0],
+        nickname,
       });
       this.persistFriends();
     }
+    // Remove from pending list
+    this.pendingFriendRequests = this.pendingFriendRequests.filter(p => p.email !== email);
     this.notificationsService.markRead(n.id).catch(() => {});
   }
 
@@ -1969,7 +1923,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         dateStr,
         label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
         isToday: dateStr === this.today,
-        events: this.events.filter(e => e.date === dateStr).map(e => ({
+        events: this.eventsForDate(dateStr).map(e => ({
           ...e,
           color: this.getCategoryColor(e.category) || e.color,
         })),
@@ -1981,7 +1935,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   // Day view
   viewDayInput = this.today;
   get viewDayEvents(): CalendarEvent[] {
-    return this.events.filter(e => e.date === this.viewDayInput).map(e => ({
+    return this.eventsForDate(this.viewDayInput).map(e => ({
       ...e,
       color: this.getCategoryColor(e.category) || e.color,
     }));
@@ -2045,7 +1999,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const dayEvents = this.events.filter((e) => e.date === dateStr).map(e => ({
+      const dayEvents = this.eventsForDate(dateStr).map(e => ({
         ...e,
         color: this.getCategoryColor(e.category) || e.color,
       }));
@@ -2070,6 +2024,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   form: ScheduleForm = {
     title: '',
     date: this.today,
+    endDate: '',
     startTime: '09:00',
     endTime: '10:00',
     description: '',
@@ -2077,6 +2032,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     location: '',
     sharedWith: [],
   };
+
+  isMultiDay = false;
 
   events: CalendarEvent[] = [];
 
@@ -2180,6 +2137,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   shareCategoryOnly = false; // true = share whole category, false = single event
   shareSuccess = '';
   shareError = '';
+  shareFriendSuggestions: { email: string; displayName: string; nickname: string }[] = [];
+  shareShowSuggestions = false;
 
   // DB sync state
   dbLoading = false;
@@ -2594,13 +2553,12 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.googleCalendarLinked = this.googleCalendarService.isLinked;
     this.loadHistory();
     this.loadSavedCategories();
+    this.loadStreaks();
     this.loadCategoryColors();
     this.loadAiConversations();
     this.loadFriends();
     await this.loadEventsFromDb(user.email);
     this.loadNotifications(user.email);
-    this.loadDailyGoal();
-    this.computeStreak();
   }
 
   ngAfterViewInit() {
@@ -2626,7 +2584,6 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       this.events = [...synced, ...uniqueShared];
       this.dbLoading = false;
       this.dbError = this.eventsService.syncWarning ?? '';
-      this.computeStreak();
       this.showProactiveBanner(await this.runProactiveReminders());
     });
 
@@ -3052,6 +3009,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.form = {
       title: '',
       date: this.today,
+      endDate: '',
       startTime: '',
       endTime: '',
       description: '',
@@ -3059,6 +3017,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       location: '',
       sharedWith: [],
     };
+    this.isMultiDay = false;
     this.formShareInput = '';
     this.formShareSuggestions = [];
     this.selectedColor = '#6c63ff';
@@ -3140,15 +3099,28 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     // Normalize single-digit hour (e.g. "9:00" → "09:00")
     this.form.startTime = this.form.startTime.padStart(5, '0');
     this.form.endTime = this.form.endTime.padStart(5, '0');
-    if (this.form.startTime >= this.form.endTime) {
-      this.scheduleError = 'End time must be after start time.';
-      return;
+
+    if (this.isMultiDay) {
+      if (!this.form.endDate) {
+        this.scheduleError = 'Please select an end date.';
+        return;
+      }
+      if (this.form.endDate < this.form.date) {
+        this.scheduleError = 'End date must be on or after the start date.';
+        return;
+      }
+    } else {
+      if (this.form.startTime >= this.form.endTime) {
+        this.scheduleError = 'End time must be after start time.';
+        return;
+      }
     }
 
     const newEvent: CalendarEvent = {
       id: Date.now().toString(),
       title: this.form.title.trim(),
       date: this.form.date,
+      endDate: this.isMultiDay && this.form.endDate ? this.form.endDate : undefined,
       startTime: this.form.startTime,
       endTime: this.form.endTime,
       description: this.form.description.trim(),
@@ -3569,7 +3541,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
 
   get dayPanelEvents(): CalendarEvent[] {
-    return this.events.filter(e => e.date === this.dayPanelDate);
+    return this.eventsForDate(this.dayPanelDate);
   }
 
   openDayPanel(dateStr: string, mouseEvent?: MouseEvent) {
@@ -3587,6 +3559,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.form = {
       title: '',
       date: dateStr,
+      endDate: '',
       startTime: '09:00',
       endTime: '10:00',
       description: '',
@@ -3594,6 +3567,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       location: '',
       sharedWith: [],
     };
+    this.isMultiDay = false;
     this.formShareInput = '';
     this.formShareSuggestions = [];
     this.selectedColor = '#6c63ff';
@@ -3672,7 +3646,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   browseSelectDay(dateStr: string) {
     this.browseSelectedDate = dateStr;
-    this.browseDayEvents = this.events.filter(e => e.date === dateStr);
+    this.browseDayEvents = this.eventsForDate(dateStr);
   }
 
   browseSelectEvent(id: string) {
@@ -3856,21 +3830,29 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
 
   get todayEvents() {
-    return this.filteredEvents.filter((e) => e.date === this.today);
+    return this.filteredEvents.filter((e) => this.eventSpansDate(e, this.today));
   }
 
   get upcomingEvents() {
     const weekAhead = new Date();
     weekAhead.setDate(weekAhead.getDate() + 7);
     const weekAheadStr = weekAhead.toISOString().split('T')[0];
-    return this.filteredEvents.filter((e) => e.date > this.today && e.date <= weekAheadStr);
+    return this.filteredEvents.filter((e) => {
+      const effectiveEnd = e.endDate || e.date;
+      // Event starts after today OR spans into the future (ends after today)
+      return (e.date > this.today || effectiveEnd > this.today) && e.date <= weekAheadStr;
+    });
   }
 
   get pastEvents() {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     const weekAgoStr = weekAgo.toISOString().split('T')[0];
-    return this.filteredEvents.filter((e) => e.date < this.today && e.date >= weekAgoStr);
+    return this.filteredEvents.filter((e) => {
+      const effectiveEnd = e.endDate || e.date;
+      // Event is fully in the past (end date < today)
+      return effectiveEnd < this.today && e.date >= weekAgoStr;
+    });
   }
 
   // ── Category helpers ──
@@ -3905,20 +3887,67 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.shareCategoryOnly = false;
     this.shareSuccess = '';
     this.shareError = '';
+    this.shareFriendSuggestions = [];
+    this.shareShowSuggestions = false;
     this.showShareModal = true;
   }
 
   closeShareModal() {
     this.showShareModal = false;
     this.shareTargetEvent = null;
+    this.shareFriendSuggestions = [];
+    this.shareShowSuggestions = false;
+  }
+
+  /** Filter friends list as user types in share modal — matches nickname, displayName, or email */
+  onShareInputChange() {
+    const q = this.shareEmail.trim().toLowerCase();
+    if (!q) {
+      this.shareFriendSuggestions = [];
+      this.shareShowSuggestions = false;
+      return;
+    }
+    this.shareFriendSuggestions = this.friends.filter(f =>
+      f.nickname.toLowerCase().includes(q) ||
+      f.displayName.toLowerCase().includes(q) ||
+      f.email.toLowerCase().includes(q)
+    );
+    this.shareShowSuggestions = this.shareFriendSuggestions.length > 0;
+  }
+
+  /** Select a friend from the suggestions dropdown */
+  selectShareFriend(friend: { email: string; displayName: string; nickname: string }) {
+    this.shareEmail = friend.email;
+    this.shareFriendSuggestions = [];
+    this.shareShowSuggestions = false;
+  }
+
+  /** Dismiss suggestions when clicking outside */
+  dismissShareSuggestions() {
+    setTimeout(() => {
+      this.shareShowSuggestions = false;
+    }, 200);
   }
 
   async confirmShare() {
     this.shareError = '';
     this.shareSuccess = '';
-    const email = this.shareEmail.trim().toLowerCase();
+    // Resolve friend nickname to email if needed
+    let email = this.shareEmail.trim().toLowerCase();
+    if (email && !email.includes('@')) {
+      const matchedFriend = this.friends.find(f =>
+        f.nickname.toLowerCase() === email ||
+        f.displayName.toLowerCase() === email
+      );
+      if (matchedFriend) {
+        email = matchedFriend.email;
+      } else {
+        this.shareError = 'Please enter a valid email address or select a friend.';
+        return;
+      }
+    }
     if (!email || !email.includes('@')) {
-      this.shareError = 'Please enter a valid email address.';
+      this.shareError = 'Please enter a valid email address or select a friend.';
       return;
     }
     if (!this.shareTargetEvent) return;
@@ -4403,6 +4432,26 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   formatDate(dateStr: string): string {
     const d = new Date(dateStr + 'T00:00:00');
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  /** Check if an event occurs on a given date (including multi-day spans). */
+  eventSpansDate(event: CalendarEvent, dateStr: string): boolean {
+    if (event.date === dateStr) return true;
+    if (event.endDate && event.endDate >= dateStr && event.date <= dateStr) return true;
+    return false;
+  }
+
+  /** Get all events that occur on a specific date (including multi-day). */
+  eventsForDate(dateStr: string): CalendarEvent[] {
+    return this.events.filter(e => this.eventSpansDate(e, dateStr));
+  }
+
+  /** Format date range for display (handles multi-day events). */
+  formatEventDateRange(event: CalendarEvent): string {
+    if (event.endDate && event.endDate !== event.date) {
+      return `${this.formatDate(event.date)} – ${this.formatDate(event.endDate)} · ${this.formatTime(event.startTime)} – ${this.formatTime(event.endTime)}`;
+    }
+    return `${this.formatDate(event.date)} · ${this.formatTime(event.startTime)} – ${this.formatTime(event.endTime)}`;
   }
 
   formatTime(t: string): string {

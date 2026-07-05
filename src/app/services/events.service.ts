@@ -6,6 +6,7 @@ export interface CalendarEvent {
   id: string;
   title: string;
   date: string;
+  endDate?: string;
   startTime: string;
   endTime: string;
   description: string;
@@ -122,7 +123,8 @@ export class EventsService {
         location:    event.location || undefined,
         sharedWith:  event.sharedWith?.length ? event.sharedWith : undefined,
         ownerEmail,
-      });
+        ...(event.endDate ? { endDate: event.endDate } : {}),
+      } as any);
       if (errors?.length) throw new Error(errors[0].message);
       const saved = this.toLocal(data!);
       // Re-read cache and either replace the temp entry or append the saved event
@@ -333,6 +335,7 @@ export class EventsService {
       id:          record.id,
       title:       record.title ?? '',
       date:        record.date ?? '',
+      endDate:     (record as any).endDate ?? undefined,
       startTime:   record.startTime ?? '',
       endTime:     record.endTime ?? '',
       description: record.description ?? '',

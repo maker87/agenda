@@ -610,78 +610,92 @@ export class AiChatService {
     switch (intent) {
 
       case 'add_event': {
-        // Try to parse everything from a single natural sentence
+        // Try to parse what the user provided
         const parsed = this.parseNaturalEvent(userText, t);
 
-        if (parsed && parsed.title && parsed.startTime && (parsed.date || parsed.recurring)) {
-          // We got enough info in one shot — skip the wizard
-          const inferred = inferCategory(parsed.title);
-          const category = parsed.category || inferred.category;
-          const color = inferred.color;
+        // Never skip the wizard — always confirm each field step by step.
+        // Only pre-fill steps that the user explicitly provided.
+        const stripped = userText
+          .replace(/^(can you|please|could you|i want to|i need to|i'd like to)\s+/i, '')
+          .replace(/^(add|create|schedule|put|book|set up|arrange|new|i have)\s+(an?\s+|a new\s+)?/i, '')
+          .replace(/\s+(to|on|in|for)\s+(my\s+)?(calendar|agenda|schedule).*$/i, '')
+          .replace(/\s+(event|called|named)$/i, '')
+          .replace(/\s+(every|at|from)\s+.*$/i, '')
+          .trim();
 
-          if (parsed.recurring) {
-            // Recurring event — create multiple occurrences
-            const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][parsed.recurring.dayOfWeek];
-            const weeks = parsed.recurring.weeks || 12;
-            const endTime = parsed.endTime || this.addMinutesToTime(parsed.startTime, parsed.durationMin || 60);
+        const quickTitle = parsed?.title || (stripped.length > 1 ? stripped : null);
 
-            text = `I'll add **"${parsed.title}"** every **${dayName}** at **${formatTime(parsed.startTime)}–${formatTime(endTime)}** for the next ${weeks} weeks.\n\n🏷️ Category: **${category}**\n\nShould I go ahead?`;
-            actions.push({
-              label: '✅ Add recurring events',
-              type: 'confirm_create_event',
-              payload: {
-                title: parsed.title,
-                date: '', // signal for recurring
-                startTime: parsed.startTime,
-                endTime,
-                description: '',
-                color,
-                category,
-                sharedWith: [],
-                _recurring: { dayOfWeek: parsed.recurring.dayOfWeek, weeks },
-              } as any,
-            });
-            newDraft = null;
+        if (quickTitle) {
+          // We have a title — start at duration step
+          // If duration was also provided, skip that too
+          if (parsed?.durationMin && parsed?.startTime && parsed?.date) {
+            // User gave title + duration + time + date — go to category step (ask to confirm)
+            const endTime = parsed.endTime || this.addMinutesToTime(parsed.startTime, parsed.durationMin);
+            newDraft = {
+              step: 'category',
+              title: quickTitle,
+              durationMin: parsed.durationMin,
+              date: parsed.date,
+              startTime: parsed.startTime,
+              endTime,
+            };
+            const inferred = inferCategory(quickTitle);
+            text = `Got it — **"${quickTitle}"** on **${formatDate(parsed.date)}** at **${formatTime(parsed.startTime)}–${formatTime(endTime)}**.\n\nWhat category should this go under? (e.g. "Work", "Personal", "Health")\n\n_I'd suggest **${inferred.category}** based on the title. Type that, a different one, or "skip" to use my suggestion._`;
+          } else if (parsed?.durationMin && parsed?.startTime) {
+            // Has title + time + duration but no date — ask for date
+            const endTime = parsed.endTime || this.addMinutesToTime(parsed.startTime, parsed.durationMin);
+            newDraft = {
+              step: 'date',
+              title: quickTitle,
+              durationMin: parsed.durationMin,
+              startTime: parsed.startTime,
+              endTime,
+            };
+            text = `Got it — **"${quickTitle}"** at **${formatTime(parsed.startTime)}–${formatTime(endTime)}**. What date? (e.g. "tomorrow", "next Monday", "July 15")`;
+          } else if (parsed?.startTime && parsed?.date) {
+            // Has title + time + date but no explicit duration — ask for duration
+            newDraft = {
+              step: 'duration',
+              title: quickTitle,
+              date: parsed.date,
+              startTime: parsed.startTime,
+            };
+            text = `Got it — **"${quickTitle}"** on **${formatDate(parsed.date)}** starting at **${formatTime(parsed.startTime)}**. How long should it be? (e.g. "1 hour", "30 minutes")`;
+          } else if (parsed?.durationMin) {
+            // Has title + duration — suggest slots
+            newDraft = { step: 'date', title: quickTitle, durationMin: parsed.durationMin };
+            const slots = this.scheduler.getSuggestions(quickTitle, parsed.durationMin, events);
+            if (slots.length > 0) {
+              const slotLines = slots.map((s, i) =>
+                `**${i + 1}.** ${formatDate(s.date)} · ${formatTime(s.startTime)}–${formatTime(s.endTime)} — _${s.reason}_`
+              ).join('\n');
+              const slotActions: ChatAction[] = slots.map((s, i) => ({
+                label: `Pick option ${i + 1}`,
+                type: 'pick_slot' as const,
+                slotIndex: i,
+              }));
+              slotActions.push({ label: 'Enter a date instead', type: 'pick_slot', slotIndex: -1 });
+              return {
+                message: {
+                  id: `msg_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+                  role: 'assistant',
+                  text: `Got it — **"${quickTitle}"** (${parsed.durationMin} min). Here are open slots:\n\n${slotLines}\n\nPick one, or tell me a specific date.`,
+                  timestamp: new Date(),
+                  actions: slotActions,
+                },
+                draft: { ...newDraft, suggestedSlots: slots },
+              };
+            }
+            text = `Got it — **"${quickTitle}"** (${parsed.durationMin} min). What date works? (e.g. "tomorrow", "next Monday", "July 15")`;
           } else {
-            // Single event with all info
-            const endTime = parsed.endTime || this.addMinutesToTime(parsed.startTime, parsed.durationMin || 60);
-            text = `Here's what I'll add:\n\n📌 **${parsed.title}**\n📅 ${formatDate(parsed.date!)}\n🕐 ${formatTime(parsed.startTime)} – ${formatTime(endTime)}\n🏷️ ${category}\n\nLooks good?`;
-            actions.push({
-              label: '✅ Add to Calendar',
-              type: 'confirm_create_event',
-              payload: {
-                title: parsed.title,
-                date: parsed.date!,
-                startTime: parsed.startTime,
-                endTime,
-                description: '',
-                color,
-                category,
-                sharedWith: [],
-              },
-            });
-            newDraft = null;
+            // Only have title — ask for duration
+            newDraft = { step: 'duration', title: quickTitle };
+            text = `Got it — **"${quickTitle}"**. How long should it be? (e.g. "1 hour", "30 minutes", "2 hours")`;
           }
         } else {
-          // Couldn't parse everything — fall back to wizard
-          const stripped = userText
-            .replace(/^(can you|please|could you|i want to|i need to|i'd like to)\s+/i, '')
-            .replace(/^(add|create|schedule|put|book|set up|arrange|new|i have)\s+(an?\s+|a new\s+)?/i, '')
-            .replace(/\s+(to|on|in|for)\s+(my\s+)?(calendar|agenda|schedule).*$/i, '')
-            .replace(/\s+(event|called|named)$/i, '')
-            .replace(/\s+(every|at|from)\s+.*$/i, '')
-            .trim();
-
-          const quickTitle = stripped.length > 1 ? stripped : (parsed?.title || null);
-
-          if (quickTitle) {
-            newDraft = { step: 'duration', title: quickTitle };
-            const inferred = inferCategory(quickTitle);
-            text = `Got it — **"${quickTitle}"** _(${inferred.category})_. How long should it be? (e.g. "1 hour", "30 minutes", "2 hours")`;
-          } else {
-            newDraft = { step: 'title' };
-            text = `Sure! Let's add a new event. What's the title?`;
-          }
+          // No title found — start from the beginning
+          newDraft = { step: 'title' };
+          text = `Sure! Let's add a new event. What's the title?`;
         }
         break;
       }
@@ -1244,33 +1258,31 @@ export class AiChatService {
             draft,
           );
         }
-        // Now suggest dates — ask if they have a preference or want AI to pick
-        const slots = this.scheduler.getSuggestions(draft.title!, dur, events);
-        if (slots.length === 0) {
-          return this.wizardMsg(
-            `I couldn't find a free slot in the next 3 weeks. Do you have a specific date in mind? (e.g. "next Monday" or "May 25")`,
-            { ...draft, step: 'date', durationMin: dur },
+
+        // If we already have a start time and date, compute endTime and move to category
+        if (draft.startTime && draft.date) {
+          const endTime = this.addMinutesToTime(draft.startTime, dur);
+          return this.buildConfirmStep(
+            { ...draft, durationMin: dur },
+            draft.date, draft.startTime, endTime, t,
           );
         }
-        const slotLines = slots.map((s, i) =>
-          `**${i + 1}.** ${formatDate(s.date)} · ${formatTime(s.startTime)}–${formatTime(s.endTime)} — _${s.reason}_`
-        ).join('\n');
-        const actions: ChatAction[] = slots.map((s, i) => ({
-          label: `Pick option ${i + 1}`,
-          type: 'pick_slot' as const,
-          slotIndex: i,
-        }));
-        actions.push({ label: 'Enter a date instead', type: 'pick_slot', slotIndex: -1 });
-        return {
-          message: {
-            id: `msg_${Date.now()}_w`,
-            role: 'assistant',
-            text: `Here are **${slots.length}** open slots for **"${draft.title}"** (${dur} min):\n\n${slotLines}\n\nPick one, or tell me a specific date.`,
-            timestamp: new Date(),
-            actions,
-          },
-          draft: { ...draft, step: 'date', durationMin: dur, suggestedSlots: slots },
-        };
+
+        // If we have a start time but no date, ask for the date
+        if (draft.startTime) {
+          const endTime = this.addMinutesToTime(draft.startTime, dur);
+          return this.wizardMsg(
+            `Got it — **${dur} minutes** (${formatTime(draft.startTime)}–${formatTime(endTime)}). What date? (e.g. "tomorrow", "next Monday", "July 15")`,
+            { ...draft, step: 'date', durationMin: dur, endTime },
+          );
+        }
+
+        // No pre-existing time — ask for the date and time
+        // Don't auto-suggest slots; ask the user directly
+        return this.wizardMsg(
+          `Got it — **${dur} minutes**. What date do you want this on? (e.g. "tomorrow", "next Monday", "July 15")\n\n_Or say "suggest" if you'd like me to find an open slot._`,
+          { ...draft, step: 'date', durationMin: dur },
+        );
       }
 
       case 'date': {
@@ -1284,25 +1296,101 @@ export class AiChatService {
           }
         }
 
+        // Handle "suggest" — user explicitly asks for AI time suggestions
+        if (/\b(suggest|find a slot|pick for me|any open slot|find me a time)\b/i.test(lower)) {
+          const dur = draft.durationMin ?? 60;
+          const slots = this.scheduler.getSuggestions(draft.title!, dur, events);
+          if (slots.length === 0) {
+            return this.wizardMsg(
+              `I couldn't find a free slot in the next 3 weeks. Please tell me a specific date (e.g. "next Monday", "July 15").`,
+              draft,
+            );
+          }
+          const slotLines = slots.map((s, i) =>
+            `**${i + 1}.** ${formatDate(s.date)} · ${formatTime(s.startTime)}–${formatTime(s.endTime)} — _${s.reason}_`
+          ).join('\n');
+          const slotActions: ChatAction[] = slots.map((s, i) => ({
+            label: `Pick option ${i + 1}`,
+            type: 'pick_slot' as const,
+            slotIndex: i,
+          }));
+          slotActions.push({ label: 'Enter a date instead', type: 'pick_slot', slotIndex: -1 });
+          return {
+            message: {
+              id: `msg_${Date.now()}_w`,
+              role: 'assistant',
+              text: `Here are open slots for **"${draft.title}"** (${dur} min):\n\n${slotLines}\n\nPick one, or tell me a specific date.`,
+              timestamp: new Date(),
+              actions: slotActions,
+            },
+            draft: { ...draft, suggestedSlots: slots },
+          };
+        }
+
         // Try to parse a natural date
-        const parsed = this.parseDate(lower, t);
-        if (!parsed) {
+        const parsedDate = this.parseDate(lower, t);
+        if (!parsedDate) {
           const hint = draft.suggestedSlots?.length
             ? `Try typing **1**, **2**, or **3** to pick a slot, or a date like "tomorrow", "next Monday", "May 25".`
-            : `Try a date like "tomorrow", "next Monday", "May 25", or "in 3 days".`;
+            : `Try a date like "tomorrow", "next Monday", "May 25", or "in 3 days". Or say "suggest" for me to find an open slot.`;
           return this.wizardMsg(hint, draft);
         }
-        // Find best time on that date
-        const dur = draft.durationMin ?? 60;
-        const slots = this.scheduler.getSuggestions(draft.title!, dur, events, parsed);
-        const best = slots[0];
-        if (best && best.date === parsed) {
-          return this.buildConfirmStep(draft, best.date, best.startTime, best.endTime, t);
+
+        // If we already have a startTime (from initial parse), go straight to confirm steps
+        if (draft.startTime) {
+          const dur = draft.durationMin ?? 60;
+          const endTime = draft.endTime || this.addMinutesToTime(draft.startTime, dur);
+          return this.buildConfirmStep(draft, parsedDate, draft.startTime, endTime, t);
         }
-        // Fallback: use 9 AM on that date
-        const startTime = '09:00';
+
+        // No startTime yet — ask the user what time
+        return this.wizardMsg(
+          `Got it — **${formatDate(parsedDate)}**. What time does it start? (e.g. "9am", "2:30pm", "14:00")`,
+          { ...draft, step: 'time', date: parsedDate },
+        );
+      }
+
+      case 'time': {
+        // Parse a time from user input
+        const timeMatch = lower.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+        if (!timeMatch) {
+          return this.wizardMsg(
+            `I didn't catch that. What time does it start? (e.g. "9am", "2:30pm", "14:00")`,
+            draft,
+          );
+        }
+        const startTime = this.parseTimeStr(timeMatch[1], timeMatch[2], timeMatch[3]);
+        const dur = draft.durationMin ?? 60;
         const endTime = this.addMinutesToTime(startTime, dur);
-        return this.buildConfirmStep(draft, parsed, startTime, endTime, t);
+        return this.buildConfirmStep(draft, draft.date!, startTime, endTime, t);
+      }
+
+      case 'category': {
+        const inferred = inferCategory(draft.title ?? '');
+        if (/\b(skip|default|same|sure)\b/i.test(lower)) {
+          // Use the inferred category
+          const updated = { ...draft, category: inferred.category, color: inferred.color };
+          return this.askForDescription(updated, inferred);
+        }
+        // Use what the user typed as the category
+        const category = userText.trim();
+        if (category.length < 1) {
+          return this.wizardMsg(`Please enter a category name, or type "skip" to use **${inferred.category}**.`, draft);
+        }
+        const updated = { ...draft, category, color: draft.color || inferred.color };
+        return this.askForDescription(updated, inferred);
+      }
+
+      case 'description': {
+        if (/\b(skip|none|no|nope|nothing|n\/a)\b/i.test(lower)) {
+          // No description
+          const updated = { ...draft, description: '' };
+          return this.buildFinalConfirm(updated);
+        }
+        // Use what the user typed as the description
+        const description = userText.trim();
+        const updated = { ...draft, description };
+        return this.buildFinalConfirm(updated);
       }
 
       case 'confirm': {
@@ -1375,21 +1463,54 @@ export class AiChatService {
     endTime: string,
     _t: string,
   ): { message: ChatMessage; draft: EventDraft | null } {
-    // Auto-infer category and color from the title if not already set
+    // Instead of going directly to confirm, ask for category first (unless already set)
+    const inferred = inferCategory(draft.title ?? '');
+    const updated: EventDraft = { ...draft, date, startTime, endTime };
+
+    if (!draft.category) {
+      // Ask for category — offer the inferred one as default
+      return this.wizardMsg(
+        `Got it — **${formatDate(date)}** at **${formatTime(startTime)}–${formatTime(endTime)}**.\n\nWhat category should this go under? (e.g. "Work", "Personal", "Health", "School")\n\n_I'd suggest **${inferred.category}** based on the title. Type that, a different one, or "skip" to use my suggestion._`,
+        { ...updated, step: 'category', color: inferred.color },
+      );
+    }
+
+    // If category is already set, check description
+    if (draft.description === undefined || draft.description === null) {
+      return this.askForDescription(updated, inferred);
+    }
+
+    // Everything filled — go to final confirm
+    return this.buildFinalConfirm(updated);
+  }
+
+  private askForDescription(draft: EventDraft, inferred: { category: string; color: string }): { message: ChatMessage; draft: EventDraft | null } {
+    const category = draft.category || inferred.category;
+    const color = draft.color || inferred.color;
+    return this.wizardMsg(
+      `Any description or notes for this event? (e.g. "Meeting with client about Q3 goals")\n\n_Type "skip" or "none" if you don't need one._`,
+      { ...draft, step: 'description', category, color },
+    );
+  }
+
+  private buildFinalConfirm(
+    draft: EventDraft,
+  ): { message: ChatMessage; draft: EventDraft | null } {
     const inferred = inferCategory(draft.title ?? '');
     const category = draft.category || inferred.category;
     const color    = draft.color    || inferred.color;
 
-    const updated: EventDraft = { ...draft, step: 'confirm', date, startTime, endTime, category, color };
+    const updated: EventDraft = { ...draft, step: 'confirm', category, color };
+    const descLine = draft.description ? `\n📝 ${draft.description}` : '';
     const actions: ChatAction[] = [
       {
         label: '✅ Add to Calendar',
         type: 'confirm_create_event',
         payload: {
           title:       draft.title!,
-          date,
-          startTime,
-          endTime,
+          date:        draft.date!,
+          startTime:   draft.startTime!,
+          endTime:     draft.endTime!,
           description: draft.description ?? '',
           color,
           category,
@@ -1402,7 +1523,7 @@ export class AiChatService {
       message: {
         id: `msg_${Date.now()}_w`,
         role: 'assistant',
-        text: `Here's the event I'll create:\n\n📌 **${draft.title}**\n📅 ${formatDate(date)}\n🕐 ${formatTime(startTime)} – ${formatTime(endTime)}\n🏷️ ${category}\n\nLooks good?`,
+        text: `Here's the event I'll create:\n\n📌 **${draft.title}**\n📅 ${formatDate(draft.date!)}\n🕐 ${formatTime(draft.startTime!)} – ${formatTime(draft.endTime!)}\n🏷️ ${category}${descLine}\n\nLooks good?`,
         timestamp: new Date(),
         actions,
       },
