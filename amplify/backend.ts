@@ -19,7 +19,10 @@ for (const construct of allConstructs) {
       new PolicyStatement({
         effect: Effect.ALLOW,
         actions: ['bedrock:InvokeModel'],
-        resources: ['arn:aws:bedrock:*::foundation-model/*', 'arn:aws:bedrock:*:*:inference-profile/*'],
+        resources: [
+          'arn:aws:bedrock:us-east-1::foundation-model/us.amazon.nova-lite-v1:0',
+          'arn:aws:bedrock:us-east-1:*:inference-profile/us.amazon.nova-lite-v1:0',
+        ],
       })
     );
   }

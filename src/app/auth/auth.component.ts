@@ -48,7 +48,7 @@ export class AuthComponent implements OnInit {
       sessionStorage.setItem(AUTH_STATE_KEY, JSON.stringify({
         view: this.view,
         email: this.email,
-        password: this.password,
+        // Never store password — user will re-enter after returning
       }));
     } catch { /* ignore */ }
   }
@@ -62,7 +62,6 @@ export class AuthComponent implements OnInit {
       if (state.view === 'confirm' && state.email) {
         this.view = 'confirm';
         this.email = state.email;
-        this.password = state.password || '';
         this.successMessage = `Enter the verification code sent to ${this.email}`;
       } else if (state.view === 'resetPassword' && state.email) {
         this.view = 'resetPassword';

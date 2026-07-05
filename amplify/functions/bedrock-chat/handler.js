@@ -227,6 +227,31 @@ function addHour(time) {
 export const handler = async (event) => {
   const { message, events, today, conversationHistory } = event.arguments;
 
+  // ── Input validation ──────────────────────────────────────────────────────
+  if (!message || typeof message !== 'string') {
+    return 'Please provide a message.';
+  }
+
+  // Enforce maximum input lengths to prevent abuse and control Bedrock costs
+  const MAX_MESSAGE_LENGTH = 2000;
+  const MAX_EVENTS_LENGTH = 50000;
+  const MAX_HISTORY_LENGTH = 10000;
+
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return `Message too long. Please keep your message under ${MAX_MESSAGE_LENGTH} characters.`;
+  }
+
+  if (events && events.length > MAX_EVENTS_LENGTH) {
+    return 'Too much event data sent. Please try again with fewer events in context.';
+  }
+
+  if (conversationHistory && conversationHistory.length > MAX_HISTORY_LENGTH) {
+    return 'Conversation history too long. Please start a new chat.';
+  }
+
+  // Sanitize today input — must be a valid YYYY-MM-DD date
+  const todaySafe = /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().split('T')[0];
+
   const client = new BedrockRuntimeClient({ region: 'us-east-1' });
 
   let eventsContext = '\n\nUser has no events on their calendar yet.';
@@ -235,13 +260,13 @@ export const handler = async (event) => {
       const parsed = JSON.parse(events);
       if (parsed.length > 0) {
         // Separate upcoming and past events for better context
-        const upcoming = parsed.filter(e => e.date >= today);
-        const past = parsed.filter(e => e.date < today);
+        const upcoming = parsed.filter(e => e.date >= todaySafe);
+        const past = parsed.filter(e => e.date < todaySafe);
 
         // Count events by day for the next 7 days
         const next7days = [];
         for (let i = 0; i < 7; i++) {
-          const d = new Date(today + 'T00:00:00');
+          const d = new Date(todaySafe + 'T00:00:00');
           d.setDate(d.getDate() + i);
           const dateStr = d.toISOString().split('T')[0];
           const dayEvents = upcoming.filter(e => e.date === dateStr);
@@ -281,7 +306,7 @@ Upcoming events (next 50):\n` +
   const cleanMessages = [{ role: 'user', content: [{ text: message }] }];
 
   const body = JSON.stringify({
-    system: [{ text: SYSTEM_PROMPT + eventsContext + `\n\nToday's date: ${today}` }],
+    system: [{ text: SYSTEM_PROMPT + eventsContext + `\n\nToday's date: ${todaySafe}` }],
     messages: cleanMessages,
     inferenceConfig: {
       maxTokens: 1024,
@@ -301,15 +326,12 @@ Upcoming events (next 50):\n` +
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
     const rawText = responseBody.output?.message?.content?.[0]?.text || 'Sorry, I could not generate a response.';
     
-    console.log('[Bedrock] Raw AI response:', rawText);
-    
     // Parse and convert to structured format
-    const finalResponse = parseAIResponse(rawText, today);
-    console.log('[Bedrock] Final response:', finalResponse);
+    const finalResponse = parseAIResponse(rawText, todaySafe);
     
     return finalResponse;
   } catch (error) {
-    console.error('Bedrock error:', error);
-    return `I'm having trouble connecting right now. Error: ${error.message || 'Unknown error'}`;
+    console.error('Bedrock invocation error');
+    return 'I\'m having trouble connecting right now. Please try again in a moment.';
   }
 };

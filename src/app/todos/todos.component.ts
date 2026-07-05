@@ -33,8 +33,10 @@ export class TodosComponent implements OnInit {
 
   createTodo() {
     try {
+      const content = window.prompt('Todo content');
+      if (!content || content.trim().length === 0) return;
       client.models.Todo.create({
-        content: window.prompt('Todo content'),
+        content: content.trim(),
       });
       this.listTodos();
     } catch (error) {

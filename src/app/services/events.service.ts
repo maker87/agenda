@@ -230,14 +230,14 @@ export class EventsService {
   /** Fetch events that other users have shared with the given email. */
   async listSharedEvents(recipientEmail: string): Promise<CalendarEvent[]> {
     try {
-      const { data, errors } = await getClient().models.CalendarEvent.list();
+      // Use a server-side filter to avoid fetching all records
+      const { data, errors } = await getClient().models.CalendarEvent.list({
+        filter: { sharedWith: { contains: recipientEmail } },
+      });
       if (errors?.length) throw new Error(errors[0].message);
-      // Filter for events where sharedWith includes the recipient
+      // Filter out events owned by the recipient (already in their own list)
       const shared = (data ?? [])
-        .filter(record => {
-          const sw = record.sharedWith ?? [];
-          return sw.includes(recipientEmail) && record.ownerEmail !== recipientEmail;
-        })
+        .filter(record => record.ownerEmail !== recipientEmail)
         .map(this.toLocal);
       return shared;
     } catch (err) {

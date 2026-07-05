@@ -2,6 +2,7 @@
 
 
 import { Injectable } from '@angular/core';
+import { environment } from '../../environments/environment';
 
 export interface GCalEvent {
   id: string;
@@ -27,7 +28,7 @@ const GCAL_COLORS: Record<string, string> = {
   '9': '#5484ed', '10': '#51b749', '11': '#dc2127',
 };
 
-const CLIENT_ID = '218113399123-f604cgc31ki5rhbju4sshlu43jqq98d2.apps.googleusercontent.com';
+const CLIENT_ID = environment.googleCalendarClientId;
 const SCOPES    = 'https://www.googleapis.com/auth/calendar.readonly';
 const TOKEN_KEY = 'agenda_gcal_token';
 
@@ -35,6 +36,9 @@ declare const google: any;
 
 @Injectable({ providedIn: 'root' })
 export class GoogleCalendarService {
+
+  // In-memory token store — not persisted to localStorage to prevent XSS theft
+  private _cachedToken: { token: string; expiry: number } | null = null;
 
   get isLinked(): boolean { return !!this.loadStoredToken(); }
 
@@ -49,9 +53,10 @@ export class GoogleCalendarService {
             scope: SCOPES,
             callback: (resp: any) => {
               if (resp.error) { reject(new Error(resp.error_description ?? resp.error)); return; }
-              console.log('[GCal] Got access token, expires_in:', resp.expires_in);
               const expiry = Date.now() + (Number(resp.expires_in) - 60) * 1000;
-              localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: resp.access_token, expiry }));
+              // Store token in memory only — sessionStorage as fallback for same-tab persistence
+              this._cachedToken = { token: resp.access_token, expiry };
+              sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ token: resp.access_token, expiry }));
               resolve(resp.access_token);
             },
           });
@@ -64,7 +69,8 @@ export class GoogleCalendarService {
   revoke() {
     const stored = this.loadStoredToken();
     if (stored && typeof google !== 'undefined') google.accounts.oauth2.revoke(stored, () => {});
-    localStorage.removeItem(TOKEN_KEY);
+    this._cachedToken = null;
+    sessionStorage.removeItem(TOKEN_KEY);
   }
 
   // ── Calendar list ─────────────────────────────────────────────────────────
@@ -77,7 +83,10 @@ export class GoogleCalendarService {
       { headers: { Authorization: `Bearer ${token}` } }
     );
     if (!res.ok) {
-      if (res.status === 401) localStorage.removeItem(TOKEN_KEY);
+      if (res.status === 401) {
+        this._cachedToken = null;
+        sessionStorage.removeItem(TOKEN_KEY);
+      }
       throw new Error(`Google Calendar API ${res.status}: ${res.statusText}`);
     }
     const data = await res.json();
@@ -142,12 +151,22 @@ export class GoogleCalendarService {
   }
 
   private loadStoredToken(): string | null {
+    // Check in-memory cache first
+    if (this._cachedToken && Date.now() < this._cachedToken.expiry) {
+      return this._cachedToken.token;
+    }
+    this._cachedToken = null;
+
+    // Fallback to sessionStorage (same-tab only, not vulnerable to cross-tab XSS)
     try {
-      const raw = localStorage.getItem(TOKEN_KEY);
+      const raw = sessionStorage.getItem(TOKEN_KEY);
       if (!raw) return null;
       const { token, expiry } = JSON.parse(raw);
-      if (Date.now() < expiry) return token;
-      localStorage.removeItem(TOKEN_KEY);
+      if (Date.now() < expiry) {
+        this._cachedToken = { token, expiry };
+        return token;
+      }
+      sessionStorage.removeItem(TOKEN_KEY);
       return null;
     } catch { return null; }
   }

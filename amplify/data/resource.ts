@@ -23,7 +23,10 @@ const schema = a.schema({
       sharedWith:  a.string().array(),
       reminderMinutes: a.integer(),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [
+      allow.owner().identityClaim('sub'),
+      allow.authenticated().to(['read']),
+    ]),
 
   Notification: a
     .model({
@@ -37,7 +40,10 @@ const schema = a.schema({
       read:           a.boolean(),
       status:         a.string(),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [
+      allow.owner().identityClaim('sub'),
+      allow.authenticated().to(['create', 'read']),
+    ]),
 
   chat: a
     .query()
@@ -49,7 +55,7 @@ const schema = a.schema({
     })
     .returns(a.string())
     .handler(a.handler.function(bedrockChatHandler))
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.authenticated()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
@@ -57,9 +63,9 @@ export type Schema = ClientSchema<typeof schema>;
 export const data = defineData({
   schema,
   authorizationModes: {
-    defaultAuthorizationMode: 'apiKey',
+    defaultAuthorizationMode: 'userPool',
     apiKeyAuthorizationMode: {
-      expiresInDays: 365,
+      expiresInDays: 30,
     },
   },
 });

@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
+import { environment } from '../../environments/environment';
 
-const MOCK_USERS = [
+// Demo accounts are ONLY available in non-production builds
+const MOCK_USERS = environment.production ? [] : [
   { email: 'demo@agenda.com', password: 'Demo1234!' },
   { email: 'alex.student@school.edu', password: 'Student1234!' },
   { email: 'jordan.coach@fitlife.com', password: 'Coach1234!' },
@@ -20,6 +22,8 @@ export interface UserProfile {
 @Injectable({ providedIn: 'root' })
 export class MockAuthService {
   login(email: string, password: string): boolean {
+    // Demo login is disabled in production
+    if (environment.production) return false;
     const match = MOCK_USERS.find(u => u.email === email && u.password === password);
     if (match) {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify({ email }));
