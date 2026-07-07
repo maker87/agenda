@@ -298,10 +298,10 @@
             <span style="font-size:24px">🔥</span>
           </div>
           <div class="action-body">
-            <h3 class="action-title">Set a Streak</h3>
-            <p class="action-desc">Track a daily habit with a checklist</p>
+            <h3 class="action-title">{{ i18n.t('setAStreak') }}</h3>
+            <p class="action-desc">{{ i18n.t('trackDailyHabit') }}</p>
           </div>
-          <button class="action-btn warning-btn" (click)="openStreakModal()">New</button>
+          <button class="action-btn warning-btn" (click)="openStreakModal()">{{ i18n.t('newStreakBtn') }}</button>
         </div>
 
         <!-- 6. AI Organize -->
@@ -319,15 +319,22 @@
       </div>
 
       <!-- Active Streaks section -->
-      <div class="streaks-section" *ngIf="streaks.length > 0">
-        <h3 class="streaks-title">🔥 Your Streaks</h3>
-        <div class="streaks-list">
+      <div class="streaks-section" *ngIf="streaks.length > 0 || streakHistory.length > 0">
+        <div class="streaks-header-row">
+          <h3 class="streaks-title">🔥 {{ i18n.t('yourStreaks') }}</h3>
+          <button class="btn-secondary" style="font-size:12px;padding:6px 12px" *ngIf="streakHistory.length > 0" (click)="showStreakHistory = !showStreakHistory">
+            {{ showStreakHistory ? i18n.t('hideHistory') : i18n.t('streakHistoryLabel') + ' (' + streakHistory.length + ')' }}
+          </button>
+        </div>
+        <div class="streaks-list" *ngIf="streaks.length > 0">
           <div class="streak-card" *ngFor="let streak of streaks">
             <div class="streak-header">
               <span class="streak-name">{{ streak.name }}</span>
+              <span class="streak-target-badge">{{ streak.target }} {{ streak.unit }}/day</span>
               <span class="streak-count">{{ getStreakCount(streak) }} day{{ getStreakCount(streak) !== 1 ? 's' : '' }}</span>
               <button class="streak-delete" (click)="deleteStreak(streak.id)" title="Delete streak">✕</button>
             </div>
+            <p class="streak-ai-plan" *ngIf="streak.aiPlan">💡 {{ streak.aiPlan }}</p>
             <div class="streak-days">
               <div
                 class="streak-day"
@@ -338,7 +345,42 @@
                 (click)="toggleStreakDay(streak, day.date)"
               >
                 <span class="streak-day-label">{{ day.label }}</span>
-                <span class="streak-day-check">{{ day.checked ? '✓' : '' }}</span>
+                <span class="streak-day-value" *ngIf="day.value > 0">{{ day.value }}</span>
+                <span class="streak-day-check">{{ day.checked ? '✓' : '·' }}</span>
+              </div>
+            </div>
+            <!-- Today's log input -->
+            <div class="streak-log-row" *ngIf="!streak.checkedDays.includes(today)">
+              <span class="streak-log-label">Today:</span>
+              <input
+                class="streak-log-input"
+                type="number"
+                min="0"
+                [placeholder]="streak.target + ' ' + streak.unit"
+                [ngModel]="streak.loggedValues[today] || ''"
+                (ngModelChange)="logStreakValue(streak, today, +$event)"
+                [attr.name]="'streakLog_' + streak.id"
+              />
+              <span class="streak-log-unit">{{ streak.unit }}</span>
+            </div>
+            <div class="streak-done-today" *ngIf="streak.checkedDays.includes(today)">
+              ✅ Done today! ({{ streak.loggedValues[today] || streak.target }} {{ streak.unit }})
+            </div>
+          </div>
+        </div>
+
+        <!-- Streak History -->
+        <div class="streak-history" *ngIf="showStreakHistory && streakHistory.length > 0">
+          <h4 class="streak-history-title">📋 {{ i18n.t('streakHistoryLabel') }}</h4>
+          <div class="streak-history-list">
+            <div class="streak-history-item" *ngFor="let h of streakHistory">
+              <div class="streak-history-info">
+                <span class="streak-history-name">{{ h.name }}</span>
+                <span class="streak-history-meta">{{ h.target }} {{ h.unit }}/day · {{ h.checkedDays.length }} total days · Deleted {{ h.deletedAt | date:'mediumDate' }}</span>
+              </div>
+              <div class="streak-history-actions">
+                <button class="btn-primary" style="font-size:11px;padding:5px 10px" (click)="restoreStreak(h.id)">{{ i18n.t('restore') }}</button>
+                <button class="streak-delete" (click)="permanentlyDeleteStreak(h.id)" [title]="i18n.t('deleteForever')">✕</button>
               </div>
             </div>
           </div>
@@ -2995,21 +3037,72 @@
       <button class="modal-close" (click)="closeStreakModal()">✕</button>
     </div>
     <div class="modal-form">
-      <div class="field">
-        <label>What are you tracking?</label>
-        <input
-          type="text"
-          [(ngModel)]="streakFormName"
-          name="streakFormName"
-          placeholder="e.g. Workout, Read 30 min, Drink water…"
-          (keyup.enter)="createStreak()"
-        />
-      </div>
-      <div class="error-msg" *ngIf="streakFormError">{{ streakFormError }}</div>
-      <div class="modal-actions">
-        <button class="btn-secondary" (click)="closeStreakModal()">Cancel</button>
-        <button class="btn-primary" (click)="createStreak()">Start Streak</button>
-      </div>
+
+      <!-- Step 1: Name -->
+      <ng-container *ngIf="streakStep === 'name'">
+        <div class="field">
+          <label>{{ i18n.t('whatHabitTrack') }}</label>
+          <input
+            type="text"
+            [(ngModel)]="streakFormName"
+            name="streakFormName"
+            [placeholder]="i18n.t('habitPlaceholder')"
+            (keyup.enter)="streakNextFromName()"
+          />
+        </div>
+        <div class="error-msg" *ngIf="streakFormError">{{ streakFormError }}</div>
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="closeStreakModal()">{{ i18n.t('cancel') }}</button>
+          <button class="btn-primary" (click)="streakNextFromName()">{{ i18n.t('nextBtn') }}</button>
+        </div>
+      </ng-container>
+
+      <!-- Step 2: Details (target + unit) -->
+      <ng-container *ngIf="streakStep === 'details'">
+        <p style="font-size:14px;color:var(--text-secondary);margin:0 0 16px">{{ i18n.t('setDailyGoal') }} <strong>{{ streakFormName }}</strong>:</p>
+        <div class="field-row">
+          <div class="field">
+            <label>{{ i18n.t('dailyTarget') }}</label>
+            <input type="number" [(ngModel)]="streakFormTarget" name="streakTarget" min="1" />
+          </div>
+          <div class="field">
+            <label>{{ i18n.t('unitLabel') }}</label>
+            <input type="text" [(ngModel)]="streakFormUnit" name="streakUnit" [placeholder]="i18n.t('unitPlaceholder')" />
+          </div>
+        </div>
+        <div class="error-msg" *ngIf="streakFormError">{{ streakFormError }}</div>
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="streakStep = 'name'">{{ i18n.t('backBtn') }}</button>
+          <button class="btn-primary" (click)="streakAskAi()">{{ i18n.t('letAiPlan') }}</button>
+        </div>
+      </ng-container>
+
+      <!-- Step 3: AI Planning -->
+      <ng-container *ngIf="streakStep === 'planning'">
+        <div style="text-align:center;padding:24px 0">
+          <span class="db-spinner"></span>
+          <p style="color:var(--text-muted);margin-top:12px">{{ i18n.t('aiCreatingPlan') }}</p>
+        </div>
+      </ng-container>
+
+      <!-- Step 4: Ready -->
+      <ng-container *ngIf="streakStep === 'ready'">
+        <div class="streak-plan-preview">
+          <div class="streak-plan-header">
+            <span class="streak-plan-icon">🔥</span>
+            <div>
+              <strong>{{ streakFormName }}</strong>
+              <span class="streak-plan-goal">{{ streakFormTarget }} {{ streakFormUnit }}{{ i18n.t('perDay') }}</span>
+            </div>
+          </div>
+          <p class="streak-plan-text" *ngIf="streakAiPlan">{{ i18n.t('aiPlanLabel') }} {{ streakAiPlan }}</p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="streakStep = 'details'">{{ i18n.t('editBtn') }}</button>
+          <button class="btn-primary" (click)="createStreak()">{{ i18n.t('startStreakBtn') }}</button>
+        </div>
+      </ng-container>
+
     </div>
   </div>
 </div>

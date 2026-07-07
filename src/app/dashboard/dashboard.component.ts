@@ -64,7 +64,7 @@ function relDate(offsetDays: number): string {
 // Format a YYYY-MM-DD string for display (used in notification bodies)
 function formatDate2(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 // Helper to build a fixed date string for a given month/day in the current year
@@ -710,53 +710,164 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   // ── Streaks ──
   private readonly STREAKS_KEY = 'agenda_streaks';
-  streaks: { id: string; name: string; checkedDays: string[] }[] = [];
+  private readonly STREAK_HISTORY_KEY = 'agenda_streak_history';
+
+  streaks: {
+    id: string; name: string; target: number; unit: string;
+    checkedDays: string[]; loggedValues: Record<string, number>;
+    aiPlan: string; createdAt: string;
+  }[] = [];
+
+  streakHistory: {
+    id: string; name: string; target: number; unit: string;
+    checkedDays: string[]; loggedValues: Record<string, number>;
+    aiPlan: string; createdAt: string; deletedAt: string;
+  }[] = [];
+
   showStreakModal = false;
+  streakStep: 'name' | 'details' | 'planning' | 'ready' = 'name';
   streakFormName = '';
   streakFormError = '';
+  streakFormTarget = 0;
+  streakFormUnit = '';
+  streakAiPlan = '';
+  streakAiLoading = false;
+  showStreakHistory = false;
 
   loadStreaks() {
     try {
       const raw = localStorage.getItem(this.STREAKS_KEY);
       this.streaks = raw ? JSON.parse(raw) : [];
+      // Migrate old format streaks (without target/unit)
+      this.streaks = this.streaks.map(s => ({
+        ...s,
+        target: s.target ?? 1,
+        unit: s.unit ?? 'times',
+        loggedValues: s.loggedValues ?? {},
+        aiPlan: s.aiPlan ?? '',
+        createdAt: s.createdAt ?? '',
+      } as typeof this.streaks[0]));
     } catch { this.streaks = []; }
+    try {
+      const raw = localStorage.getItem(this.STREAK_HISTORY_KEY);
+      this.streakHistory = raw ? JSON.parse(raw) : [];
+    } catch { this.streakHistory = []; }
   }
 
   private saveStreaks() {
     localStorage.setItem(this.STREAKS_KEY, JSON.stringify(this.streaks));
   }
 
+  private saveStreakHistory() {
+    localStorage.setItem(this.STREAK_HISTORY_KEY, JSON.stringify(this.streakHistory));
+  }
+
   openStreakModal() {
     this.showStreakModal = true;
+    this.streakStep = 'name';
     this.streakFormName = '';
     this.streakFormError = '';
+    this.streakFormTarget = 0;
+    this.streakFormUnit = '';
+    this.streakAiPlan = '';
   }
 
   closeStreakModal() {
     this.showStreakModal = false;
   }
 
-  createStreak() {
+  streakNextFromName() {
     const name = this.streakFormName.trim();
     if (!name) { this.streakFormError = 'Give your streak a name.'; return; }
     if (this.streaks.find(s => s.name === name)) { this.streakFormError = 'A streak with that name already exists.'; return; }
-    this.streaks = [...this.streaks, { id: `streak_${Date.now()}`, name, checkedDays: [] }];
+    this.streakFormError = '';
+    this.streakStep = 'details';
+    const lower = name.toLowerCase();
+    if (lower.includes('read')) { this.streakFormUnit = 'pages'; this.streakFormTarget = 20; }
+    else if (lower.includes('water') || lower.includes('drink')) { this.streakFormUnit = 'glasses'; this.streakFormTarget = 8; }
+    else if (lower.includes('run') || lower.includes('walk') || lower.includes('exercise') || lower.includes('workout')) { this.streakFormUnit = 'minutes'; this.streakFormTarget = 30; }
+    else if (lower.includes('meditat')) { this.streakFormUnit = 'minutes'; this.streakFormTarget = 10; }
+    else if (lower.includes('code') || lower.includes('study')) { this.streakFormUnit = 'minutes'; this.streakFormTarget = 60; }
+    else { this.streakFormUnit = 'minutes'; this.streakFormTarget = 30; }
+  }
+
+  async streakAskAi() {
+    this.streakFormError = '';
+    if (!this.streakFormTarget || this.streakFormTarget <= 0) { this.streakFormError = 'Set a daily target above 0.'; return; }
+    if (!this.streakFormUnit.trim()) { this.streakFormError = 'Specify a unit.'; return; }
+    this.streakStep = 'planning';
+    this.streakAiLoading = true;
+    try {
+      const prompt = `I want to build a daily habit: "${this.streakFormName}". My daily goal is ${this.streakFormTarget} ${this.streakFormUnit}. Give me a short 2-3 sentence motivational plan for maintaining this streak. Include a tip for consistency. Be concise and encouraging.`;
+      const { text } = await this.bedrockChat.sendMessage(prompt, this.events, []);
+      this.streakAiPlan = text.trim();
+    } catch {
+      this.streakAiPlan = `Aim for ${this.streakFormTarget} ${this.streakFormUnit} every day. Start small if needed — consistency beats intensity. Try pairing it with an existing habit to make it stick.`;
+    }
+    this.streakAiLoading = false;
+    this.streakStep = 'ready';
+  }
+
+  createStreak() {
+    const name = this.streakFormName.trim();
+    if (!name) return;
+    this.streaks = [...this.streaks, {
+      id: `streak_${Date.now()}`, name,
+      target: this.streakFormTarget || 1,
+      unit: this.streakFormUnit.trim() || 'times',
+      checkedDays: [], loggedValues: {},
+      aiPlan: this.streakAiPlan,
+      createdAt: new Date().toISOString().split('T')[0],
+    }];
     this.saveStreaks();
     this.closeStreakModal();
   }
 
   deleteStreak(id: string) {
+    const streak = this.streaks.find(s => s.id === id);
+    if (streak) {
+      this.streakHistory = [...this.streakHistory, { ...streak, deletedAt: new Date().toISOString() }];
+      this.saveStreakHistory();
+    }
     this.streaks = this.streaks.filter(s => s.id !== id);
     this.saveStreaks();
   }
 
-  toggleStreakDay(streak: { id: string; name: string; checkedDays: string[] }, dateStr: string) {
+  restoreStreak(id: string) {
+    const entry = this.streakHistory.find(s => s.id === id);
+    if (!entry) return;
+    const { deletedAt: _d, ...streak } = entry;
+    this.streaks = [...this.streaks, streak];
+    this.streakHistory = this.streakHistory.filter(s => s.id !== id);
+    this.saveStreaks();
+    this.saveStreakHistory();
+  }
+
+  permanentlyDeleteStreak(id: string) {
+    this.streakHistory = this.streakHistory.filter(s => s.id !== id);
+    this.saveStreakHistory();
+  }
+
+  logStreakValue(streak: typeof this.streaks[0], dateStr: string, value: number) {
+    if (dateStr > new Date().toISOString().split('T')[0]) return;
+    streak.loggedValues[dateStr] = value;
+    if (value >= streak.target && !streak.checkedDays.includes(dateStr)) {
+      streak.checkedDays = [...streak.checkedDays, dateStr].sort();
+    } else if (value < streak.target) {
+      streak.checkedDays = streak.checkedDays.filter(d => d !== dateStr);
+    }
+    this.saveStreaks();
+  }
+
+  toggleStreakDay(streak: typeof this.streaks[0], dateStr: string) {
     if (dateStr > new Date().toISOString().split('T')[0]) return;
     const idx = streak.checkedDays.indexOf(dateStr);
     if (idx >= 0) {
       streak.checkedDays = streak.checkedDays.filter(d => d !== dateStr);
+      delete streak.loggedValues[dateStr];
     } else {
       streak.checkedDays = [...streak.checkedDays, dateStr].sort();
+      streak.loggedValues[dateStr] = streak.target;
     }
     this.saveStreaks();
   }
@@ -767,10 +878,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     if (sorted.length === 0) return 0;
     let count = 0;
     const cursor = new Date(today + 'T12:00:00');
-    // Allow starting from yesterday if today isn't checked
-    if (!sorted.includes(today) && sorted.length > 0) {
-      cursor.setDate(cursor.getDate() - 1);
-    }
+    if (!sorted.includes(today)) { cursor.setDate(cursor.getDate() - 1); }
     for (const day of sorted) {
       const expected = cursor.toISOString().split('T')[0];
       if (day === expected) { count++; cursor.setDate(cursor.getDate() - 1); }
@@ -779,18 +887,32 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     return count;
   }
 
-  getStreakWeek(streak: { checkedDays: string[] }): { date: string; label: string; checked: boolean; isToday: boolean; isFuture: boolean }[] {
+  getStreakWeek(streak: { checkedDays: string[]; loggedValues?: Record<string, number>; target?: number; unit?: string }): { date: string; label: string; checked: boolean; isToday: boolean; isFuture: boolean; value: number }[] {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const days: { date: string; label: string; checked: boolean; isToday: boolean; isFuture: boolean }[] = [];
+    const days: { date: string; label: string; checked: boolean; isToday: boolean; isFuture: boolean; value: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
-      days.push({ date: dateStr, label: dayNames[d.getDay()], checked: streak.checkedDays.includes(dateStr), isToday: dateStr === todayStr, isFuture: dateStr > todayStr });
+      days.push({ date: dateStr, label: dayNames[d.getDay()], checked: streak.checkedDays.includes(dateStr), isToday: dateStr === todayStr, isFuture: dateStr > todayStr, value: streak.loggedValues?.[dateStr] ?? 0 });
     }
     return days;
+  }
+
+  getStreakReminders(): { title: string; body: string }[] {
+    const today = new Date().toISOString().split('T')[0];
+    const reminders: { title: string; body: string }[] = [];
+    for (const streak of this.streaks) {
+      if (!streak.checkedDays.includes(today)) {
+        reminders.push({
+          title: `Don't break your streak: ${streak.name}`,
+          body: `Goal: ${streak.target} ${streak.unit} today. Current streak: ${this.getStreakCount(streak)} days!`,
+        });
+      }
+    }
+    return reminders;
   }
 
   // ── History ──
@@ -1022,7 +1144,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
         .sort((a, b) => a.startTime.localeCompare(b.startTime));
       days.push({
         date: dateStr,
-        label: d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+        label: d.toLocaleDateString(this.i18n.getLocale(), { weekday: 'long', month: 'short', day: 'numeric' }),
         events: dayEvents,
         isToday: i === 0,
       });
@@ -2077,17 +2199,21 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   currentYear = new Date().getFullYear();
   currentMonthIndex = new Date().getMonth(); // 0-based
 
-  monthNames = [
-    'January','February','March','April','May','June',
-    'July','August','September','October','November','December'
-  ];
-  dayLabels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  /** Locale-aware month names — updates when language changes. */
+  get monthNames(): string[] {
+    return this.i18n.getMonthNames();
+  }
+
+  /** Locale-aware short day labels — updates when language changes. */
+  get dayLabels(): string[] {
+    return this.i18n.getDayLabels();
+  }
 
   // ── Calendar view state ──
   calendarView: 'year' | 'month' | 'week' | 'day' = 'year';
 
   // Month view: user can type a month name or number
-  viewMonthInput = this.monthNames[new Date().getMonth()];
+  viewMonthInput = '';
   get viewMonthIndex(): number {
     const trimmed = this.viewMonthInput.trim().toLowerCase();
     const byName = this.monthNames.findIndex(m => m.toLowerCase().startsWith(trimmed));
@@ -2114,7 +2240,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       const dateStr = d.toISOString().split('T')[0];
       days.push({
         dateStr,
-        label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        label: d.toLocaleDateString(this.i18n.getLocale(), { weekday: 'short', month: 'short', day: 'numeric' }),
         isToday: dateStr === this.today,
         events: this.eventsForDate(dateStr).map(e => ({
           ...e,
@@ -2135,7 +2261,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
   get viewDayLabel(): string {
     const d = new Date(this.viewDayInput + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    return d.toLocaleDateString(this.i18n.getLocale(), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   }
 
   // ── Year view slideshow ──
@@ -2761,6 +2887,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.userEmail = user.email;
     this.profile = this.mockAuth.getProfile(user.email);
     this.i18n.setLanguage(this.profile.language);
+    this.viewMonthInput = this.monthNames[new Date().getMonth()];
     this.googleCalendarLinked = this.googleCalendarService.isLinked;
     this.loadHistory();
     this.loadSavedCategories();
@@ -3862,7 +3989,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   get dayPanelLabel(): string {
     if (!this.dayPanelDate) return '';
     const d = new Date(this.dayPanelDate + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    return d.toLocaleDateString(this.i18n.getLocale(), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   }
 
   get dayPanelEvents(): CalendarEvent[] {
@@ -4653,8 +4780,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   formatNotifTime(iso: string | undefined): string {
     if (!iso) return '';
     const d = new Date(iso);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return d.toLocaleDateString(this.i18n.getLocale(), { month: 'short', day: 'numeric' })
+      + ' · ' + d.toLocaleTimeString(this.i18n.getLocale(), { hour: 'numeric', minute: '2-digit' });
   }
 
 
@@ -4740,12 +4867,12 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   formatHistoryTime(ts: number): string {
     const d = new Date(ts);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-      + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return d.toLocaleDateString(this.i18n.getLocale(), { month: 'short', day: 'numeric', year: 'numeric' })
+      + ' · ' + d.toLocaleTimeString(this.i18n.getLocale(), { hour: 'numeric', minute: '2-digit' });
   }
 
   historyActionLabel(action: HistoryAction): string {
-    return action === 'added' ? 'Added' : action === 'deleted' ? 'Deleted' : 'Changed';
+    return action === 'added' ? this.i18n.t('added') : action === 'deleted' ? this.i18n.t('deleted') : this.i18n.t('changed');
   }
 
   historyActionColor(action: HistoryAction): string {
@@ -4759,7 +4886,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   formatDate(dateStr: string): string {
     const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(this.i18n.getLocale(), { weekday: 'short', month: 'short', day: 'numeric' });
   }
 
   /** Check if an event occurs on a given date (including multi-day spans). */
@@ -4784,9 +4911,8 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   formatTime(t: string): string {
     const [h, m] = t.split(':').map(Number);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const hour = h % 12 || 12;
-    return `${hour}:${m.toString().padStart(2, '0')} ${ampm}`;
+    const d = new Date(2000, 0, 1, h, m);
+    return d.toLocaleTimeString(this.i18n.getLocale(), { hour: 'numeric', minute: '2-digit' });
   }
 
   encodeLocation(location: string): string {

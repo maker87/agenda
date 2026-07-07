@@ -712,13 +712,20 @@
 /* ── Modal ── */
 .modal-overlay {
   position: fixed;
-  inset: 0;
-  background: var(--modal-overlay);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9000;
+  z-index: 99999;
   padding: 24px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .modal {
@@ -726,17 +733,19 @@
   border-radius: 18px;
   width: 100%;
   max-width: 480px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.2);
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 48px);
   overflow: hidden;
-  opacity: 1 !important;
+  position: relative;
+  z-index: 1;
 }
 
 .app-shell[data-theme="dark"] .modal {
   background: #1a1a2e;
   border: 1px solid #3a3a5c;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7), 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 /* ── Dark mode form contrast fixes ── */
@@ -8147,4 +8156,173 @@
 .profile-region-row .profile-select {
   flex: 1;
   min-width: 160px;
+}
+
+/* ── Streak enhancements ── */
+.streaks-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.streak-target-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-light);
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.streak-ai-plan {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  background: var(--bg-surface-2);
+  border-radius: 8px;
+  border-left: 3px solid var(--accent);
+  line-height: 1.5;
+}
+
+.streak-day-value {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.streak-log-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.streak-log-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.streak-log-input {
+  width: 80px;
+  padding: 6px 10px;
+  border: 1.5px solid var(--border-input);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--bg-surface-2);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.streak-log-input:focus {
+  border-color: var(--accent);
+}
+
+.streak-log-unit {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.streak-done-today {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Streak History */
+.streak-history {
+  margin-top: 20px;
+  border-top: 1.5px solid var(--border);
+  padding-top: 16px;
+}
+
+.streak-history-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 12px;
+}
+
+.streak-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.streak-history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.streak-history-info { flex: 1; min-width: 0; }
+
+.streak-history-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.streak-history-meta {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.streak-history-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Streak plan preview in modal */
+.streak-plan-preview {
+  background: var(--bg-surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.streak-plan-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.streak-plan-icon { font-size: 24px; }
+
+.streak-plan-goal {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.streak-plan-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
 }
