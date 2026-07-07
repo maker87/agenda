@@ -14,6 +14,7 @@ import { AiChatService, ChatMessage, EventDraft, getProactiveReminders } from '.
 import { AiOrganizeService, OrganizedEvent, OrganizeResult } from '../services/ai-organize.service';
 import { BedrockChatService, ChatAction as BedrockAction } from '../services/bedrock-chat.service';
 import { I18nService } from '../services/i18n.service';
+import { signOut } from 'aws-amplify/auth';
 
 interface CalendarEvent {
   id: string;
@@ -3105,7 +3106,10 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     }
   }
 
-  logout() {
+  async logout() {
+    // Clear the AWS Cognito session; otherwise the route guards re-establish
+    // the session from the cached token and bounce the user back in.
+    try { await signOut(); } catch { /* ignore if no Cognito session */ }
     this.mockAuth.logout();
     this.router.navigate(['/']);
   }
