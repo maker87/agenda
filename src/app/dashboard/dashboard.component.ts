@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewInit } from '@angular/core';
+import { Component, OnInit, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -28,6 +28,35 @@ interface CalendarEvent {
   category: string;
   location?: string;
   sharedWith: string[];
+}
+
+interface FriendMessage {
+  id: string;
+  fromEmail: string;
+  toEmail: string;
+  text: string;
+  createdAt: string;
+}
+
+interface EventAttachment {
+  name: string;
+  dataUrl: string;
+  type: string;
+  size: number;
+}
+
+interface StreakDay {
+  date: string; label: string; checked: boolean; isToday: boolean; isFuture: boolean; value: number;
+}
+
+interface Streak {
+  id: string; name: string; target: number; unit: string;
+  checkedDays: string[]; loggedValues: Record<string, number>;
+  aiPlan: string; createdAt: string;
+  // Cached derived values, recomputed only when the streak's data changes
+  // (avoids re-sorting/re-scanning checkedDays on every change-detection cycle).
+  _count?: number;
+  _week?: StreakDay[];
 }
 
 type HistoryAction = 'added' | 'deleted' | 'changed';
@@ -707,23 +736,15 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   gcalImporting = false;
   gcalFutureOnly = true;
   gcalImportCount = 0;
-  activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly' = 'schedule';
+  activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly' | 'friends' = 'schedule';
 
   // ── Streaks ──
   private readonly STREAKS_KEY = 'agenda_streaks';
   private readonly STREAK_HISTORY_KEY = 'agenda_streak_history';
 
-  streaks: {
-    id: string; name: string; target: number; unit: string;
-    checkedDays: string[]; loggedValues: Record<string, number>;
-    aiPlan: string; createdAt: string;
-  }[] = [];
+  streaks: Streak[] = [];
 
-  streakHistory: {
-    id: string; name: string; target: number; unit: string;
-    checkedDays: string[]; loggedValues: Record<string, number>;
-    aiPlan: string; createdAt: string; deletedAt: string;
-  }[] = [];
+  streakHistory: (Streak & { deletedAt: string })[] = [];
 
   showStreakModal = false;
   streakStep: 'name' | 'details' | 'planning' | 'ready' = 'name';
@@ -858,6 +879,11 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       streak.checkedDays = streak.checkedDays.filter(d => d !== dateStr);
     }
     this.saveStreaks();
+  }
+
+  adjustStreakToday(streak: typeof this.streaks[0], delta: number) {
+    const current = streak.loggedValues[this.today] || 0;
+    this.logStreakValue(streak, this.today, Math.max(0, current + delta));
   }
 
   toggleStreakDay(streak: typeof this.streaks[0], dateStr: string) {
@@ -1247,10 +1273,14 @@ export class DashboardComponent implements OnInit, AfterViewInit {
       this.scrollChatToBottom();
       this.syncConversationMessages();
 
-      // Auto-execute actions
+      // create_event / create_recurring / create_reminder are NOT
+      // auto-executed — the user must explicitly click the action button
+      // (rendered above) to confirm before anything is added. Only
+      // side-effect-free navigation actions fire immediately.
       for (const action of actions) {
-        console.log('[AI Chat] Executing action:', action);
-        this.executeBedrockAction(action);
+        if (action.type === 'navigate') {
+          this.executeBedrockAction(action);
+        }
       }
     }).catch((err) => {
       console.error('[AI Chat] Error:', err);
@@ -1306,6 +1336,19 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     }
     if (action.type === 'create_reminder' && action.reminderTitle) {
       this.createAiReminder(action.reminderTitle, action.reminderBody ?? '');
+    }
+    // Bedrock-suggested event/recurring/reminder actions carry their fields
+    // directly on the action (title/date/startTime/...), not wrapped in
+    // `payload` or `reminderTitle`. These only ever execute here, on an
+    // explicit user click of the confirmation button — never automatically.
+    if (
+      (action.type === 'create_event' || action.type === 'create_recurring') &&
+      !action.payload
+    ) {
+      this.executeBedrockAction(action as any as BedrockAction);
+    }
+    if (action.type === 'create_reminder' && !action.reminderTitle && (action as any).title) {
+      this.executeBedrockAction(action as any as BedrockAction);
     }
     if (action.type === 'copy_text' && action.copyText) {
       navigator.clipboard.writeText(action.copyText).then(() => {
@@ -1978,6 +2021,174 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     n.status = 'rejected';
     n.read = true;
     this.notificationsService.markRead(n.id).catch(() => {});
+  }
+
+  // ── Friends messaging (Friends tab) ──
+  selectedFriendEmail: string | null = null;
+  friendMessageDraft = '';
+  friendMessages: { [friendEmail: string]: FriendMessage[] } = {};
+  friendMessagesUnread: { [friendEmail: string]: number } = {};
+
+  @ViewChild('friendMessagesScroll') private friendMessagesScrollRef?: ElementRef<HTMLDivElement>;
+
+  private readonly FRIEND_MESSAGES_KEY = (friendEmail: string) =>
+    `agenda_messages_${this.userEmail}_${friendEmail}`;
+
+  private readonly FRIEND_AUTO_REPLIES = [
+    "Hey! 👋 What's up?",
+    "Sounds good, I'll check my calendar!",
+    "Got it, thanks for letting me know.",
+    "Haha, nice — see you then!",
+    "I'm free after 3pm if that works for you.",
+    "👍",
+    "Can we push this to next week?",
+  ];
+
+  get selectedFriend(): { email: string; displayName: string; nickname: string } | null {
+    return this.friends.find(f => f.email === this.selectedFriendEmail) ?? null;
+  }
+
+  get selectedFriendMessages(): FriendMessage[] {
+    return this.selectedFriendEmail ? (this.friendMessages[this.selectedFriendEmail] ?? []) : [];
+  }
+
+  private loadFriendMessagesFor(friendEmail: string): FriendMessage[] {
+    try {
+      const raw = localStorage.getItem(this.FRIEND_MESSAGES_KEY(friendEmail));
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  }
+
+  private persistFriendMessagesFor(friendEmail: string) {
+    localStorage.setItem(this.FRIEND_MESSAGES_KEY(friendEmail), JSON.stringify(this.friendMessages[friendEmail] ?? []));
+  }
+
+  /** Preview text shown in the friend list row; lazily loads & caches history from localStorage. */
+  getLastMessagePreview(friendEmail: string): string {
+    if (!this.friendMessages[friendEmail]) {
+      this.friendMessages[friendEmail] = this.loadFriendMessagesFor(friendEmail);
+    }
+    const msgs = this.friendMessages[friendEmail];
+    if (!msgs.length) return 'No messages yet — say hi!';
+    const last = msgs[msgs.length - 1];
+    return (last.fromEmail === this.userEmail ? 'You: ' : '') + last.text;
+  }
+
+  getUnreadMessageCount(friendEmail: string): number {
+    return this.friendMessagesUnread[friendEmail] ?? 0;
+  }
+
+  openFriendChat(friendEmail: string) {
+    this.selectedFriendEmail = friendEmail;
+    if (!this.friendMessages[friendEmail]) {
+      this.friendMessages[friendEmail] = this.loadFriendMessagesFor(friendEmail);
+    }
+    this.friendMessagesUnread[friendEmail] = 0;
+    setTimeout(() => this.scrollFriendMessagesToBottom(), 0);
+  }
+
+  sendFriendMessage() {
+    const text = this.friendMessageDraft.trim();
+    const friendEmail = this.selectedFriendEmail;
+    if (!text || !friendEmail) return;
+
+    const msg: FriendMessage = {
+      id: Date.now().toString() + Math.random().toString(36).slice(2),
+      fromEmail: this.userEmail,
+      toEmail: friendEmail,
+      text,
+      createdAt: new Date().toISOString(),
+    };
+    this.friendMessages[friendEmail] = [...(this.friendMessages[friendEmail] ?? []), msg];
+    this.persistFriendMessagesFor(friendEmail);
+    this.friendMessageDraft = '';
+    setTimeout(() => this.scrollFriendMessagesToBottom(), 0);
+
+    // Simulate the friend replying (demo has no real backend for the other user, same
+    // approach as the friend-request auto-accept in sendFriendRequest()).
+    setTimeout(() => {
+      const reply: FriendMessage = {
+        id: Date.now().toString() + Math.random().toString(36).slice(2),
+        fromEmail: friendEmail,
+        toEmail: this.userEmail,
+        text: this.FRIEND_AUTO_REPLIES[Math.floor(Math.random() * this.FRIEND_AUTO_REPLIES.length)],
+        createdAt: new Date().toISOString(),
+      };
+      this.friendMessages[friendEmail] = [...(this.friendMessages[friendEmail] ?? []), reply];
+      this.persistFriendMessagesFor(friendEmail);
+      if (this.selectedFriendEmail === friendEmail) {
+        setTimeout(() => this.scrollFriendMessagesToBottom(), 0);
+      } else {
+        this.friendMessagesUnread[friendEmail] = (this.friendMessagesUnread[friendEmail] ?? 0) + 1;
+      }
+    }, 900 + Math.random() * 1200);
+  }
+
+  private scrollFriendMessagesToBottom() {
+    const el = this.friendMessagesScrollRef?.nativeElement;
+    if (el) el.scrollTop = el.scrollHeight;
+  }
+
+  // ── Event attachments (upload beside Share) ──
+  eventAttachments: { [eventId: string]: EventAttachment[] } = {};
+  attachmentUploadTargetEvent: CalendarEvent | null = null;
+
+  @ViewChild('attachmentFileInput') private attachmentFileInputRef?: ElementRef<HTMLInputElement>;
+
+  private readonly ATTACHMENTS_KEY = () => `agenda_attachments_${this.userEmail}`;
+
+  loadEventAttachments() {
+    try {
+      const raw = localStorage.getItem(this.ATTACHMENTS_KEY());
+      this.eventAttachments = raw ? JSON.parse(raw) : {};
+    } catch { this.eventAttachments = {}; }
+  }
+
+  private persistEventAttachments() {
+    localStorage.setItem(this.ATTACHMENTS_KEY(), JSON.stringify(this.eventAttachments));
+  }
+
+  getEventAttachments(eventId: string): EventAttachment[] {
+    return this.eventAttachments[eventId] ?? [];
+  }
+
+  /** Opens the file picker for the given event; on selection the file is attached and the
+   *  Share modal opens automatically so sending it to a friend is a single extra click. */
+  triggerAttachmentUpload(event: CalendarEvent) {
+    this.attachmentUploadTargetEvent = event;
+    this.attachmentFileInputRef?.nativeElement.click();
+  }
+
+  onAttachmentFileChange(evt: Event) {
+    const input = evt.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const targetEvent = this.attachmentUploadTargetEvent;
+    input.value = '';
+    if (!file || !targetEvent) return;
+    if (file.size > 5 * 1024 * 1024) {
+      console.warn('[Dashboard] Attachment too large (max 5MB):', file.name);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const list = [...this.getEventAttachments(targetEvent.id), { name: file.name, dataUrl, type: file.type, size: file.size }];
+      this.eventAttachments = { ...this.eventAttachments, [targetEvent.id]: list };
+      this.persistEventAttachments();
+      this.attachmentUploadTargetEvent = null;
+      // Jump straight into sharing now that there's something to send (unless the
+      // Share modal for this event is already open — don't reset the in-progress form).
+      if (!(this.showShareModal && this.shareTargetEvent?.id === targetEvent.id)) {
+        this.openShareModal(targetEvent);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  removeEventAttachment(eventId: string, index: number) {
+    const list = this.getEventAttachments(eventId).filter((_, i) => i !== index);
+    this.eventAttachments = { ...this.eventAttachments, [eventId]: list };
+    this.persistEventAttachments();
   }
 
   // ── Share sub-tab ──
@@ -2896,6 +3107,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.loadCategoryColors();
     this.loadAiConversations();
     this.loadFriends();
+    this.loadEventAttachments();
     await this.loadEventsFromDb(user.email);
     this.loadNotifications(user.email);
   }
@@ -3080,7 +3292,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.currentYear++;
   }
 
-  switchTab(tab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly') {
+  switchTab(tab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly' | 'friends') {
     this.activeTab = tab;
     if (tab === 'calendar') {
       this.slideMonthIndex = this.currentMonthIndex;

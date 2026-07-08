@@ -945,6 +945,11 @@
   overflow: visible;
 }
 
+/* ...and escape the modal's own clipping box too, so it renders in front instead of being cut off */
+.modal.picker-open {
+  overflow: visible;
+}
+
 .field {
   margin-bottom: 16px;
 }
@@ -3066,6 +3071,40 @@
   background: var(--bg-selected);
 }
 
+.upload-btn {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: #94a3b8;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+  line-height: 1;
+}
+
+.upload-btn:hover {
+  color: var(--accent);
+  background: var(--bg-selected);
+}
+
+.upload-badge {
+  position: absolute;
+  top: -4px;
+  right: -2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
+
 .event-shared {
   font-size: 11px;
   color: #94a3b8;
@@ -3162,6 +3201,44 @@
 }
 
 .share-chip-remove:hover { opacity: 1; }
+
+.share-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.share-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  background: #ede9fe;
+  color: #6d28d9;
+  border-radius: 12px;
+  font-size: 12px;
+  max-width: 220px;
+}
+
+.share-attachment-chip .share-chip-remove { color: #6d28d9; }
+
+.share-attachment-add-btn {
+  background: none;
+  border: 1.5px dashed var(--border-input);
+  color: var(--text-muted);
+  border-radius: 12px;
+  padding: 3px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.share-attachment-add-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 /* ── Share friend suggestions ── */
 .share-input-wrap {
@@ -7134,6 +7211,194 @@
 [data-theme="dark"] .friend-nickname-input { background: #1e1e2e; border-color: var(--text-secondary); color: #eee; }
 [data-theme="dark"] .friend-nickname-input:focus { border-color: var(--accent); }
 [data-theme="dark"] .friend-remove-btn { background: #3a2020; border-color: #ef4444; }
+
+/* ── Friends tab: messenger ── */
+.friends-messenger {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+  height: calc(100vh - 200px);
+  min-height: 420px;
+}
+
+.friends-messenger-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.friends-messenger-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.friends-messenger-item:hover {
+  background: var(--bg-hover);
+}
+
+.friends-messenger-item.active {
+  background: var(--bg-selected);
+}
+
+.friends-messenger-preview {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friends-messenger-unread {
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.friends-messenger-thread {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-input);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.friends-messenger-empty {
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.friends-messenger-thread-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-input);
+  flex-shrink: 0;
+}
+
+.friends-messenger-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.friends-msg-bubble {
+  max-width: 70%;
+  align-self: flex-start;
+  background: var(--bg-surface-2);
+  border-radius: 14px 14px 14px 4px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.friends-msg-bubble.mine {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 14px 14px 4px 14px;
+}
+
+.friends-msg-text {
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.friends-msg-time {
+  font-size: 10px;
+  opacity: 0.65;
+  align-self: flex-end;
+}
+
+.friends-messenger-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border-input);
+  flex-shrink: 0;
+}
+
+.friends-messenger-input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border-input);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.friends-messenger-input:focus {
+  border-color: var(--accent);
+}
+
+.friends-messenger-send-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.friends-messenger-send-btn:hover:not(:disabled) {
+  background: #5a52e0;
+}
+
+.friends-messenger-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+[data-theme="dark"] .friends-messenger-thread { background: #1e1e2e; border-color: #3a3a4a; }
+[data-theme="dark"] .friends-messenger-thread-header { border-color: #3a3a4a; }
+[data-theme="dark"] .friends-messenger-input-row { border-color: #3a3a4a; }
+[data-theme="dark"] .friends-messenger-input { background: #2a2a3a; border-color: #3a3a4a; color: #eee; }
+[data-theme="dark"] .friends-msg-bubble { background: #2a2a3a; color: #eee; }
+
+@media (max-width: 720px) {
+  .friends-messenger {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .friends-messenger-list {
+    max-height: 240px;
+  }
+}
 [data-theme="dark"] .friend-no-results { color: #777; }
 
 /* ── Browse Calendar in Modals ── */
@@ -8229,6 +8494,36 @@
 .streak-log-unit {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.streak-log-step {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border-input);
+  border-radius: 8px;
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.streak-log-step:hover:not(:disabled) {
+  background: var(--accent-light);
+  border-color: var(--accent);
+}
+
+.streak-log-step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.streak-log-done {
+  font-size: 14px;
+  margin-left: auto;
 }
 
 .streak-done-today {

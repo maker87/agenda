@@ -182,6 +182,14 @@
       </button>
       <button
         class="nav-item"
+        [class.active]="activeTab === 'friends'"
+        (click)="switchTab('friends')"
+      >
+        <span class="nav-icon">👥</span>
+        Friends
+      </button>
+      <button
+        class="nav-item"
         [class.active]="activeTab === 'ai'"
         (click)="switchTab('ai')"
       >
@@ -217,6 +225,14 @@
 
   <!-- Main Content -->
   <main class="main-content">
+
+    <!-- Shared hidden file input for the event-attachment upload button -->
+    <input
+      #attachmentFileInput
+      type="file"
+      style="display:none"
+      (change)="onAttachmentFileChange($event)"
+    />
 
     <!-- ── SCHEDULE TAB ── -->
     <div *ngIf="activeTab === 'schedule'" class="tab-content">
@@ -349,9 +365,16 @@
                 <span class="streak-day-check">{{ day.checked ? '✓' : '·' }}</span>
               </div>
             </div>
-            <!-- Today's log input -->
-            <div class="streak-log-row" *ngIf="!streak.checkedDays.includes(today)">
-              <span class="streak-log-label">Today:</span>
+            <!-- Today's log input (always visible so you can keep adjusting after hitting goal) -->
+            <div class="streak-log-row">
+              <span class="streak-log-label">{{ i18n.t('todayLabel') }}</span>
+              <button
+                class="streak-log-step"
+                type="button"
+                (click)="adjustStreakToday(streak, -1)"
+                [disabled]="(streak.loggedValues[today] || 0) <= 0"
+                title="-1"
+              >−</button>
               <input
                 class="streak-log-input"
                 type="number"
@@ -361,10 +384,14 @@
                 (ngModelChange)="logStreakValue(streak, today, +$event)"
                 [attr.name]="'streakLog_' + streak.id"
               />
+              <button
+                class="streak-log-step"
+                type="button"
+                (click)="adjustStreakToday(streak, 1)"
+                title="+1"
+              >+</button>
               <span class="streak-log-unit">{{ streak.unit }}</span>
-            </div>
-            <div class="streak-done-today" *ngIf="streak.checkedDays.includes(today)">
-              ✅ Done today! ({{ streak.loggedValues[today] || streak.target }} {{ streak.unit }})
+              <span class="streak-log-done" *ngIf="streak.checkedDays.includes(today)" title="Goal reached today">✅</span>
             </div>
           </div>
         </div>
@@ -443,6 +470,9 @@
                 </div>
                 <div class="event-actions">
                   <button class="reminder-btn" (click)="openReminderModal(event)" title="Set reminder">🔔</button>
+                  <button class="upload-btn" (click)="triggerAttachmentUpload(event)" title="Attach a file to share">
+                    📎<span class="upload-badge" *ngIf="getEventAttachments(event.id).length > 0">{{ getEventAttachments(event.id).length }}</span>
+                  </button>
                   <button class="share-btn" (click)="openShareModal(event)" title="Share event">↗</button>
                   <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
                 </div>
@@ -472,6 +502,9 @@
                 </div>
                 <div class="event-actions">
                   <button class="reminder-btn" (click)="openReminderModal(event)" title="Set reminder">🔔</button>
+                  <button class="upload-btn" (click)="triggerAttachmentUpload(event)" title="Attach a file to share">
+                    📎<span class="upload-badge" *ngIf="getEventAttachments(event.id).length > 0">{{ getEventAttachments(event.id).length }}</span>
+                  </button>
                   <button class="share-btn" (click)="openShareModal(event)" title="Share event">↗</button>
                   <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
                 </div>
@@ -505,6 +538,9 @@
                 </div>
                 <div class="event-actions">
                   <button class="reminder-btn" (click)="openReminderModal(event)" title="Set reminder">🔔</button>
+                  <button class="upload-btn" (click)="triggerAttachmentUpload(event)" title="Attach a file to share">
+                    📎<span class="upload-badge" *ngIf="getEventAttachments(event.id).length > 0">{{ getEventAttachments(event.id).length }}</span>
+                  </button>
                   <button class="share-btn" (click)="openShareModal(event)" title="Share event">↗</button>
                   <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
                 </div>
@@ -1327,6 +1363,9 @@
                   <span class="event-title">{{ event.title }}</span>
                 </div>
                 <div class="event-actions">
+                  <button class="upload-btn" (click)="triggerAttachmentUpload(event)" title="Attach a file to share">
+                    📎<span class="upload-badge" *ngIf="getEventAttachments(event.id).length > 0">{{ getEventAttachments(event.id).length }}</span>
+                  </button>
                   <button class="share-btn" (click)="openShareModal(event)" title="Share event">↗</button>
                   <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
                 </div>
@@ -1338,6 +1377,85 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ── FRIENDS TAB (messaging) ── -->
+    <div *ngIf="activeTab === 'friends'" class="tab-content">
+      <header class="page-header">
+        <div>
+          <h2 class="page-title">Friends</h2>
+          <p class="page-subtitle">Message the friends you've added</p>
+        </div>
+      </header>
+
+      <div class="friends-messenger" *ngIf="friends.length > 0">
+        <!-- Friend list -->
+        <div class="friends-messenger-list">
+          <div
+            class="friends-messenger-item"
+            *ngFor="let f of friends"
+            [class.active]="selectedFriendEmail === f.email"
+            (click)="openFriendChat(f.email)"
+          >
+            <div class="friend-avatar friend-avatar-added">{{ (f.nickname || f.displayName)[0] }}</div>
+            <div class="friend-info">
+              <span class="friend-display-name">{{ f.nickname || f.displayName }}</span>
+              <span class="friends-messenger-preview">{{ getLastMessagePreview(f.email) }}</span>
+            </div>
+            <span class="friends-messenger-unread" *ngIf="getUnreadMessageCount(f.email) > 0">{{ getUnreadMessageCount(f.email) }}</span>
+          </div>
+        </div>
+
+        <!-- Conversation -->
+        <div class="friends-messenger-thread" *ngIf="selectedFriend as sf">
+          <div class="friends-messenger-thread-header">
+            <div class="friend-avatar friend-avatar-added">{{ (sf.nickname || sf.displayName)[0] }}</div>
+            <div class="friend-info">
+              <span class="friend-display-name">{{ sf.nickname || sf.displayName }}</span>
+              <span class="friend-username">{{ sf.email }}</span>
+            </div>
+          </div>
+
+          <div class="friends-messenger-messages" #friendMessagesScroll>
+            <div *ngIf="selectedFriendMessages.length === 0" class="empty-state">
+              <span class="empty-icon">💬</span>
+              <p>Say hi to {{ sf.nickname || sf.displayName }}!</p>
+            </div>
+            <div
+              class="friends-msg-bubble"
+              *ngFor="let m of selectedFriendMessages"
+              [class.mine]="m.fromEmail === userEmail"
+            >
+              <span class="friends-msg-text">{{ m.text }}</span>
+              <span class="friends-msg-time">{{ formatNotifTime(m.createdAt) }}</span>
+            </div>
+          </div>
+
+          <form class="friends-messenger-input-row" (ngSubmit)="sendFriendMessage()">
+            <input
+              class="friends-messenger-input"
+              type="text"
+              [(ngModel)]="friendMessageDraft"
+              name="friendMessageDraft"
+              placeholder="Type a message…"
+              autocomplete="off"
+            />
+            <button type="submit" class="friends-messenger-send-btn" [disabled]="!friendMessageDraft.trim()" title="Send">➤</button>
+          </form>
+        </div>
+
+        <div class="friends-messenger-thread friends-messenger-empty" *ngIf="!selectedFriend">
+          <span class="empty-icon">👈</span>
+          <p>Select a friend to start messaging.</p>
+        </div>
+      </div>
+
+      <!-- Empty friends state -->
+      <div *ngIf="friends.length === 0" class="empty-state large">
+        <span class="empty-icon">👥</span>
+        <p>No friends yet. Add friends from the Notifications tab to start messaging.</p>
+        <button class="btn-primary" (click)="switchTab('notifications'); notifSubTab = 'friends'">Add a Friend</button>
       </div>
     </div>
 
@@ -1926,7 +2044,7 @@
 
 <!-- ── CHANGE EVENT MODAL ── -->
 <div class="modal-overlay" *ngIf="showChangeModal" (click)="closeChangeModal()">
-  <div class="modal modal-browse" (click)="$event.stopPropagation()">
+  <div class="modal modal-browse" [class.picker-open]="showChangeCategoryPicker" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>{{ changeStep === 'search' ? i18n.t('changeEventTitle') : i18n.t('updateEvent') }}</h3>
       <button class="modal-close" (click)="closeChangeModal()">✕</button>
@@ -2438,7 +2556,7 @@
 </div>
 
 <!-- ── SCHEDULE EVENT MODAL ── -->
-<div class="modal-overlay" *ngIf="showScheduleModal" (click)="closeModal()">  <div class="modal" (click)="$event.stopPropagation()">
+<div class="modal-overlay" *ngIf="showScheduleModal" (click)="closeModal()">  <div class="modal" [class.picker-open]="showCategoryPicker" (click)="$event.stopPropagation()">
 
     <div class="modal-header">
       <h3>{{ i18n.t('newEventTitle') }}</h3>
@@ -2818,6 +2936,16 @@
           <div class="share-event-title">{{ shareTargetEvent.title }}</div>
           <div class="share-event-meta">{{ formatDate(shareTargetEvent.date) }} · {{ formatTime(shareTargetEvent.startTime) }} – {{ formatTime(shareTargetEvent.endTime) }}</div>
         </div>
+      </div>
+
+      <!-- Attachments -->
+      <div class="share-attachments">
+        <span class="share-existing-label">Attachments</span>
+        <div class="share-attachment-chip" *ngFor="let a of getEventAttachments(shareTargetEvent.id); let i = index">
+          📎 {{ a.name }}
+          <button class="share-chip-remove" (click)="removeEventAttachment(shareTargetEvent.id, i)" title="Remove">✕</button>
+        </div>
+        <button type="button" class="share-attachment-add-btn" (click)="triggerAttachmentUpload(shareTargetEvent)">+ Attach file</button>
       </div>
 
       <!-- Category share toggle (only shown if event has a category) -->

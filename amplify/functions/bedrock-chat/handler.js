@@ -39,7 +39,16 @@ When the user asks for advice, tips, or recommendations related to their calenda
 - Be concise but helpful — give 3-5 actionable tips when appropriate
 - Reference specific events or days from their calendar when relevant
 
-CRITICAL: When creating events, you MUST start your response with the structured line. NO EXCEPTIONS.
+CRITICAL EVENT/REMINDER CREATION RULES — follow this process, do not skip steps:
+
+1. GATHER REQUIRED INFO FIRST. An event needs a title, a date, and a start time before it can be created (an end time too, though that can be defaulted per step 2). If the user's request is missing any of title/date/start time, do NOT create or propose anything yet — ask a short, friendly follow-up question for exactly what's missing. Never invent or guess a date ("I'll assume tomorrow") or a time ("I'll pick something reasonable") on your own.
+   Exception: if the user explicitly grants you freedom for a specific missing piece — phrases like "you pick", "surprise me", "whatever works", "doesn't matter", "your choice" — you may choose a reasonable value for THAT piece only, and must clearly state what you chose in your reply.
+
+2. OPTIONAL DETAILS ARE OFFERED, NOT FABRICATED. End time/duration, category, location, and description are optional "event details". If the user didn't specify one, OFFER to fill it in rather than silently making it up — e.g. "Want me to default this to 1 hour and file it under Personal, or would you like to specify?" Only fill it in once the user agrees or grants you freedom (see exception above), and state what you picked.
+
+3. CONFIRM BEFORE CREATING — NEVER CREATE ON THE FIRST TURN. Once you have title, date, start time, and an end time (given or agreed/defaulted), do NOT emit EVENT_CREATE / EVENT_RECURRING / REMINDER_CREATE yet. Instead, reply in plain text with a full summary of exactly what you're about to add (Title, Date, Start–End time, Category, Location, Description if any) and explicitly ask "Shall I add this to your calendar?" Then wait.
+
+4. ONLY CREATE AFTER EXPLICIT CONFIRMATION. Only on a later turn, once the user clearly confirms your summary (e.g. "yes", "confirm", "go ahead", "add it", "do it", "sounds good"), output the structured line as the FIRST line of that reply, using exactly the details from the confirmed summary — do not change them.
 
 Format for single events:
 EVENT_CREATE|title|YYYY-MM-DD|HH:MM|HH:MM|category
@@ -50,22 +59,31 @@ dayOfWeek: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
 
 Format for reminders:
 REMINDER_CREATE|title|body
+(Reminders follow the same ask-then-confirm process before this line is ever emitted.)
 
 EXAMPLES:
 User: "add basketball next tuesday at 6pm"
+You: Got the day and time! I don't have an end time — want me to default it to 1 hour (6–7 PM), and should I file it under Fitness? Let me know and I'll get it ready to add.
+
+User: "yes that's fine"
+You: Here's what I'll add: **Basketball**, Tuesday June 10, 6:00–7:00 PM, category Fitness. Shall I add this to your calendar?
+
+User: "yes"
 You: EVENT_CREATE|Basketball|2026-06-10|18:00|19:00|Fitness
-Done! Basketball is on your calendar for Tuesday at 6 PM.
+Adding Basketball — Tuesday, 6–7 PM, Fitness.
 
-User: "schedule yoga every wednesday at 7am"
+User: "add a meeting"
+You: Sure — what date and time should I put it on your calendar for?
+
+User: "schedule yoga every wednesday at 7am, you pick everything else"
+You: Got it — I'll default it to 7–8 AM and mark it Fitness for 12 weeks. Here's the plan: **Yoga**, every Wednesday, 7:00–8:00 AM, Fitness, for 12 weeks. Want me to go ahead and add it?
+
+User: "yes"
 You: EVENT_RECURRING|Yoga|07:00|08:00|Fitness|3|12
-Done! Yoga scheduled every Wednesday at 7 AM for 12 weeks.
-
-User: "add a meeting tomorrow at 2"
-You: EVENT_CREATE|Meeting|2026-06-09|14:00|15:00|Work
-Done! Meeting added for tomorrow at 2 PM.
+Done — Yoga every Wednesday, 7–8 AM, for 12 weeks.
 
 User: "what's on my schedule today?"
-You: (just answer normally, no EVENT_CREATE prefix)
+You: (just answer normally, no structured line)
 
 User: "how should I plan my week?"
 You: (look at their events, identify busy/free days, give personalized scheduling advice)
@@ -80,12 +98,11 @@ User: "what is 2+2?" or "solve this equation" or "tell me about history"
 You: I'm your calendar assistant — I can only help with scheduling, planning, and time management. Try asking me for advice about your week or to add an event!
 
 Rules:
-- EVERY time you create an event, the FIRST line MUST be EVENT_CREATE or EVENT_RECURRING
-- If no date given, use tomorrow
-- If no time given, pick something reasonable
-- Default duration: 1 hour
+- NEVER emit EVENT_CREATE / EVENT_RECURRING / REMINDER_CREATE unless the user has explicitly confirmed the exact proposed details on a prior turn in this conversation
+- NEVER invent a title, date, or start time the user didn't provide or explicitly delegate to you ("you pick" etc. — and only for the specific field they delegated)
+- Use the conversation history to remember what the user already told you — don't re-ask for info you already have, and don't lose track of a proposal you already summarized
 - Categories: Work, Personal, Fitness, School, Social, Health, Entertainment, Travel
-- After the structured line, write ONE short friendly confirmation
+- When you DO emit the structured line (after confirmation), it must be the FIRST line of that reply, followed by ONE short friendly confirmation
 - For non-creation questions about the calendar, just respond normally
 - For planning/advice questions, give personalized tips based on the user's actual events
 - For ANY non-calendar question, politely refuse and redirect to calendar tasks`;
@@ -148,66 +165,10 @@ function parseAIResponse(text, today) {
     cleanLines.push(line);
   }
 
-  // FALLBACK: If no actions were parsed but the text mentions adding/creating,
-  // try to extract event info from the natural language response
-  if (actions.length === 0) {
-    const fullText = text;
-    const fullLower = text.toLowerCase();
-    if (/added|scheduled|created|set up/.test(fullLower)) {
-      // Try to find a date (YYYY-MM-DD)
-      let date = null;
-      const isoMatch = fullText.match(/(\d{4}-\d{2}-\d{2})/);
-      if (isoMatch) {
-        date = isoMatch[1];
-      } else {
-        // Try "Jun 15", "June 15", "Jun. 15" etc.
-        const months = { jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12' };
-        const monthMatch = fullText.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)(?:day)?,?\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\.?\s+(\d{1,2})/i);
-        if (monthMatch) {
-          const m = months[monthMatch[1].toLowerCase().slice(0, 3)];
-          const d = monthMatch[2].padStart(2, '0');
-          const y = today ? today.slice(0, 4) : new Date().getFullYear().toString();
-          date = `${y}-${m}-${d}`;
-        }
-      }
-
-      // Try to find times
-      const timeMatches = fullText.match(/(\d{1,2}:\d{2})/g);
-      let startTime = timeMatches ? timeMatches[0] : null;
-      let endTime = timeMatches && timeMatches.length >= 2 ? timeMatches[1] : null;
-
-      // Also try "10 AM", "5 PM" format
-      if (!startTime) {
-        const ampmMatch = fullText.match(/(\d{1,2})\s*(AM|PM)/i);
-        if (ampmMatch) {
-          let h = parseInt(ampmMatch[1]);
-          if (ampmMatch[2].toUpperCase() === 'PM' && h !== 12) h += 12;
-          if (ampmMatch[2].toUpperCase() === 'AM' && h === 12) h = 0;
-          startTime = `${String(h).padStart(2, '0')}:00`;
-        }
-      }
-
-      if (!endTime && startTime) {
-        endTime = addHour(startTime);
-      }
-
-      // Try to find a title in quotes or bold
-      const titleMatch = fullText.match(/["\u201c]([^"\u201d]+)["\u201d]/) || fullText.match(/\*\*([^*]+)\*\*/);
-      let title = titleMatch ? titleMatch[1] : null;
-
-      // If we have enough info, create the action
-      if (date && startTime && title) {
-        actions.push({
-          type: 'create_event',
-          title: title,
-          date: date,
-          startTime: startTime,
-          endTime: endTime || addHour(startTime),
-          category: 'Personal',
-        });
-      }
-    }
-  }
+  // NOTE: intentionally no fallback/guessing extraction here. If the model
+  // didn't emit an explicit structured line, no action is created \u2014 the AI
+  // must never fabricate an event from loose prose without an explicit,
+  // confirmed structured directive.
 
   // Build the final response with action blocks appended
   let response = cleanLines.join('\n').trim();
@@ -216,12 +177,6 @@ function parseAIResponse(text, today) {
   }
 
   return response;
-}
-
-function addHour(time) {
-  const [h, m] = time.split(':').map(Number);
-  const newH = (h + 1) % 24;
-  return `${String(newH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 export const handler = async (event) => {
@@ -301,9 +256,41 @@ Upcoming events (next 50):\n` +
     } catch (err) { /* ignore */ }
   }
 
-  // Build conversation messages — only include current message, no history
-  // (History confuses Nova into not following the structured format)
-  const cleanMessages = [{ role: 'user', content: [{ text: message }] }];
+  // Build conversation messages, including prior turns so the model can
+  // track a multi-turn "ask required info → offer optional info → confirm"
+  // flow (e.g. remembering a title/date it already asked about). History
+  // entries are pre-cleaned of ```action``` blocks by the frontend.
+  const cleanMessages = [];
+  if (conversationHistory) {
+    try {
+      const historyParsed = JSON.parse(conversationHistory);
+      if (Array.isArray(historyParsed)) {
+        // The frontend includes the current user message as the last history
+        // entry; drop it here since it's already sent separately as `message`.
+        const priorTurns = historyParsed.slice(0, -1)
+          .filter(m => (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string' && m.text.trim());
+
+        // Bedrock/Nova requires strictly alternating user/assistant turns
+        // starting with 'user'. Drop a leading assistant turn and collapse
+        // any consecutive same-role turns defensively.
+        const startIdx = priorTurns.findIndex(m => m.role === 'user');
+        const trimmed = startIdx === -1 ? [] : priorTurns.slice(startIdx);
+        for (const turn of trimmed) {
+          const last = cleanMessages[cleanMessages.length - 1];
+          if (last && last.role === turn.role) {
+            last.content[0].text += '\n' + turn.text;
+          } else {
+            cleanMessages.push({ role: turn.role, content: [{ text: turn.text }] });
+          }
+        }
+        // Ensure history ends on an assistant turn (since `message` below adds the next user turn)
+        if (cleanMessages.length && cleanMessages[cleanMessages.length - 1].role === 'user') {
+          cleanMessages.pop();
+        }
+      }
+    } catch (err) { /* ignore malformed history, fall back to no history */ }
+  }
+  cleanMessages.push({ role: 'user', content: [{ text: message }] });
 
   const body = JSON.stringify({
     system: [{ text: SYSTEM_PROMPT + eventsContext + `\n\nToday's date: ${todaySafe}` }],
