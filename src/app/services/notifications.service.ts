@@ -5,7 +5,7 @@ import type { Schema } from '../../../amplify/data/resource';
 export interface AppNotification {
   id: string;
   recipientEmail: string;
-  type: 'share' | 'reminder' | 'friend_request' | 'event_invite' | 'invite_response';
+  type: 'share' | 'reminder' | 'friend_request' | 'friend_response' | 'event_invite' | 'invite_response';
   title: string;
   body: string;
   eventId: string;

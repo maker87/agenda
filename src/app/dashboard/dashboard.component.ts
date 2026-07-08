@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -6,6 +6,7 @@ import { MockAuthService, UserProfile } from '../services/mock-auth.service';
 import { EventsService } from '../services/events.service';
 import { CategoryCountPipe } from '../pipes/category-count.pipe';
 import { NotificationsService, AppNotification } from '../services/notifications.service';
+import { FriendsService, Friend, FriendMessage } from '../services/friends.service';
 import { CategoryTreeService, CategoryNode, CATEGORY_SEP } from '../services/category-tree.service';
 import { GoogleCalendarService, GCalEvent, GCalCalendar } from '../services/google-calendar.service';
 import { HolidaysService } from '../services/holidays.service';
@@ -28,14 +29,6 @@ interface CalendarEvent {
   category: string;
   location?: string;
   sharedWith: string[];
-}
-
-interface FriendMessage {
-  id: string;
-  fromEmail: string;
-  toEmail: string;
-  text: string;
-  createdAt: string;
 }
 
 interface EventAttachment {
@@ -435,7 +428,7 @@ function buildCoachEvents(): CalendarEvent[] {
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
 })
-export class DashboardComponent implements OnInit, AfterViewInit {
+export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   userEmail = '';
 
   // ── Profile panel ──
@@ -1854,71 +1847,66 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   friendSearch = '';
   friendNickname = '';
   friendSearchResults: { email: string; displayName: string; nickname: string }[] = [];
-  friends: { email: string; displayName: string; nickname: string }[] = [];
+  friends: Friend[] = [];
   friendRequestsSent: Set<string> = new Set();
   friendSearchLoading = false;
   friendSearchError = '';
 
-  private readonly FRIENDS_KEY = () => `agenda_friends_${this.userEmail}`;
-
-  // Mock user pool for demo (simulates other users in the system)
-  private readonly MOCK_USERS = [
-    { email: 'alex.johnson@school.edu',    displayName: 'Alex Johnson' },
-    { email: 'priya.sharma@gmail.com',     displayName: 'Priya Sharma' },
-    { email: 'marcus.t@outlook.com',       displayName: 'Marcus Thompson' },
-    { email: 'lisa.martinez@school.edu',   displayName: 'Lisa Martinez' },
-    { email: 'derek.w@yahoo.com',          displayName: 'Derek Williams' },
-    { email: 'sarah.kim@school.edu',       displayName: 'Sarah Kim' },
-    { email: 'tom.rivera@gmail.com',       displayName: 'Tom Rivera' },
-    { email: 'nina.patel@outlook.com',     displayName: 'Nina Patel' },
-    { email: 'james.obrien@school.edu',    displayName: 'James O\'Brien' },
-    { email: 'chloe.bennett@gmail.com',    displayName: 'Chloe Bennett' },
-  ];
-
-  loadFriends() {
+  async loadFriends() {
     try {
-      const raw = localStorage.getItem(this.FRIENDS_KEY());
-      this.friends = raw ? JSON.parse(raw) : [];
-    } catch { this.friends = []; }
+      this.friends = await this.friendsService.listFriends(this.userEmail);
+    } catch (err) {
+      console.warn('[Dashboard] Could not load friends:', err);
+      this.friends = [];
+    }
   }
 
-  private persistFriends() {
-    localStorage.setItem(this.FRIENDS_KEY(), JSON.stringify(this.friends));
-  }
-
+  /** Adding a friend only works by exact email — there's no user directory to browse. */
   searchFriends() {
     const q = this.friendSearch.trim().toLowerCase();
     this.friendSearchError = '';
     if (!q) { this.friendSearchResults = []; return; }
 
-    // Validate email-like input
-    const isEmailQuery = q.includes('@');
-
     this.friendSearchLoading = true;
-    // Simulate async search
     setTimeout(() => {
       const friendEmails = new Set(this.friends.map(f => f.email));
-      this.friendSearchResults = this.MOCK_USERS
-        .filter(u =>
-          u.email.toLowerCase().includes(q) &&
-          !friendEmails.has(u.email) &&
-          u.email !== this.userEmail
-        )
-        .map(u => ({ email: u.email, displayName: u.displayName, nickname: '' }));
-
-      // If the query looks like a full email that isn't in mock users, show it as an option
-      if (isEmailQuery && this.friendSearchResults.length === 0) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (emailRegex.test(q) && q !== this.userEmail && !friendEmails.has(q)) {
-          this.friendSearchResults = [{ email: q, displayName: q.split('@')[0], nickname: '' }];
-        }
-      }
-
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      this.friendSearchResults =
+        emailRegex.test(q) && q !== this.userEmail.toLowerCase() && !friendEmails.has(q)
+          ? [{ email: q, displayName: q.split('@')[0], nickname: '' }]
+          : [];
       this.friendSearchLoading = false;
     }, 300);
   }
 
-  sendFriendRequest(email: string) {
+  /** Sends a real friend-request notification to `email` and records it as pending locally. */
+  private async createFriendRequest(email: string, nickname: string): Promise<boolean> {
+    this.pendingFriendRequests.push({ email, displayName: email.split('@')[0], nickname });
+    try {
+      const n = await this.notificationsService.create({
+        recipientEmail: email,
+        type: 'friend_request',
+        title: `${this.userEmail} wants to be your friend`,
+        body: `From: ${this.userEmail}`,
+        eventId: this.userEmail, // requester's email, so the recipient knows who to friend back
+        eventDate: '',
+        senderEmail: this.userEmail,
+        read: false,
+        status: 'pending',
+      });
+      // If the recipient is the current user (demo/testing), show it immediately
+      if (email === this.userEmail) {
+        this.notifications = [n, ...this.notifications];
+      }
+      return true;
+    } catch (err) {
+      console.warn('[Dashboard] Could not send friend request:', err);
+      this.pendingFriendRequests = this.pendingFriendRequests.filter(p => p.email !== email);
+      return false;
+    }
+  }
+
+  async sendFriendRequest(email: string) {
     const nickname = this.friendNickname.trim();
     if (!nickname) {
       this.friendSearchError = 'Please enter a nickname for this friend.';
@@ -1926,61 +1914,39 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     }
     this.friendSearchError = '';
     this.friendRequestsSent.add(email);
-
-    // Find the mock user to get their display name
-    const user = this.MOCK_USERS.find(u => u.email === email);
-    const displayName = user?.displayName ?? email.split('@')[0];
-
-    // Store the pending request (not yet a friend — they need to accept)
-    this.pendingFriendRequests.push({ email, displayName, nickname });
-
-    // Remove from search results
     this.friendSearchResults = this.friendSearchResults.filter(u => u.email !== email);
     this.friendNickname = '';
 
-    // Simulate: after a short delay, the other person "accepts" and sends back a friend request
-    setTimeout(() => {
-      const incomingNotif: AppNotification = {
-        id: Date.now().toString() + Math.random().toString(36).slice(2),
-        recipientEmail: this.userEmail,
-        type: 'friend_request',
-        title: `${displayName} accepted your friend request`,
-        body: `Email: ${email} — Accept to add them as a friend.`,
-        eventId: email,
-        eventDate: nickname, // store nickname in eventDate for later use
-        senderEmail: email,
-        read: false,
-        createdAt: new Date().toISOString(),
-        status: 'pending',
-      };
-      this.notifications = [incomingNotif, ...this.notifications];
-    }, 1500);
+    const ok = await this.createFriendRequest(email, nickname);
+    if (!ok) {
+      this.friendSearchError = 'Could not send the friend request. Please try again.';
+      this.friendRequestsSent.delete(email);
+    }
   }
 
   // Pending outgoing friend requests (waiting for the other person to accept)
   pendingFriendRequests: { email: string; displayName: string; nickname: string }[] = [];
 
-  acceptFriendRequest(user: { email: string; displayName: string; nickname: string }) {
-    const alreadyFriend = this.friends.some(f => f.email === user.email);
-    if (!alreadyFriend) {
-      this.friends.push(user);
-      this.persistFriends();
-    }
-    this.friendRequestsSent.delete(user.email);
-    this.friendSearchResults = this.friendSearchResults.filter(u => u.email !== user.email);
-  }
-
-  removeFriend(email: string) {
+  async removeFriend(email: string) {
+    const friend = this.friends.find(f => f.email === email);
+    if (!friend) return;
     this.friends = this.friends.filter(f => f.email !== email);
-    this.persistFriends();
+    try {
+      await this.friendsService.removeFriend(friend.id);
+    } catch (err) {
+      console.error('[Dashboard] Failed to remove friend:', err);
+    }
   }
 
   /** Update a friend's nickname. */
-  updateFriendNickname(email: string, newNickname: string) {
+  async updateFriendNickname(email: string, newNickname: string) {
     const friend = this.friends.find(f => f.email === email);
-    if (friend && newNickname.trim()) {
-      friend.nickname = newNickname.trim();
-      this.persistFriends();
+    if (!friend || !newNickname.trim()) return;
+    friend.nickname = newNickname.trim();
+    try {
+      await this.friendsService.updateNickname(friend.id, friend.nickname);
+    } catch (err) {
+      console.error('[Dashboard] Failed to update friend nickname:', err);
     }
   }
 
@@ -1991,84 +1957,75 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
 
   /** Accept an incoming friend-request notification. */
-  acceptFriendNotif(n: AppNotification) {
+  async acceptFriendNotif(n: AppNotification) {
     n.status = 'accepted';
     n.read = true;
-    const email = n.eventId; // stored in eventId
-    const mockUser = this.MOCK_USERS.find(u => u.email === email);
-    const alreadyFriend = this.friends.some(f => f.email === email);
-    if (!alreadyFriend) {
-      // Try to find the nickname from the pending request we sent
-      const pending = this.pendingFriendRequests.find(p => p.email === email);
-      const nickname = (pending?.nickname
-        ?? (n.eventDate || ''))
-        || mockUser?.displayName?.split(' ')[0]
-        || email.split('@')[0];
-      this.friends.push({
-        email,
-        displayName: mockUser?.displayName ?? email.split('@')[0],
-        nickname,
-      });
-      this.persistFriends();
+    const requesterEmail = n.eventId; // stored in eventId
+    this.notificationsService.updateStatus(n.id, 'accepted').catch(() => {});
+
+    if (requesterEmail && !this.friends.some(f => f.email === requesterEmail)) {
+      try {
+        const friend = await this.friendsService.addFriend(
+          this.userEmail, requesterEmail, requesterEmail.split('@')[0]
+        );
+        this.friends = [...this.friends, friend];
+      } catch (err) {
+        console.error('[Dashboard] Failed to save accepted friend:', err);
+      }
     }
-    // Remove from pending list
-    this.pendingFriendRequests = this.pendingFriendRequests.filter(p => p.email !== email);
-    this.notificationsService.markRead(n.id).catch(() => {});
+    this.pendingFriendRequests = this.pendingFriendRequests.filter(p => p.email !== requesterEmail);
+
+    // Let the requester know so they can add us back on their side
+    try {
+      const responseNotif = await this.notificationsService.create({
+        recipientEmail: requesterEmail,
+        type: 'friend_response',
+        title: `${this.userEmail} accepted your friend request`,
+        body: `You can now message each other from the Friends tab.`,
+        eventId: this.userEmail,
+        eventDate: '',
+        senderEmail: this.userEmail,
+        read: false,
+        status: 'accepted',
+      });
+      if (requesterEmail === this.userEmail) {
+        this.notifications = [responseNotif, ...this.notifications];
+      }
+    } catch (err) {
+      console.warn('[Dashboard] Could not notify requester of acceptance:', err);
+    }
   }
 
   /** Reject an incoming friend-request notification. */
   rejectFriendNotif(n: AppNotification) {
     n.status = 'rejected';
     n.read = true;
-    this.notificationsService.markRead(n.id).catch(() => {});
+    this.notificationsService.updateStatus(n.id, 'rejected').catch(() => {});
   }
 
   // ── Friends messaging (Friends tab) ──
   selectedFriendEmail: string | null = null;
   friendMessageDraft = '';
-  friendMessages: { [friendEmail: string]: FriendMessage[] } = {};
+  allFriendMessages: FriendMessage[] = [];
   friendMessagesUnread: { [friendEmail: string]: number } = {};
+  private messagePollHandle: ReturnType<typeof setInterval> | null = null;
 
   @ViewChild('friendMessagesScroll') private friendMessagesScrollRef?: ElementRef<HTMLDivElement>;
 
-  private readonly FRIEND_MESSAGES_KEY = (friendEmail: string) =>
-    `agenda_messages_${this.userEmail}_${friendEmail}`;
-
-  private readonly FRIEND_AUTO_REPLIES = [
-    "Hey! 👋 What's up?",
-    "Sounds good, I'll check my calendar!",
-    "Got it, thanks for letting me know.",
-    "Haha, nice — see you then!",
-    "I'm free after 3pm if that works for you.",
-    "👍",
-    "Can we push this to next week?",
-  ];
-
-  get selectedFriend(): { email: string; displayName: string; nickname: string } | null {
+  get selectedFriend(): Friend | null {
     return this.friends.find(f => f.email === this.selectedFriendEmail) ?? null;
   }
 
   get selectedFriendMessages(): FriendMessage[] {
-    return this.selectedFriendEmail ? (this.friendMessages[this.selectedFriendEmail] ?? []) : [];
+    if (!this.selectedFriendEmail) return [];
+    return this.allFriendMessages.filter(
+      m => m.fromEmail === this.selectedFriendEmail || m.toEmail === this.selectedFriendEmail
+    );
   }
 
-  private loadFriendMessagesFor(friendEmail: string): FriendMessage[] {
-    try {
-      const raw = localStorage.getItem(this.FRIEND_MESSAGES_KEY(friendEmail));
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-  }
-
-  private persistFriendMessagesFor(friendEmail: string) {
-    localStorage.setItem(this.FRIEND_MESSAGES_KEY(friendEmail), JSON.stringify(this.friendMessages[friendEmail] ?? []));
-  }
-
-  /** Preview text shown in the friend list row; lazily loads & caches history from localStorage. */
+  /** Preview text shown in the friend list row. */
   getLastMessagePreview(friendEmail: string): string {
-    if (!this.friendMessages[friendEmail]) {
-      this.friendMessages[friendEmail] = this.loadFriendMessagesFor(friendEmail);
-    }
-    const msgs = this.friendMessages[friendEmail];
+    const msgs = this.allFriendMessages.filter(m => m.fromEmail === friendEmail || m.toEmail === friendEmail);
     if (!msgs.length) return 'No messages yet — say hi!';
     const last = msgs[msgs.length - 1];
     return (last.fromEmail === this.userEmail ? 'You: ' : '') + last.text;
@@ -2080,48 +2037,59 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
   openFriendChat(friendEmail: string) {
     this.selectedFriendEmail = friendEmail;
-    if (!this.friendMessages[friendEmail]) {
-      this.friendMessages[friendEmail] = this.loadFriendMessagesFor(friendEmail);
-    }
     this.friendMessagesUnread[friendEmail] = 0;
     setTimeout(() => this.scrollFriendMessagesToBottom(), 0);
   }
 
-  sendFriendMessage() {
+  async sendFriendMessage() {
     const text = this.friendMessageDraft.trim();
     const friendEmail = this.selectedFriendEmail;
     if (!text || !friendEmail) return;
-
-    const msg: FriendMessage = {
-      id: Date.now().toString() + Math.random().toString(36).slice(2),
-      fromEmail: this.userEmail,
-      toEmail: friendEmail,
-      text,
-      createdAt: new Date().toISOString(),
-    };
-    this.friendMessages[friendEmail] = [...(this.friendMessages[friendEmail] ?? []), msg];
-    this.persistFriendMessagesFor(friendEmail);
     this.friendMessageDraft = '';
-    setTimeout(() => this.scrollFriendMessagesToBottom(), 0);
 
-    // Simulate the friend replying (demo has no real backend for the other user, same
-    // approach as the friend-request auto-accept in sendFriendRequest()).
-    setTimeout(() => {
-      const reply: FriendMessage = {
-        id: Date.now().toString() + Math.random().toString(36).slice(2),
-        fromEmail: friendEmail,
-        toEmail: this.userEmail,
-        text: this.FRIEND_AUTO_REPLIES[Math.floor(Math.random() * this.FRIEND_AUTO_REPLIES.length)],
-        createdAt: new Date().toISOString(),
-      };
-      this.friendMessages[friendEmail] = [...(this.friendMessages[friendEmail] ?? []), reply];
-      this.persistFriendMessagesFor(friendEmail);
-      if (this.selectedFriendEmail === friendEmail) {
-        setTimeout(() => this.scrollFriendMessagesToBottom(), 0);
-      } else {
-        this.friendMessagesUnread[friendEmail] = (this.friendMessagesUnread[friendEmail] ?? 0) + 1;
+    try {
+      const msg = await this.friendsService.sendMessage(this.userEmail, friendEmail, text);
+      this.allFriendMessages = [...this.allFriendMessages, msg];
+      setTimeout(() => this.scrollFriendMessagesToBottom(), 0);
+    } catch (err) {
+      console.error('[Dashboard] Failed to send message:', err);
+      this.friendMessageDraft = text;
+    }
+  }
+
+  /** Refreshes the full message history and bumps unread badges for new incoming messages. */
+  private async refreshAllFriendMessages() {
+    try {
+      const previousIds = new Set(this.allFriendMessages.map(m => m.id));
+      const all = await this.friendsService.listAllMessages(this.userEmail);
+      const newIncoming = all.filter(m => !previousIds.has(m.id) && m.fromEmail !== this.userEmail);
+      this.allFriendMessages = all;
+      for (const m of newIncoming) {
+        if (m.fromEmail !== this.selectedFriendEmail) {
+          this.friendMessagesUnread[m.fromEmail] = (this.friendMessagesUnread[m.fromEmail] ?? 0) + 1;
+        }
       }
-    }, 900 + Math.random() * 1200);
+      if (this.selectedFriendEmail && newIncoming.some(m => m.fromEmail === this.selectedFriendEmail)) {
+        setTimeout(() => this.scrollFriendMessagesToBottom(), 0);
+      }
+    } catch (err) {
+      console.warn('[Dashboard] Could not refresh messages:', err);
+    }
+  }
+
+  /** Polls for new messages while the Friends tab is open (the app has no live subscriptions). */
+  private startMessagePolling() {
+    if (this.messagePollHandle) return;
+    this.messagePollHandle = setInterval(() => {
+      if (this.activeTab === 'friends') this.refreshAllFriendMessages();
+    }, 4000);
+  }
+
+  private stopMessagePolling() {
+    if (this.messagePollHandle) {
+      clearInterval(this.messagePollHandle);
+      this.messagePollHandle = null;
+    }
   }
 
   private scrollFriendMessagesToBottom() {
@@ -2275,21 +2243,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
 
     } else if (this.shareType === 'friend') {
       label = 'Friend Request';
-      const displayName = email;
-      const incomingNotif: AppNotification = {
-        id: Date.now().toString() + Math.random().toString(36).slice(2),
-        recipientEmail: this.userEmail,
-        type: 'friend_request',
-        title: `${displayName} wants to be your friend`,
-        body: `From: ${email}`,
-        eventId: email,
-        eventDate: '',
-        senderEmail: email,
-        read: false,
-        createdAt: new Date().toISOString(),
-        status: 'pending',
-      };
-      this.notifications = [incomingNotif, ...this.notifications];
+      this.createFriendRequest(email, email.split('@')[0]);
     }
 
     // Check if already sent
@@ -2684,7 +2638,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   shareCategoryOnly = false; // true = share whole category, false = single event
   shareSuccess = '';
   shareError = '';
-  shareFriendSuggestions: { email: string; displayName: string; nickname: string }[] = [];
+  shareFriendSuggestions: Friend[] = [];
   shareShowSuggestions = false;
 
   // DB sync state
@@ -3080,6 +3034,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     private mockAuth: MockAuthService,
     private eventsService: EventsService,
     private notificationsService: NotificationsService,
+    private friendsService: FriendsService,
     private categoryTreeService: CategoryTreeService,
     private googleCalendarService: GoogleCalendarService,
     private holidaysService: HolidaysService,
@@ -3106,14 +3061,20 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     this.loadStreaks();
     this.loadCategoryColors();
     this.loadAiConversations();
-    this.loadFriends();
+    await this.loadFriends();
+    this.refreshAllFriendMessages();
+    this.startMessagePolling();
     this.loadEventAttachments();
     await this.loadEventsFromDb(user.email);
-    this.loadNotifications(user.email);
+    await this.loadNotifications(user.email);
   }
 
   ngAfterViewInit() {
     // Scroll to current month when calendar tab is first opened
+  }
+
+  ngOnDestroy() {
+    this.stopMessagePolling();
   }
 
   /**
@@ -4590,7 +4551,7 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
 
   /** Select a friend from the suggestions dropdown */
-  selectShareFriend(friend: { email: string; displayName: string; nickname: string }) {
+  selectShareFriend(friend: Friend) {
     this.shareEmail = friend.email;
     this.shareFriendSuggestions = [];
     this.shareShowSuggestions = false;
@@ -4862,9 +4823,38 @@ export class DashboardComponent implements OnInit, AfterViewInit {
     try {
       this.notifications = await this.notificationsService.listForUser(email);
       this.checkDueReminders();
+      await this.processFriendResponses();
     } catch (err) {
       // Fallback: keep empty array, no crash
       console.warn('[Dashboard] Could not load notifications:', err);
+    }
+  }
+
+  /**
+   * Completes the friend-request handshake on the requester's side: when the
+   * other person accepts, they send us a 'friend_response' notification —
+   * only WE can write to our own Friend list, so we do it here.
+   */
+  private async processFriendResponses() {
+    const toProcess = this.notifications.filter(
+      n => n.type === 'friend_response' && n.status === 'accepted' && !n.read
+    );
+    for (const n of toProcess) {
+      const friendEmail = n.eventId;
+      if (friendEmail && !this.friends.some(f => f.email === friendEmail)) {
+        const pending = this.pendingFriendRequests.find(p => p.email === friendEmail);
+        const nickname = pending?.nickname || friendEmail.split('@')[0];
+        try {
+          const friend = await this.friendsService.addFriend(this.userEmail, friendEmail, nickname);
+          this.friends = [...this.friends, friend];
+        } catch (err) {
+          console.error('[Dashboard] Failed to add accepted friend:', err);
+        }
+      }
+      this.pendingFriendRequests = this.pendingFriendRequests.filter(p => p.email !== friendEmail);
+      this.friendRequestsSent.delete(friendEmail);
+      n.read = true;
+      this.notificationsService.markRead(n.id).catch(() => {});
     }
   }
 

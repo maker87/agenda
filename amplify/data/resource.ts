@@ -45,6 +45,27 @@ const schema = a.schema({
       allow.authenticated().to(['create', 'read']),
     ]),
 
+  Friend: a
+    .model({
+      ownerEmail:  a.string().required(),
+      friendEmail: a.string().required(),
+      nickname:    a.string(),
+    })
+    .authorization((allow) => [
+      allow.owner().identityClaim('sub'),
+    ]),
+
+  FriendMessage: a
+    .model({
+      fromEmail: a.string().required(),
+      toEmail:   a.string().required(),
+      text:      a.string().required(),
+    })
+    .authorization((allow) => [
+      allow.owner().identityClaim('sub'),
+      allow.authenticated().to(['create', 'read']),
+    ]),
+
   chat: a
     .query()
     .arguments({

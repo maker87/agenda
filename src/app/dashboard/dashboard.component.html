@@ -966,12 +966,13 @@
             (click)="markNotifRead(n)"
           >
             <!-- Type icon -->
-            <div class="notif-icon" [class.notif-icon-share]="n.type === 'share'" [class.notif-icon-reminder]="n.type === 'reminder'" [class.notif-icon-invite]="n.type === 'event_invite'" [class.notif-icon-invite-response]="n.type === 'invite_response'" [class.notif-icon-friend]="n.type === 'friend_request'">
+            <div class="notif-icon" [class.notif-icon-share]="n.type === 'share'" [class.notif-icon-reminder]="n.type === 'reminder'" [class.notif-icon-invite]="n.type === 'event_invite'" [class.notif-icon-invite-response]="n.type === 'invite_response'" [class.notif-icon-friend]="n.type === 'friend_request' || n.type === 'friend_response'">
               <span *ngIf="n.type === 'share'">↗</span>
               <span *ngIf="n.type === 'reminder'">🔔</span>
               <span *ngIf="n.type === 'event_invite'">📩</span>
               <span *ngIf="n.type === 'invite_response'">✉️</span>
               <span *ngIf="n.type === 'friend_request'">👥</span>
+              <span *ngIf="n.type === 'friend_response'">🤝</span>
             </div>
 
             <!-- Content -->
