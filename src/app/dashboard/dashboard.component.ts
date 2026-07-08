@@ -3107,11 +3107,14 @@ export class DashboardComponent implements OnInit, AfterViewInit {
   }
 
   async logout() {
-    // Clear the AWS Cognito session; otherwise the route guards re-establish
-    // the session from the cached token and bounce the user back in.
-    try { await signOut(); } catch { /* ignore if no Cognito session */ }
+    // Global sign-out revokes the refresh token server-side, so a cached
+    // Cognito token can't silently re-authenticate the guard afterward.
+    try { await signOut({ global: true }); } catch { /* no active Cognito session */ }
     this.mockAuth.logout();
-    this.router.navigate(['/']);
+    sessionStorage.clear();
+    // Hard navigation (not the Angular router) guarantees a fresh app load,
+    // clearing any in-memory auth state left over from the current session.
+    window.location.href = '/';
   }
 
   linkGoogleCalendar() {
