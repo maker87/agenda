@@ -984,6 +984,12 @@
   background: var(--bg-surface);
 }
 
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
 .field-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1223,7 +1229,7 @@
 }
 
 .category-picker-placeholder {
-  color: var(--text-faint);
+  color: var(--text-secondary);
   flex: 1;
 }
 
@@ -8025,7 +8031,7 @@
 }
 
 .location-input-wrap input::placeholder {
-  color: var(--text-faint);
+  color: var(--text-secondary);
 }
 
 .location-maps-link {
