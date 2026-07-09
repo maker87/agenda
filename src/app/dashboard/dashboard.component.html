@@ -2653,17 +2653,6 @@
             required
           />
         </div>
-        <div class="field" *ngIf="form.repeatType === 'multiday'">
-          <label for="event-end-date">End Date</label>
-          <input
-            id="event-end-date"
-            type="date"
-            [(ngModel)]="form.endDate"
-            name="endDate"
-            [min]="form.date"
-            required
-          />
-        </div>
       </div>
 
       <!-- Repeat type selector -->
@@ -2672,7 +2661,7 @@
         <div class="repeat-type-pills">
           <button type="button" class="repeat-pill" [class.active]="form.repeatType === 'none'" (click)="form.repeatType = 'none'">One-time</button>
           <button type="button" class="repeat-pill" [class.active]="form.repeatType === 'weekly'" (click)="form.repeatType = 'weekly'">Weekly</button>
-          <button type="button" class="repeat-pill" [class.active]="form.repeatType === 'multiday'" (click)="form.repeatType = 'multiday'">Multi-day</button>
+          <button type="button" class="repeat-pill" [class.active]="form.repeatType === 'multiday'" (click)="selectMultiDayMode()">Multi-day</button>
         </div>
       </div>
 
@@ -2701,9 +2690,45 @@
         </p>
       </div>
 
-      <!-- Multi-day hint -->
-      <div class="field" *ngIf="form.repeatType === 'multiday'">
-        <p class="repeat-hint">The event will be created on each day from the start date to the end date with the same time.</p>
+      <!-- Multi-day: click dates on a calendar to select which days this event spans -->
+      <div class="field repeat-weekly-options" *ngIf="form.repeatType === 'multiday'">
+        <label>Select the dates this event spans</label>
+        <div class="mini-cal">
+          <div class="mini-cal-header">
+            <button type="button" class="mini-cal-nav" (click)="prevMultiDayPickerMonth()" title="Previous month">‹</button>
+            <span class="mini-cal-title">{{ monthNames[multiDayPickerMonth] }} {{ multiDayPickerYear }}</span>
+            <button type="button" class="mini-cal-nav" (click)="nextMultiDayPickerMonth()" title="Next month">›</button>
+          </div>
+          <div class="mini-cal-daynames">
+            <span *ngFor="let d of dayNames">{{ d }}</span>
+          </div>
+          <div class="mini-cal-grid">
+            <ng-container *ngFor="let week of multiDayPickerWeeks">
+              <button
+                type="button"
+                *ngFor="let cell of week"
+                class="mini-cal-day"
+                [class.empty]="!cell"
+                [class.past]="cell && cell.isPast"
+                [class.today]="cell && cell.isToday"
+                [class.selected]="cell && isMultiDateSelected(cell.dateStr)"
+                [disabled]="!cell"
+                (click)="cell && toggleMultiDate(cell.dateStr)"
+              >{{ cell ? cell.day : '' }}</button>
+            </ng-container>
+          </div>
+        </div>
+        <div class="multi-date-chips" *ngIf="form.multiDates.length > 0">
+          <span class="multi-date-chip" *ngFor="let d of multiDatesSorted">
+            {{ formatDate(d) }}
+            <button type="button" (click)="toggleMultiDate(d)" title="Remove this date">✕</button>
+          </span>
+        </div>
+        <p class="repeat-hint">
+          {{ form.multiDates.length === 0
+            ? 'Click each date above that this event should happen on.'
+            : form.multiDates.length + ' date' + (form.multiDates.length === 1 ? '' : 's') + ' selected — same start/end time on each.' }}
+        </p>
       </div>
 
       <div class="field-row">

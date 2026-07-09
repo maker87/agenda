@@ -1,5 +1,7 @@
-/* ── Theme Variables ── */
-.app-shell {
+/* ── Theme Variables ──
+   Defined on :host (not .app-shell) so modals — which render as siblings of
+   .app-shell, not descendants of it — can still inherit these custom properties. */
+:host {
   --bg-page:        #f0f2f5;
   --bg-surface:     #ffffff;
   --bg-surface-2:   #fafafa;
@@ -40,7 +42,7 @@
   --swatch-border:  #1a1a2e;
 }
 
-.app-shell[data-theme="dark"] {
+:host([data-theme="dark"]) {
   --bg-page:        #0f0f1a;
   --bg-surface:     #1a1a2e;
   --bg-surface-2:   #22223a;
@@ -1118,6 +1120,160 @@
   background: #1e1e34;
   border-color: #4a4a70;
   color: #f0f0f8;
+}
+
+/* ── Multi-day mini calendar picker ── */
+.mini-cal {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1.5px solid var(--border-input);
+  border-radius: 10px;
+  background: var(--bg-surface);
+}
+
+.mini-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.mini-cal-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.mini-cal-nav {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-input);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mini-cal-nav:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.mini-cal-daynames {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+
+.mini-cal-daynames span {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.mini-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.mini-cal-day {
+  aspect-ratio: 1;
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mini-cal-day.empty {
+  background: transparent;
+  border: none;
+  cursor: default;
+}
+
+.mini-cal-day:not(.empty):hover {
+  border-color: var(--accent);
+}
+
+.mini-cal-day.today {
+  border-color: var(--accent-mid);
+}
+
+.mini-cal-day.past {
+  color: var(--text-faint);
+}
+
+.mini-cal-day.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.multi-date-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.multi-date-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 14px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.multi-date-chip button {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.multi-date-chip button:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.app-shell[data-theme="dark"] .mini-cal {
+  background: #1e1e34;
+  border-color: #4a4a70;
+}
+
+.app-shell[data-theme="dark"] .mini-cal-nav {
+  background: #1e1e34;
+  border-color: #4a4a70;
+  color: #c0c0d8;
+}
+
+.app-shell[data-theme="dark"] .mini-cal-day {
+  background: #22223a;
+  color: #f0f0f8;
+}
+
+.app-shell[data-theme="dark"] .mini-cal-day.selected {
+  background: #7c74ff;
+  border-color: #7c74ff;
+  color: #fff;
 }
 
 .toggle-label {

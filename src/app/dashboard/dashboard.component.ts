@@ -75,6 +75,7 @@ interface ScheduleForm {
   repeatType: 'none' | 'weekly' | 'multiday';  // recurring type
   repeatDays: boolean[];  // [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
   repeatUntil: string;    // end date for weekly recurrence (YYYY-MM-DD)
+  multiDates: string[];   // dates selected by clicking the multi-day picker (YYYY-MM-DD)
 }
 
 // Helper to build a date string relative to today
@@ -427,6 +428,11 @@ function buildCoachEvents(): CalendarEvent[] {
   imports: [CommonModule, FormsModule, CategoryCountPipe],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
+  // Modals render as siblings of .app-shell (not descendants of it), so theme CSS
+  // variables — which used to live only on .app-shell — never reached them. Mirroring
+  // the data-theme attribute onto the host makes :host a valid variable source for
+  // everything the component renders, modals included.
+  host: { '[attr.data-theme]': "isDarkMode ? 'dark' : 'light'" },
 })
 export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   userEmail = '';
@@ -2631,6 +2637,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     repeatType: 'none',
     repeatDays: [false, false, false, false, false, false, false],
     repeatUntil: '',
+    multiDates: [],
   };
 
   dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -2647,6 +2654,51 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   isMultiDay = false;
+
+  // ── Multi-day date picker (click dates on a mini calendar) ──
+  multiDayPickerYear = new Date().getFullYear();
+  multiDayPickerMonth = new Date().getMonth();
+
+  get multiDayPickerWeeks() {
+    return this.buildWeeks(this.multiDayPickerYear, this.multiDayPickerMonth);
+  }
+
+  get multiDatesSorted(): string[] {
+    return [...this.form.multiDates].sort();
+  }
+
+  isMultiDateSelected(dateStr: string): boolean {
+    return this.form.multiDates.includes(dateStr);
+  }
+
+  toggleMultiDate(dateStr: string) {
+    this.form.multiDates = this.isMultiDateSelected(dateStr)
+      ? this.form.multiDates.filter(d => d !== dateStr)
+      : [...this.form.multiDates, dateStr];
+  }
+
+  prevMultiDayPickerMonth() {
+    const d = new Date(this.multiDayPickerYear, this.multiDayPickerMonth - 1, 1);
+    this.multiDayPickerYear = d.getFullYear();
+    this.multiDayPickerMonth = d.getMonth();
+  }
+
+  nextMultiDayPickerMonth() {
+    const d = new Date(this.multiDayPickerYear, this.multiDayPickerMonth + 1, 1);
+    this.multiDayPickerYear = d.getFullYear();
+    this.multiDayPickerMonth = d.getMonth();
+  }
+
+  /** Switches the New Event form into multi-day mode and seeds the picker from the chosen start date. */
+  selectMultiDayMode() {
+    this.form.repeatType = 'multiday';
+    if (this.form.multiDates.length === 0 && this.form.date) {
+      this.form.multiDates = [this.form.date];
+    }
+    const base = new Date((this.form.date || this.today) + 'T00:00:00');
+    this.multiDayPickerYear = base.getFullYear();
+    this.multiDayPickerMonth = base.getMonth();
+  }
 
   events: CalendarEvent[] = [];
 
@@ -3649,6 +3701,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       repeatType: 'none',
       repeatDays: [false, false, false, false, false, false, false],
       repeatUntil: '',
+      multiDates: [],
     };
     this.isMultiDay = false;
     this.formShareInput = '';
@@ -3785,37 +3838,25 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    // ── Multi-day: create one event for each day in the range ──
+    // ── Multi-day: create one event on each date picked from the calendar ──
     if (this.form.repeatType === 'multiday') {
-      if (!this.form.endDate) {
-        this.scheduleError = 'Please select an end date.';
-        return;
-      }
-      if (this.form.endDate < this.form.date) {
-        this.scheduleError = 'End date must be on or after the start date.';
+      if (this.form.multiDates.length === 0) {
+        this.scheduleError = 'Please click at least one date on the calendar.';
         return;
       }
 
-      const events: CalendarEvent[] = [];
-      const start = new Date(this.form.date + 'T00:00:00');
-      const end = new Date(this.form.endDate + 'T00:00:00');
-      const cur = new Date(start);
-
-      while (cur <= end) {
-        events.push({
-          id: `${Date.now()}_${events.length}`,
-          title: this.form.title.trim(),
-          date: cur.toISOString().split('T')[0],
-          startTime: this.form.startTime,
-          endTime: this.form.endTime,
-          description: this.form.description.trim(),
-          color: this.form.category ? this.getCategoryColor(this.form.category.trim()) : this.selectedColor,
-          category: this.form.category.trim(),
-          location: this.form.location.trim(),
-          sharedWith: [...this.form.sharedWith],
-        });
-        cur.setDate(cur.getDate() + 1);
-      }
+      const events: CalendarEvent[] = this.multiDatesSorted.map((dateStr, i) => ({
+        id: `${Date.now()}_${i}`,
+        title: this.form.title.trim(),
+        date: dateStr,
+        startTime: this.form.startTime,
+        endTime: this.form.endTime,
+        description: this.form.description.trim(),
+        color: this.form.category ? this.getCategoryColor(this.form.category.trim()) : this.selectedColor,
+        category: this.form.category.trim(),
+        location: this.form.location.trim(),
+        sharedWith: [...this.form.sharedWith],
+      }));
 
       this.addMultipleEventsAndClose(events);
       return;
@@ -4313,6 +4354,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       repeatType: 'none',
       repeatDays: [false, false, false, false, false, false, false],
       repeatUntil: '',
+      multiDates: [],
     };
     this.isMultiDay = false;
     this.formShareInput = '';
