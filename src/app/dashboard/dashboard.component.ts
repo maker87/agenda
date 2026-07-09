@@ -2659,8 +2659,21 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   multiDayPickerYear = new Date().getFullYear();
   multiDayPickerMonth = new Date().getMonth();
 
+  // buildWeeks() rebuilds every day cell (incl. per-day event lookups) from scratch,
+  // so calling it from a plain getter meant *ngFor tore down and recreated every
+  // calendar button on EVERY change-detection cycle (e.g. the friend-messages poll
+  // ticking in the background) — not just when the visible month changed. That churn
+  // could eat a click mid-DOM-swap. Cache it and only rebuild when year/month move.
+  private _multiDayPickerWeeksCache: { year: number; month: number; weeks: ReturnType<DashboardComponent['buildWeeks']> } | null = null;
+
   get multiDayPickerWeeks() {
-    return this.buildWeeks(this.multiDayPickerYear, this.multiDayPickerMonth);
+    const cache = this._multiDayPickerWeeksCache;
+    if (cache && cache.year === this.multiDayPickerYear && cache.month === this.multiDayPickerMonth) {
+      return cache.weeks;
+    }
+    const weeks = this.buildWeeks(this.multiDayPickerYear, this.multiDayPickerMonth);
+    this._multiDayPickerWeeksCache = { year: this.multiDayPickerYear, month: this.multiDayPickerMonth, weeks };
+    return weeks;
   }
 
   get multiDatesSorted(): string[] {
