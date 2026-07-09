@@ -60,6 +60,15 @@ const schema = a.schema({
       fromEmail: a.string().required(),
       toEmail:   a.string().required(),
       text:      a.string().required(),
+      // Present when this message shares a calendar event (denormalized snapshot,
+      // so the recipient can view/add it without needing access to the sender's event).
+      eventTitle:       a.string(),
+      eventDate:        a.string(),
+      eventStartTime:   a.string(),
+      eventEndTime:     a.string(),
+      eventDescription: a.string(),
+      eventColor:       a.string(),
+      eventCategory:    a.string(),
     })
     .authorization((allow) => [
       allow.owner().identityClaim('sub'),

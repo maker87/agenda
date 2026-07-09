@@ -1905,7 +1905,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Sends a real friend-request notification to `email` and records it as pending locally. */
   private async createFriendRequest(email: string, nickname: string): Promise<boolean> {
-    this.pendingFriendRequests.push({ email, displayName: email.split('@')[0], nickname });
+    const pending: { email: string; displayName: string; nickname: string; notificationId?: string } =
+      { email, displayName: email.split('@')[0], nickname };
+    this.pendingFriendRequests.push(pending);
     try {
       const n = await this.notificationsService.create({
         recipientEmail: email,
@@ -1918,6 +1920,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         read: false,
         status: 'pending',
       });
+      pending.notificationId = n.id;
       // If the recipient is the current user (demo/testing), show it immediately
       if (email === this.userEmail) {
         this.notifications = [n, ...this.notifications];
@@ -1949,7 +1952,21 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // Pending outgoing friend requests (waiting for the other person to accept)
-  pendingFriendRequests: { email: string; displayName: string; nickname: string }[] = [];
+  pendingFriendRequests: { email: string; displayName: string; nickname: string; notificationId?: string }[] = [];
+
+  /** Cancel/delete an outgoing friend request that hasn't been accepted yet. */
+  async cancelFriendRequest(email: string) {
+    const pending = this.pendingFriendRequests.find(p => p.email === email);
+    this.pendingFriendRequests = this.pendingFriendRequests.filter(p => p.email !== email);
+    this.friendRequestsSent.delete(email);
+    if (pending?.notificationId) {
+      try {
+        await this.notificationsService.delete(pending.notificationId);
+      } catch (err) {
+        console.warn('[Dashboard] Could not delete friend request notification:', err);
+      }
+    }
+  }
 
   async removeFriend(email: string) {
     const friend = this.friends.find(f => f.email === email);
@@ -2078,6 +2095,85 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     } catch (err) {
       console.error('[Dashboard] Failed to send message:', err);
       this.friendMessageDraft = text;
+    }
+  }
+
+  // ── Send an event via message ──
+  showSendEventModal = false;
+  sendEventSearch = '';
+  /** Message ids whose shared event has already been added to the calendar this session. */
+  addedSharedEventIds = new Set<string>();
+
+  get sendEventCandidates(): CalendarEvent[] {
+    const q = this.sendEventSearch.trim().toLowerCase();
+    const todayStr = new Date().toISOString().split('T')[0];
+    const list = q
+      ? this.events.filter(e => e.title.toLowerCase().includes(q) || e.category.toLowerCase().includes(q))
+      : this.events;
+    // Upcoming events first (soonest first), then past events (most recent first)
+    return [...list].sort((a, b) => {
+      const aFuture = a.date >= todayStr, bFuture = b.date >= todayStr;
+      if (aFuture !== bFuture) return aFuture ? -1 : 1;
+      return aFuture ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
+    });
+  }
+
+  openSendEventModal() {
+    if (!this.selectedFriendEmail) return;
+    this.sendEventSearch = '';
+    this.showSendEventModal = true;
+  }
+
+  closeSendEventModal() {
+    this.showSendEventModal = false;
+  }
+
+  async sendEventToFriend(event: CalendarEvent) {
+    const friendEmail = this.selectedFriendEmail;
+    if (!friendEmail) return;
+    this.showSendEventModal = false;
+
+    try {
+      const msg = await this.friendsService.sendEventMessage(this.userEmail, friendEmail, {
+        title: event.title,
+        date: event.date,
+        startTime: event.startTime,
+        endTime: event.endTime,
+        description: event.description,
+        color: event.color,
+        category: event.category,
+      });
+      this.allFriendMessages = [...this.allFriendMessages, msg];
+      setTimeout(() => this.scrollFriendMessagesToBottom(), 0);
+    } catch (err) {
+      console.error('[Dashboard] Failed to share event via message:', err);
+    }
+  }
+
+  /** Recipient adds a shared-event message to their own calendar, then gets the same AI category prompt as an accepted invite. */
+  async addSharedEventToCalendar(msg: FriendMessage) {
+    if (!msg.sharedEvent || this.addedSharedEventIds.has(msg.id)) return;
+    const ev = msg.sharedEvent;
+    this.addedSharedEventIds.add(msg.id);
+
+    const newEvent: Omit<CalendarEvent, 'id'> = {
+      title: ev.title,
+      date: ev.date,
+      startTime: ev.startTime,
+      endTime: ev.endTime,
+      description: ev.description || `Shared by ${msg.fromEmail}`,
+      color: ev.color || '#6c63ff',
+      category: '', // set via the AI category suggestion modal below
+      sharedWith: [],
+    };
+
+    try {
+      const created = await this.eventsService.createEvent(newEvent, this.userEmail);
+      this.events = [...this.events, created];
+      this.openInviteCategoryModal(created);
+    } catch (err) {
+      console.error('[Dashboard] Failed to add shared event:', err);
+      this.addedSharedEventIds.delete(msg.id);
     }
   }
 

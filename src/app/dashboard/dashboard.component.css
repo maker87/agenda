@@ -7390,11 +7390,141 @@
   cursor: not-allowed;
 }
 
+.friends-messenger-attach-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-input);
+  background: var(--bg-surface);
+  font-size: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.friends-messenger-attach-btn:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+/* ── Shared event card (inside a chat bubble) ── */
+.friends-msg-bubble-event {
+  max-width: 78%;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-input);
+  padding: 4px;
+}
+
+.friends-msg-bubble-event.mine {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.shared-event-card {
+  padding: 10px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shared-event-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shared-event-card-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.shared-event-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.shared-event-card-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.shared-event-card-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.shared-event-card-add-btn {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.shared-event-card-add-btn:hover:not(:disabled) {
+  background: #5a52e0;
+}
+
+.shared-event-card-add-btn:disabled {
+  background: var(--bg-surface-2);
+  color: var(--text-muted);
+  cursor: default;
+}
+
+/* ── Send Event picker modal ── */
+.send-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+  margin-top: 12px;
+}
+
+.send-event-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-input);
+  background: var(--bg-surface);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.send-event-item:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.send-event-item-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 [data-theme="dark"] .friends-messenger-thread { background: #1e1e2e; border-color: #3a3a4a; }
 [data-theme="dark"] .friends-messenger-thread-header { border-color: #3a3a4a; }
 [data-theme="dark"] .friends-messenger-input-row { border-color: #3a3a4a; }
 [data-theme="dark"] .friends-messenger-input { background: #2a2a3a; border-color: #3a3a4a; color: #eee; }
+[data-theme="dark"] .friends-messenger-attach-btn { background: #2a2a3a; border-color: #3a3a4a; }
 [data-theme="dark"] .friends-msg-bubble { background: #2a2a3a; color: #eee; }
+[data-theme="dark"] .friends-msg-bubble-event { background: #1e1e2e; border-color: #3a3a4a; }
+[data-theme="dark"] .send-event-item { background: #1e1e2e; border-color: #3a3a4a; }
 
 @media (max-width: 720px) {
   .friends-messenger {

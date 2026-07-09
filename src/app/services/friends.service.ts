@@ -9,12 +9,23 @@ export interface Friend {
   nickname: string;
 }
 
+export interface SharedEventSnapshot {
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  description: string;
+  color: string;
+  category: string;
+}
+
 export interface FriendMessage {
   id: string;
   fromEmail: string;
   toEmail: string;
   text: string;
   createdAt: string;
+  sharedEvent?: SharedEventSnapshot;
 }
 
 // Lazy — avoids crashing at module load when Amplify isn't configured
@@ -77,6 +88,23 @@ export class FriendsService {
     return this.toLocalMessage(data!);
   }
 
+  /** Shares a calendar event as a message — the recipient gets a denormalized snapshot they can add to their own calendar. */
+  async sendEventMessage(fromEmail: string, toEmail: string, event: SharedEventSnapshot): Promise<FriendMessage> {
+    const { data, errors } = await getClient().models.FriendMessage.create({
+      fromEmail, toEmail,
+      text: `📅 Shared an event: ${event.title}`,
+      eventTitle:       event.title,
+      eventDate:        event.date,
+      eventStartTime:   event.startTime,
+      eventEndTime:     event.endTime,
+      eventDescription: event.description || undefined,
+      eventColor:       event.color || undefined,
+      eventCategory:    event.category || undefined,
+    });
+    if (errors?.length) throw new Error(errors[0].message);
+    return this.toLocalMessage(data!);
+  }
+
   private toLocalFriend(r: Schema['Friend']['type']): Friend {
     const email = r.friendEmail ?? '';
     return {
@@ -88,12 +116,24 @@ export class FriendsService {
   }
 
   private toLocalMessage(r: Schema['FriendMessage']['type']): FriendMessage {
-    return {
+    const msg: FriendMessage = {
       id: r.id,
       fromEmail: r.fromEmail ?? '',
       toEmail: r.toEmail ?? '',
       text: r.text ?? '',
       createdAt: r.createdAt ?? new Date().toISOString(),
     };
+    if (r.eventTitle) {
+      msg.sharedEvent = {
+        title: r.eventTitle,
+        date: r.eventDate ?? '',
+        startTime: r.eventStartTime ?? '',
+        endTime: r.eventEndTime ?? '',
+        description: r.eventDescription ?? '',
+        color: r.eventColor ?? '#6c63ff',
+        category: r.eventCategory ?? '',
+      };
+    }
+    return msg;
   }
 }

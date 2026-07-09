@@ -1427,13 +1427,31 @@
               class="friends-msg-bubble"
               *ngFor="let m of selectedFriendMessages"
               [class.mine]="m.fromEmail === userEmail"
+              [class.friends-msg-bubble-event]="m.sharedEvent"
             >
-              <span class="friends-msg-text">{{ m.text }}</span>
+              <ng-container *ngIf="!m.sharedEvent">
+                <span class="friends-msg-text">{{ m.text }}</span>
+              </ng-container>
+              <div class="shared-event-card" *ngIf="m.sharedEvent as ev">
+                <div class="shared-event-card-header">
+                  <span class="shared-event-card-dot" [style.background]="ev.color || '#6c63ff'"></span>
+                  <span class="shared-event-card-title">{{ ev.title }}</span>
+                </div>
+                <div class="shared-event-card-meta">{{ formatDate(ev.date) }} · {{ ev.startTime }}–{{ ev.endTime }}</div>
+                <p class="shared-event-card-desc" *ngIf="ev.description">{{ ev.description }}</p>
+                <button
+                  class="shared-event-card-add-btn"
+                  *ngIf="m.fromEmail !== userEmail"
+                  [disabled]="addedSharedEventIds.has(m.id)"
+                  (click)="addSharedEventToCalendar(m)"
+                >{{ addedSharedEventIds.has(m.id) ? '✓ Added' : '＋ Add to my calendar' }}</button>
+              </div>
               <span class="friends-msg-time">{{ formatNotifTime(m.createdAt) }}</span>
             </div>
           </div>
 
           <form class="friends-messenger-input-row" (ngSubmit)="sendFriendMessage()">
+            <button type="button" class="friends-messenger-attach-btn" (click)="openSendEventModal()" title="Share an event">📅</button>
             <input
               class="friends-messenger-input"
               type="text"
@@ -1457,6 +1475,48 @@
         <span class="empty-icon">👥</span>
         <p>No friends yet. Add friends from the Notifications tab to start messaging.</p>
         <button class="btn-primary" (click)="switchTab('notifications'); notifSubTab = 'friends'">Add a Friend</button>
+      </div>
+    </div>
+
+    <!-- ── Send Event picker (from within a Friends chat) ── -->
+    <div class="modal-overlay" *ngIf="showSendEventModal" (click)="closeSendEventModal()">
+      <div class="modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Share an Event</h3>
+          <button class="modal-close" (click)="closeSendEventModal()">✕</button>
+        </div>
+        <div class="modal-form">
+          <div class="field">
+            <div class="friend-search-wrap">
+              <span class="history-search-icon">🔍</span>
+              <input
+                class="history-search-input"
+                type="text"
+                [(ngModel)]="sendEventSearch"
+                name="sendEventSearch"
+                placeholder="Search your events…"
+              />
+            </div>
+          </div>
+          <div class="send-event-list" *ngIf="sendEventCandidates.length > 0">
+            <button
+              type="button"
+              class="send-event-item"
+              *ngFor="let ev of sendEventCandidates"
+              (click)="sendEventToFriend(ev)"
+            >
+              <span class="send-event-item-dot" [style.background]="ev.color"></span>
+              <div class="friend-info">
+                <span class="friend-display-name">{{ ev.title }}</span>
+                <span class="friend-username">{{ formatDate(ev.date) }} · {{ ev.startTime }}–{{ ev.endTime }}</span>
+              </div>
+            </button>
+          </div>
+          <div class="empty-state" *ngIf="sendEventCandidates.length === 0">
+            <span class="empty-icon">📅</span>
+            <p>No events found.</p>
+          </div>
+        </div>
       </div>
     </div>
 
