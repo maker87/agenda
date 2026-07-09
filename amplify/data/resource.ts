@@ -42,7 +42,12 @@ const schema = a.schema({
     })
     .authorization((allow) => [
       allow.owner().identityClaim('sub'),
-      allow.authenticated().to(['create', 'read']),
+      // Notifications are created by the sender but acted on (read/accepted/
+      // rejected/deleted) by the recipient, who is never the owner — without
+      // this, updateStatus()/markRead()/delete() from the recipient silently
+      // fail auth and the notification (e.g. a friend request) reverts to
+      // pending every time the app reloads.
+      allow.authenticated().to(['create', 'read', 'update', 'delete']),
     ]),
 
   Friend: a
