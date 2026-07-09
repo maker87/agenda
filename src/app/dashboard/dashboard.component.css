@@ -6116,7 +6116,7 @@
   position: fixed;
   inset: 0;
   z-index: 998;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.75);
 }
 
 /* Floating panel */
