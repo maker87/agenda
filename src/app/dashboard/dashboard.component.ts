@@ -1274,30 +1274,22 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       const assistantMsg: ChatMessage = {
         id: `msg_${Date.now()}_a`,
         role: 'assistant',
-        text: actions.length > 0 ? reply : displayText,
+        text: displayText,
         timestamp: new Date(),
-        actions: actions.length > 0 ? actions.map(a => ({
-          ...a,
-          label: a.type === 'create_event' ? '✅ Add to Calendar' :
-                 a.type === 'create_recurring' ? '✅ Add Recurring' :
-                 a.type === 'create_reminder' ? '🔔 Set Reminder' :
-                 a.type === 'navigate' ? (a.label || 'Go') : a.type,
-          type: a.type,
-        })) as any : undefined,
       };
       this.chatMessages = [...this.chatMessages, assistantMsg];
       this.chatTyping = false;
       this.scrollChatToBottom();
       this.syncConversationMessages();
 
-      // create_event / create_recurring / create_reminder are NOT
-      // auto-executed — the user must explicitly click the action button
-      // (rendered above) to confirm before anything is added. Only
-      // side-effect-free navigation actions fire immediately.
+      // The Lambda only ever emits create_event / create_recurring /
+      // create_reminder after the user has already explicitly confirmed the
+      // proposed details on a prior chat turn (see bedrock-chat SYSTEM_PROMPT
+      // rules 3-4), so by the time an action reaches the frontend it's meant
+      // to happen — execute it immediately instead of waiting on a second,
+      // redundant button click the user has no reason to expect.
       for (const action of actions) {
-        if (action.type === 'navigate') {
-          this.executeBedrockAction(action);
-        }
+        this.executeBedrockAction(action);
       }
     }).catch((err) => {
       console.error('[AI Chat] Error:', err);
