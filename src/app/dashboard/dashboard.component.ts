@@ -761,7 +761,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         loggedValues: s.loggedValues ?? {},
         aiPlan: s.aiPlan ?? '',
         createdAt: s.createdAt ?? '',
-      } as typeof this.streaks[0]));
+      } as Streak));
+      this.streaks.forEach(s => this.recomputeStreakDerived(s));
     } catch { this.streaks = []; }
     try {
       const raw = localStorage.getItem(this.STREAK_HISTORY_KEY);
@@ -826,14 +827,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   createStreak() {
     const name = this.streakFormName.trim();
     if (!name) return;
-    this.streaks = [...this.streaks, {
+    const streak: Streak = {
       id: `streak_${Date.now()}`, name,
       target: this.streakFormTarget || 1,
       unit: this.streakFormUnit.trim() || 'times',
       checkedDays: [], loggedValues: {},
       aiPlan: this.streakAiPlan,
       createdAt: new Date().toISOString().split('T')[0],
-    }];
+    };
+    this.recomputeStreakDerived(streak);
+    this.streaks = [...this.streaks, streak];
     this.saveStreaks();
     this.closeStreakModal();
   }
@@ -852,6 +855,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     const entry = this.streakHistory.find(s => s.id === id);
     if (!entry) return;
     const { deletedAt: _d, ...streak } = entry;
+    this.recomputeStreakDerived(streak);
     this.streaks = [...this.streaks, streak];
     this.streakHistory = this.streakHistory.filter(s => s.id !== id);
     this.saveStreaks();
@@ -863,7 +867,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.saveStreakHistory();
   }
 
-  logStreakValue(streak: typeof this.streaks[0], dateStr: string, value: number) {
+  logStreakValue(streak: Streak, dateStr: string, value: number) {
     if (dateStr > new Date().toISOString().split('T')[0]) return;
     streak.loggedValues[dateStr] = value;
     if (value >= streak.target && !streak.checkedDays.includes(dateStr)) {
@@ -871,15 +875,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     } else if (value < streak.target) {
       streak.checkedDays = streak.checkedDays.filter(d => d !== dateStr);
     }
+    this.recomputeStreakDerived(streak);
     this.saveStreaks();
   }
 
-  adjustStreakToday(streak: typeof this.streaks[0], delta: number) {
+  adjustStreakToday(streak: Streak, delta: number) {
     const current = streak.loggedValues[this.today] || 0;
     this.logStreakValue(streak, this.today, Math.max(0, current + delta));
   }
 
-  toggleStreakDay(streak: typeof this.streaks[0], dateStr: string) {
+  toggleStreakDay(streak: Streak, dateStr: string) {
     if (dateStr > new Date().toISOString().split('T')[0]) return;
     const idx = streak.checkedDays.indexOf(dateStr);
     if (idx >= 0) {
@@ -889,12 +894,20 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       streak.checkedDays = [...streak.checkedDays, dateStr].sort();
       streak.loggedValues[dateStr] = streak.target;
     }
+    this.recomputeStreakDerived(streak);
     this.saveStreaks();
   }
 
-  getStreakCount(streak: { checkedDays: string[] }): number {
+  // Recomputes the cached streak count/week after a mutation, instead of
+  // recalculating (sort + scan) on every template read / change-detection cycle.
+  private recomputeStreakDerived(streak: Streak) {
+    streak._count = this.computeStreakCount(streak.checkedDays);
+    streak._week = this.computeStreakWeek(streak);
+  }
+
+  private computeStreakCount(checkedDays: string[]): number {
     const today = new Date().toISOString().split('T')[0];
-    const sorted = [...streak.checkedDays].sort().reverse();
+    const sorted = [...checkedDays].sort().reverse();
     if (sorted.length === 0) return 0;
     let count = 0;
     const cursor = new Date(today + 'T12:00:00');
@@ -907,18 +920,29 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return count;
   }
 
-  getStreakWeek(streak: { checkedDays: string[]; loggedValues?: Record<string, number>; target?: number; unit?: string }): { date: string; label: string; checked: boolean; isToday: boolean; isFuture: boolean; value: number }[] {
+  private computeStreakWeek(streak: { checkedDays: string[]; loggedValues?: Record<string, number> }): StreakDay[] {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const days: { date: string; label: string; checked: boolean; isToday: boolean; isFuture: boolean; value: number }[] = [];
+    const checkedSet = new Set(streak.checkedDays);
+    const days: StreakDay[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
-      days.push({ date: dateStr, label: dayNames[d.getDay()], checked: streak.checkedDays.includes(dateStr), isToday: dateStr === todayStr, isFuture: dateStr > todayStr, value: streak.loggedValues?.[dateStr] ?? 0 });
+      days.push({ date: dateStr, label: dayNames[d.getDay()], checked: checkedSet.has(dateStr), isToday: dateStr === todayStr, isFuture: dateStr > todayStr, value: streak.loggedValues?.[dateStr] ?? 0 });
     }
     return days;
+  }
+
+  /** Returns the current streak count, using the cached value kept up to date by recomputeStreakDerived. */
+  getStreakCount(streak: Streak): number {
+    return streak._count ?? this.computeStreakCount(streak.checkedDays);
+  }
+
+  /** Returns the last-7-days view, using the cached value kept up to date by recomputeStreakDerived. */
+  getStreakWeek(streak: Streak): StreakDay[] {
+    return streak._week ?? this.computeStreakWeek(streak);
   }
 
   getStreakReminders(): { title: string; body: string }[] {
