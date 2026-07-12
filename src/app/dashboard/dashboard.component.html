@@ -8,22 +8,22 @@
     <div class="ai-login-banner-inner">
       <span class="ai-login-banner-icon">✨</span>
       <div class="ai-login-banner-content">
-        <span class="ai-login-banner-heading">AI Reminders for you</span>
+        <span class="ai-login-banner-heading">{{ i18n.t('aiRemindersForYou') }}</span>
         <ul class="ai-login-banner-list">
           <li *ngFor="let item of loginBannerItems">
             <strong>{{ item.title }}</strong> — {{ item.body }}
           </li>
         </ul>
       </div>
-      <button class="ai-login-banner-close" (click)="dismissLoginBanner()" aria-label="Dismiss">✕</button>
+      <button class="ai-login-banner-close" (click)="dismissLoginBanner()" [attr.aria-label]="i18n.t('dismiss')">✕</button>
     </div>
   </div>
     <div class="topbar-right">
       <button
         class="topbar-theme-btn"
         (click)="toggleTheme()"
-        [title]="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
-        [attr.aria-label]="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
+        [title]="isDarkMode ? i18n.t('lightMode') : i18n.t('darkMode')"
+        [attr.aria-label]="isDarkMode ? i18n.t('lightMode') : i18n.t('darkMode')"
       >
         <span *ngIf="!isDarkMode">🌙</span>
         <span *ngIf="isDarkMode">☀️</span>
@@ -47,7 +47,7 @@
       <span class="notif-panel-title">{{ i18n.t('notifications') }}</span>
       <div class="notif-panel-actions">
         <button class="notif-panel-mark-all" *ngIf="unreadCount > 0" (click)="markAllNotifsRead()">{{ i18n.t('markAllRead') }}</button>
-        <button class="notif-panel-close" (click)="showNotifPanel = false" title="Close">✕</button>
+        <button class="notif-panel-close" (click)="showNotifPanel = false" [title]="i18n.t('close')">✕</button>
       </div>
     </div>
 
@@ -97,25 +97,25 @@
           </div>
           <!-- Accept / Reject buttons for pending friend requests -->
           <div class="notif-invite-actions" *ngIf="n.type === 'friend_request' && n.status === 'pending'">
-            <button class="notif-invite-accept" (click)="$event.stopPropagation(); acceptFriendNotif(n)">✓ Accept</button>
-            <button class="notif-invite-decline" (click)="$event.stopPropagation(); rejectFriendNotif(n)">✗ Reject</button>
+            <button class="notif-invite-accept" (click)="$event.stopPropagation(); acceptFriendNotif(n)">✓ {{ i18n.t('accept') }}</button>
+            <button class="notif-invite-decline" (click)="$event.stopPropagation(); rejectFriendNotif(n)">✗ {{ i18n.t('reject') }}</button>
           </div>
           <div class="notif-invite-status" *ngIf="n.type === 'friend_request' && n.status === 'accepted'">
-            <span class="notif-invite-badge accepted">Friends ✓</span>
+            <span class="notif-invite-badge accepted">{{ i18n.t('friendsAccepted') }}</span>
           </div>
           <div class="notif-invite-status" *ngIf="n.type === 'friend_request' && n.status === 'rejected'">
-            <span class="notif-invite-badge declined">Rejected</span>
+            <span class="notif-invite-badge declined">{{ i18n.t('rejected') }}</span>
           </div>
         </div>
         <div class="notif-panel-item-unread-dot" *ngIf="!n.read"></div>
-        <button class="notif-panel-item-delete" (click)="$event.stopPropagation(); deleteNotif(n)" title="Dismiss">✕</button>
+        <button class="notif-panel-item-delete" (click)="$event.stopPropagation(); deleteNotif(n)" [title]="i18n.t('dismiss')">✕</button>
       </div>
     </div>
 
     <!-- Footer: view all -->
     <div class="notif-panel-footer">
       <button class="notif-panel-view-all" (click)="showNotifPanel = false; switchTab('notifications')">
-        View all in Notifications tab →
+        {{ i18n.t('viewAllNotifications') }}
       </button>
     </div>
   </div>
@@ -186,7 +186,7 @@
         (click)="switchTab('friends')"
       >
         <span class="nav-icon">👥</span>
-        Friends
+        {{ i18n.t('friendsNav') }}
       </button>
       <button
         class="nav-item"
@@ -207,7 +207,7 @@
     </nav>
 
     <div class="sidebar-footer">
-      <div class="user-info" (click)="openProfileTab()" style="cursor:pointer" title="View profile">
+      <div class="user-info" (click)="openProfileTab()" style="cursor:pointer" [title]="i18n.t('viewProfile')">
         <div class="user-avatar">
           <img *ngIf="profile.avatarUrl" [src]="profile.avatarUrl" alt="avatar" class="user-avatar-img" />
           <span *ngIf="!profile.avatarUrl">{{ userInitial }}</span>
@@ -217,7 +217,7 @@
           <span class="user-email">{{ userEmail }}</span>
         </div>
       </div>
-      <button class="logout-btn" (click)="logout()" title="Sign out">
+      <button class="logout-btn" (click)="logout()" [title]="i18n.t('signOut')">
         <span>⎋</span>
       </button>
     </div>
@@ -259,17 +259,17 @@
             </svg>
           </div>
           <div class="action-body">
-            <h3 class="action-title">Google Calendar</h3>
+            <h3 class="action-title">{{ i18n.t('googleCalendar') }}</h3>
             <p class="action-desc" *ngIf="!googleCalendarLinked && !linkingGoogle">{{ i18n.t('syncEvents') }}</p>
             <p class="action-desc" *ngIf="linkingGoogle" style="color:var(--accent)">{{ i18n.t('connectingToGoogle') }}</p>
             <p class="action-desc linked-text" *ngIf="googleCalendarLinked">{{ i18n.t('connectedEventsImported') }}</p>
             <p class="action-desc" *ngIf="googleSyncError" style="color:#ef4444;font-size:12px;margin-top:4px">{{ googleSyncError }}</p>
           </div>
           <button class="action-btn gcal-btn" *ngIf="!googleCalendarLinked" (click)="linkGoogleCalendar()" [disabled]="linkingGoogle">
-            <span *ngIf="!linkingGoogle">Link</span>
+            <span *ngIf="!linkingGoogle">{{ i18n.t('link') }}</span>
             <span *ngIf="linkingGoogle" class="spinner-dark"></span>
           </button>
-          <button class="action-btn unlink-btn" *ngIf="googleCalendarLinked" (click)="unlinkGoogleCalendar()">Unlink</button>
+          <button class="action-btn unlink-btn" *ngIf="googleCalendarLinked" (click)="unlinkGoogleCalendar()">{{ i18n.t('unlink') }}</button>
         </div>
 
         <!-- 2. Add New Event -->
@@ -326,10 +326,10 @@
             <span style="font-size:24px">🤖</span>
           </div>
           <div class="action-body">
-            <h3 class="action-title">AI Organize</h3>
-            <p class="action-desc">Describe your schedule and let AI create events &amp; categories</p>
+            <h3 class="action-title">{{ i18n.t('aiOrganizeCardTitle') }}</h3>
+            <p class="action-desc">{{ i18n.t('aiOrganizeCardDesc') }}</p>
           </div>
-          <button class="action-btn primary-btn" (click)="openOrganizeModal()">Go</button>
+          <button class="action-btn primary-btn" (click)="openOrganizeModal()">{{ i18n.t('goBtn') }}</button>
         </div>
 
       </div>
@@ -346,33 +346,45 @@
           <div class="streak-card" *ngFor="let streak of streaks">
             <div class="streak-header">
               <span class="streak-name">{{ streak.name }}</span>
-              <span class="streak-target-badge">{{ streak.target }} {{ streak.unit }}/day</span>
-              <span class="streak-count">{{ getStreakCount(streak) }} day{{ getStreakCount(streak) !== 1 ? 's' : '' }}</span>
-              <button class="streak-delete" (click)="deleteStreak(streak.id)" title="Delete streak">✕</button>
+              <span class="streak-target-badge">{{ streak.target }} {{ streak.unit }}{{ i18n.t('perDay') }}</span>
+              <span class="streak-count">{{ getStreakCount(streak) }} {{ i18n.t('days') }}</span>
+              <button class="streak-delete" (click)="deleteStreak(streak.id)" [title]="i18n.t('deleteStreakTitle')">✕</button>
             </div>
             <p class="streak-ai-plan" *ngIf="streak.aiPlan">💡 {{ streak.aiPlan }}</p>
+            <div class="streak-goal-progress" *ngIf="getStreakGoalProgress(streak) as goal">
+              <div class="streak-goal-progress-bar">
+                <div class="streak-goal-progress-fill" [style.width.%]="goal.percent"></div>
+              </div>
+              <span class="streak-goal-progress-label">
+                🎯 {{ goal.current }} / {{ goal.total }} {{ streak.unit }} ({{ goal.percent }}%)
+                <ng-container *ngIf="streak.goalDeadline"> · {{ goal.daysLeft }} day{{ goal.daysLeft !== 1 ? 's' : '' }} left</ng-container>
+              </span>
+            </div>
             <div class="streak-days">
               <div
                 class="streak-day"
                 *ngFor="let day of getStreakWeek(streak)"
                 [class.checked]="day.checked"
+                [class.partial]="!day.checked && day.value > 0"
                 [class.today]="day.isToday"
                 [class.future]="day.isFuture"
-                (click)="toggleStreakDay(streak, day.date)"
+                [class.log-selected]="getSelectedLogDate(streak) === day.date"
+                [title]="getStreakDayTitle(streak, day)"
+                (click)="selectLogDate(streak, day.date)"
               >
                 <span class="streak-day-label">{{ day.label }}</span>
                 <span class="streak-day-value" *ngIf="day.value > 0">{{ day.value }}</span>
-                <span class="streak-day-check">{{ day.checked ? '✓' : '·' }}</span>
+                <span class="streak-day-check">{{ day.checked ? '✓' : (day.value > 0 ? '▲' : '·') }}</span>
               </div>
             </div>
-            <!-- Today's log input (always visible so you can keep adjusting after hitting goal) -->
+            <!-- Log input for the selected day (defaults to today; click a day above to log/edit it instead) -->
             <div class="streak-log-row">
-              <span class="streak-log-label">{{ i18n.t('todayLabel') }}</span>
+              <span class="streak-log-label">{{ getSelectedLogDate(streak) === today ? i18n.t('todayLabel') : formatDate(getSelectedLogDate(streak)) }}</span>
               <button
                 class="streak-log-step"
                 type="button"
-                (click)="adjustStreakToday(streak, -1)"
-                [disabled]="(streak.loggedValues[today] || 0) <= 0"
+                (click)="adjustStreakLog(streak, -1)"
+                [disabled]="(streak.loggedValues[getSelectedLogDate(streak)] || 0) <= 0"
                 title="-1"
               >−</button>
               <input
@@ -380,18 +392,18 @@
                 type="number"
                 min="0"
                 [placeholder]="streak.target + ' ' + streak.unit"
-                [ngModel]="streak.loggedValues[today] || ''"
-                (ngModelChange)="logStreakValue(streak, today, +$event)"
+                [ngModel]="streak.loggedValues[getSelectedLogDate(streak)] || ''"
+                (ngModelChange)="logStreakValue(streak, getSelectedLogDate(streak), +$event)"
                 [attr.name]="'streakLog_' + streak.id"
               />
               <button
                 class="streak-log-step"
                 type="button"
-                (click)="adjustStreakToday(streak, 1)"
+                (click)="adjustStreakLog(streak, 1)"
                 title="+1"
               >+</button>
               <span class="streak-log-unit">{{ streak.unit }}</span>
-              <span class="streak-log-done" *ngIf="streak.checkedDays.includes(today)" title="Goal reached today">✅</span>
+              <span class="streak-log-done" *ngIf="streak.checkedDays.includes(getSelectedLogDate(streak))" [title]="i18n.t('todayGoalMet')">✅</span>
             </div>
           </div>
         </div>
@@ -403,7 +415,7 @@
             <div class="streak-history-item" *ngFor="let h of streakHistory">
               <div class="streak-history-info">
                 <span class="streak-history-name">{{ h.name }}</span>
-                <span class="streak-history-meta">{{ h.target }} {{ h.unit }}/day · {{ h.checkedDays.length }} total days · Deleted {{ h.deletedAt | date:'mediumDate' }}</span>
+                <span class="streak-history-meta">{{ h.target }} {{ h.unit }}{{ i18n.t('perDay') }} · {{ h.checkedDays.length }} {{ i18n.t('totalDays') }} · {{ i18n.t('deletedOn') }} {{ h.deletedAt | date:'mediumDate' }}</span>
               </div>
               <div class="streak-history-actions">
                 <button class="btn-primary" style="font-size:11px;padding:5px 10px" (click)="restoreStreak(h.id)">{{ i18n.t('restore') }}</button>
@@ -437,7 +449,7 @@
 
       <div *ngIf="events.length === 0" class="empty-state large">
         <span class="empty-icon">📋</span>
-        <p>Your agenda is empty. Start by scheduling your first event!</p>
+        <p>{{ i18n.t('noEvents') }}</p>
         <button class="btn-primary" (click)="openScheduleModal()">{{ i18n.t('scheduleNow') }}</button>
       </div>
 
@@ -465,16 +477,16 @@
             <div class="event-body">
               <div class="event-header">
                 <div class="event-title-group">
-                  <span class="event-title">{{ event.title }}</span>
+                  <span class="event-title">{{ event.title | translateTitle }}</span>
                   <span class="event-cat-badge" *ngIf="event.category">{{ event.category }}</span>
                 </div>
                 <div class="event-actions">
-                  <button class="reminder-btn" (click)="openReminderModal(event)" title="Set reminder">🔔</button>
-                  <button class="upload-btn" (click)="triggerAttachmentUpload(event)" title="Attach a file to share">
+                  <button class="reminder-btn" (click)="openReminderModal(event)" [title]="i18n.t('setReminder')">🔔</button>
+                  <button class="upload-btn" (click)="triggerAttachmentUpload(event)" [title]="i18n.t('attachFileToShare')">
                     📎<span class="upload-badge" *ngIf="getEventAttachments(event.id).length > 0">{{ getEventAttachments(event.id).length }}</span>
                   </button>
-                  <button class="share-btn" (click)="openShareModal(event)" title="Share event">↗</button>
-                  <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+                  <button class="share-btn" (click)="openShareModal(event)" [title]="i18n.t('shareEvent')">↗</button>
+                  <button class="delete-btn" (click)="deleteEvent(event.id)" [title]="i18n.t('deleteEvent')">✕</button>
                 </div>
               </div>
               <div class="event-time">
@@ -497,16 +509,16 @@
             <div class="event-body">
               <div class="event-header">
                 <div class="event-title-group">
-                  <span class="event-title">{{ event.title }}</span>
+                  <span class="event-title">{{ event.title | translateTitle }}</span>
                   <span class="event-cat-badge" *ngIf="event.category">{{ event.category }}</span>
                 </div>
                 <div class="event-actions">
-                  <button class="reminder-btn" (click)="openReminderModal(event)" title="Set reminder">🔔</button>
-                  <button class="upload-btn" (click)="triggerAttachmentUpload(event)" title="Attach a file to share">
+                  <button class="reminder-btn" (click)="openReminderModal(event)" [title]="i18n.t('setReminder')">🔔</button>
+                  <button class="upload-btn" (click)="triggerAttachmentUpload(event)" [title]="i18n.t('attachFileToShare')">
                     📎<span class="upload-badge" *ngIf="getEventAttachments(event.id).length > 0">{{ getEventAttachments(event.id).length }}</span>
                   </button>
-                  <button class="share-btn" (click)="openShareModal(event)" title="Share event">↗</button>
-                  <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+                  <button class="share-btn" (click)="openShareModal(event)" [title]="i18n.t('shareEvent')">↗</button>
+                  <button class="delete-btn" (click)="deleteEvent(event.id)" [title]="i18n.t('deleteEvent')">✕</button>
                 </div>
               </div>
               <div class="event-time">
@@ -533,16 +545,16 @@
             <div class="event-body">
               <div class="event-header">
                 <div class="event-title-group">
-                  <span class="event-title">{{ event.title }}</span>
+                  <span class="event-title">{{ event.title | translateTitle }}</span>
                   <span class="event-cat-badge" *ngIf="event.category">{{ event.category }}</span>
                 </div>
                 <div class="event-actions">
-                  <button class="reminder-btn" (click)="openReminderModal(event)" title="Set reminder">🔔</button>
-                  <button class="upload-btn" (click)="triggerAttachmentUpload(event)" title="Attach a file to share">
+                  <button class="reminder-btn" (click)="openReminderModal(event)" [title]="i18n.t('setReminder')">🔔</button>
+                  <button class="upload-btn" (click)="triggerAttachmentUpload(event)" [title]="i18n.t('attachFileToShare')">
                     📎<span class="upload-badge" *ngIf="getEventAttachments(event.id).length > 0">{{ getEventAttachments(event.id).length }}</span>
                   </button>
-                  <button class="share-btn" (click)="openShareModal(event)" title="Share event">↗</button>
-                  <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+                  <button class="share-btn" (click)="openShareModal(event)" [title]="i18n.t('shareEvent')">↗</button>
+                  <button class="delete-btn" (click)="deleteEvent(event.id)" [title]="i18n.t('deleteEvent')">✕</button>
                 </div>
               </div>
               <div class="event-time">
@@ -589,7 +601,7 @@
         <div class="cal-input-group" *ngIf="calendarView === 'year'">
           <label class="cal-input-label">{{ i18n.t('jumpTo') }}</label>
           <select class="cal-text-input" (change)="scrollToYearMonth(+$any($event.target).value)" name="yearJump">
-            <option value="" disabled selected>Month…</option>
+            <option value="" disabled selected>{{ i18n.t('monthEllipsis') }}</option>
             <option *ngFor="let m of calendarMonths; let i = index" [value]="i">{{ m.name }}</option>
           </select>
         </div>
@@ -722,8 +734,8 @@
                       *ngFor="let ev of cell.events.slice(0, 3)"
                       [style.background]="ev.color"
                       [title]="ev.title"
-                    >{{ ev.title }}</div>
-                    <div class="slide-event-more" *ngIf="cell.events.length > 3">+{{ cell.events.length - 3 }} more</div>
+                    >{{ ev.title | translateTitle }}</div>
+                    <div class="slide-event-more" *ngIf="cell.events.length > 3">+{{ cell.events.length - 3 }} {{ i18n.t('more') }}</div>
                   </div>
                 </div>
               </ng-container>
@@ -768,7 +780,7 @@
                 *ngFor="let ev of day.events"
                 [style.border-left-color]="ev.color"
               >
-                <span class="week-event-title">{{ ev.title }}</span>
+                <span class="week-event-title">{{ ev.title | translateTitle }}</span>
                 <span class="week-event-time">{{ formatTime(ev.startTime) }}</span>
               </div>
             </div>
@@ -793,7 +805,7 @@
               <span class="day-event-end">{{ formatTime(ev.endTime) }}</span>
             </div>
             <div class="day-event-card" [style.border-left-color]="ev.color">
-              <div class="day-event-title">{{ ev.title }}</div>
+              <div class="day-event-title">{{ ev.title | translateTitle }}</div>
               <div class="day-event-desc" *ngIf="ev.description">{{ ev.description }}</div>
             </div>
           </div>
@@ -841,16 +853,16 @@
           class="history-search-clear"
           *ngIf="historySearch"
           (click)="historySearch = ''"
-          title="Clear search"
+          [title]="i18n.t('clearSearch')"
         >✕</button>
       </div>
 
       <!-- Empty state -->
       <div *ngIf="filteredHistory.length === 0" class="empty-state large">
         <span class="empty-icon">🕓</span>
-        <p *ngIf="history.length === 0">No history yet. Changes you make to events will appear here.</p>
-        <p *ngIf="history.length > 0 && !historySearch">No entries match this filter.</p>
-        <p *ngIf="history.length > 0 && historySearch">No entries match "{{ historySearch }}".</p>
+        <p *ngIf="history.length === 0">{{ i18n.t('noHistory') }}</p>
+        <p *ngIf="history.length > 0 && !historySearch">{{ i18n.t('noEntriesFilter') }}</p>
+        <p *ngIf="history.length > 0 && historySearch">{{ i18n.t('noEntriesSearch') }} "{{ historySearch }}".</p>
       </div>
 
       <!-- History list -->
@@ -861,7 +873,7 @@
           </div>
           <div class="history-event-color" [style.background]="entry.snapshot.color"></div>
           <div class="history-body">
-            <div class="history-title">{{ entry.snapshot.title }}</div>
+            <div class="history-title">{{ entry.snapshot.title | translateTitle }}</div>
             <div class="history-meta">
               <span *ngIf="entry.action !== 'changed'">
                 📅 {{ formatDate(entry.snapshot.date) }} · {{ formatTime(entry.snapshot.startTime) }} – {{ formatTime(entry.snapshot.endTime) }}
@@ -878,7 +890,7 @@
             <button
               class="history-restore-btn"
               (click)="restoreEvent(entry)"
-              [title]="entry.action === 'deleted' ? 'Restore event' : entry.action === 'changed' ? 'Revert change' : 'Undo add'"
+              [title]="entry.action === 'deleted' ? i18n.t('restore') : entry.action === 'changed' ? i18n.t('revert') : i18n.t('undo')"
             >
               <span *ngIf="entry.action === 'deleted'">↩ {{ i18n.t('restore') }}</span>
               <span *ngIf="entry.action === 'changed'">↩ {{ i18n.t('revert') }}</span>
@@ -945,16 +957,16 @@
             type="text"
             [(ngModel)]="notifSearch"
             name="notifSearch"
-            placeholder="Search notifications…"
+            [placeholder]="i18n.t('searchNotifications')"
           />
-          <button class="history-search-clear" *ngIf="notifSearch" (click)="notifSearch = ''" title="Clear">✕</button>
+          <button class="history-search-clear" *ngIf="notifSearch" (click)="notifSearch = ''" [title]="i18n.t('clearChat')">✕</button>
         </div>
 
         <!-- Empty state -->
         <div *ngIf="filteredNotifications.length === 0" class="empty-state large">
           <span class="empty-icon">🔔</span>
-          <p *ngIf="notifications.length === 0">No notifications yet. Share an event or set a reminder to get started.</p>
-          <p *ngIf="notifications.length > 0">No notifications match this filter.</p>
+          <p *ngIf="notifications.length === 0">{{ i18n.t('noNotifications') }}</p>
+          <p *ngIf="notifications.length > 0">{{ i18n.t('noNotificationsFilter') }}</p>
         </div>
 
         <!-- Notification list -->
@@ -1027,10 +1039,10 @@
               type="email"
               [(ngModel)]="friendSearch"
               name="friendSearch"
-              placeholder="Search by email address…"
+              [placeholder]="i18n.t('searchByEmailPlaceholder')"
               (ngModelChange)="searchFriends()"
             />
-            <button class="history-search-clear" *ngIf="friendSearch" (click)="friendSearch = ''; friendSearchResults = []" title="Clear">✕</button>
+            <button class="history-search-clear" *ngIf="friendSearch" (click)="friendSearch = ''; friendSearchResults = []" [title]="i18n.t('clearLabel')">✕</button>
           </div>
 
           <!-- Loading -->
@@ -1052,35 +1064,35 @@
                   type="text"
                   [(ngModel)]="friendNickname"
                   name="friendNickname"
-                  placeholder="Nickname…"
+                  [placeholder]="i18n.t('nicknamePlaceholder')"
                   (keydown.enter)="sendFriendRequest(user.email)"
                 />
                 <button
                   class="friend-add-btn"
                   (click)="sendFriendRequest(user.email)"
                   [disabled]="!friendNickname.trim()"
-                  [title]="friendNickname.trim() ? 'Add friend' : 'Enter a nickname first'"
-                >+ Add</button>
+                  [title]="friendNickname.trim() ? i18n.t('addFriendTitle') : i18n.t('enterNicknameFirst')"
+                >{{ i18n.t('addBtn') }}</button>
               </div>
               <button
                 class="friend-pending-btn"
                 *ngIf="friendRequestsSent.has(user.email)"
                 disabled
-              >⏳ Pending</button>
+              >{{ i18n.t('pendingBtn') }}</button>
             </div>
             <p class="friend-search-error" *ngIf="friendSearchError">{{ friendSearchError }}</p>
           </div>
 
           <!-- No results -->
           <div class="friend-no-results" *ngIf="!friendSearchLoading && friendSearch && friendSearchResults.length === 0">
-            No users found matching "{{ friendSearch }}"
+            {{ i18n.t('noUsersFound') }} "{{ friendSearch }}"
           </div>
         </div>
 
         <!-- Pending friend requests -->
         <div class="friend-list-section" *ngIf="pendingFriendRequests.length > 0" style="margin-top:20px">
-          <h3 class="section-label">Pending Requests ({{ pendingFriendRequests.length }})</h3>
-          <p class="friend-search-hint" style="margin-bottom:8px">Waiting for them to accept your request.</p>
+          <h3 class="section-label">{{ i18n.t('pendingRequestsLabel') }} ({{ pendingFriendRequests.length }})</h3>
+          <p class="friend-search-hint" style="margin-bottom:8px">{{ i18n.t('waitingForAccept') }}</p>
           <div class="friend-results">
             <div class="friend-result-item" *ngFor="let p of pendingFriendRequests">
               <div class="friend-avatar" style="background:#fef3c7;color:#d97706">⏳</div>
@@ -1089,7 +1101,8 @@
                 <span class="friend-username">{{ p.email }}</span>
                 <span class="friend-real-name">{{ p.displayName }}</span>
               </div>
-              <span class="friend-pending-btn" style="cursor:default">Pending</span>
+              <span class="friend-pending-btn" style="cursor:default">{{ i18n.t('pendingLabel') }}</span>
+              <button class="friend-remove-btn" (click)="cancelFriendRequest(p.email)" [title]="i18n.t('cancelRequestTitle')">✕</button>
             </div>
           </div>
         </div>
@@ -1105,7 +1118,7 @@
                 <span class="friend-username">{{ f.email }}</span>
                 <span class="friend-real-name" *ngIf="f.nickname !== f.displayName">{{ f.displayName }}</span>
               </div>
-              <button class="friend-remove-btn" (click)="removeFriend(f.email)" title="Remove friend">{{ i18n.t('remove') }}</button>
+              <button class="friend-remove-btn" (click)="removeFriend(f.email)" [title]="i18n.t('removeFriendTitle')">{{ i18n.t('remove') }}</button>
             </div>
           </div>
         </div>
@@ -1113,7 +1126,7 @@
         <!-- Empty friends state -->
         <div *ngIf="friends.length === 0 && !friendSearch" class="empty-state large" style="margin-top:24px">
           <span class="empty-icon">👥</span>
-          <p>No friends added yet. Search by email above to get started.</p>
+          <p>{{ i18n.t('noFriendsYet') }}</p>
         </div>
 
       </ng-container>
@@ -1361,7 +1374,7 @@
             <div class="event-body">
               <div class="event-header">
                 <div class="event-title-group">
-                  <span class="event-title">{{ event.title }}</span>
+                  <span class="event-title">{{ event.title | translateTitle }}</span>
                 </div>
                 <div class="event-actions">
                   <button class="upload-btn" (click)="triggerAttachmentUpload(event)" title="Attach a file to share">
@@ -1385,8 +1398,8 @@
     <div *ngIf="activeTab === 'friends'" class="tab-content">
       <header class="page-header">
         <div>
-          <h2 class="page-title">Friends</h2>
-          <p class="page-subtitle">Message the friends you've added</p>
+          <h2 class="page-title">{{ i18n.t('friendsPageTitle') }}</h2>
+          <p class="page-subtitle">{{ i18n.t('friendsPageSubtitle') }}</p>
         </div>
       </header>
 
@@ -1421,7 +1434,7 @@
           <div class="friends-messenger-messages" #friendMessagesScroll>
             <div *ngIf="selectedFriendMessages.length === 0" class="empty-state">
               <span class="empty-icon">💬</span>
-              <p>Say hi to {{ sf.nickname || sf.displayName }}!</p>
+              <p>{{ i18n.t('sayHiTo') }} {{ sf.nickname || sf.displayName }}!</p>
             </div>
             <div
               class="friends-msg-bubble"
@@ -1435,7 +1448,7 @@
               <div class="shared-event-card" *ngIf="m.sharedEvent as ev">
                 <div class="shared-event-card-header">
                   <span class="shared-event-card-dot" [style.background]="ev.color || '#6c63ff'"></span>
-                  <span class="shared-event-card-title">{{ ev.title }}</span>
+                  <span class="shared-event-card-title">{{ ev.title | translateTitle }}</span>
                 </div>
                 <div class="shared-event-card-meta">{{ formatDate(ev.date) }} · {{ ev.startTime }}–{{ ev.endTime }}</div>
                 <p class="shared-event-card-desc" *ngIf="ev.description">{{ ev.description }}</p>
@@ -1444,37 +1457,37 @@
                   *ngIf="m.fromEmail !== userEmail"
                   [disabled]="addedSharedEventIds.has(m.id)"
                   (click)="addSharedEventToCalendar(m)"
-                >{{ addedSharedEventIds.has(m.id) ? '✓ Added' : '＋ Add to my calendar' }}</button>
+                >{{ addedSharedEventIds.has(m.id) ? i18n.t('addedBtn') : i18n.t('addToMyCalendar') }}</button>
               </div>
               <span class="friends-msg-time">{{ formatNotifTime(m.createdAt) }}</span>
             </div>
           </div>
 
           <form class="friends-messenger-input-row" (ngSubmit)="sendFriendMessage()">
-            <button type="button" class="friends-messenger-attach-btn" (click)="openSendEventModal()" title="Share an event">📅</button>
+            <button type="button" class="friends-messenger-attach-btn" (click)="openSendEventModal()" [title]="i18n.t('shareAnEventTitle')">📅</button>
             <input
               class="friends-messenger-input"
               type="text"
               [(ngModel)]="friendMessageDraft"
               name="friendMessageDraft"
-              placeholder="Type a message…"
+              [placeholder]="i18n.t('typeMessagePlaceholder')"
               autocomplete="off"
             />
-            <button type="submit" class="friends-messenger-send-btn" [disabled]="!friendMessageDraft.trim()" title="Send">➤</button>
+            <button type="submit" class="friends-messenger-send-btn" [disabled]="!friendMessageDraft.trim()" [title]="i18n.t('sendLabel')">➤</button>
           </form>
         </div>
 
         <div class="friends-messenger-thread friends-messenger-empty" *ngIf="!selectedFriend">
           <span class="empty-icon">👈</span>
-          <p>Select a friend to start messaging.</p>
+          <p>{{ i18n.t('selectFriendToStart') }}</p>
         </div>
       </div>
 
       <!-- Empty friends state -->
       <div *ngIf="friends.length === 0" class="empty-state large">
         <span class="empty-icon">👥</span>
-        <p>No friends yet. Add friends from the Notifications tab to start messaging.</p>
-        <button class="btn-primary" (click)="switchTab('notifications'); notifSubTab = 'friends'">Add a Friend</button>
+        <p>{{ i18n.t('noFriendsYetMessaging') }}</p>
+        <button class="btn-primary" (click)="switchTab('notifications'); notifSubTab = 'friends'">{{ i18n.t('addFriend') }}</button>
       </div>
     </div>
 
@@ -1482,7 +1495,7 @@
     <div class="modal-overlay" *ngIf="showSendEventModal" (click)="closeSendEventModal()">
       <div class="modal" (click)="$event.stopPropagation()">
         <div class="modal-header">
-          <h3>Share an Event</h3>
+          <h3>{{ i18n.t('sendEventModalTitle') }}</h3>
           <button class="modal-close" (click)="closeSendEventModal()">✕</button>
         </div>
         <div class="modal-form">
@@ -1494,7 +1507,7 @@
                 type="text"
                 [(ngModel)]="sendEventSearch"
                 name="sendEventSearch"
-                placeholder="Search your events…"
+                [placeholder]="i18n.t('searchYourEventsPlaceholder')"
               />
             </div>
           </div>
@@ -1507,14 +1520,14 @@
             >
               <span class="send-event-item-dot" [style.background]="ev.color"></span>
               <div class="friend-info">
-                <span class="friend-display-name">{{ ev.title }}</span>
+                <span class="friend-display-name">{{ ev.title | translateTitle }}</span>
                 <span class="friend-username">{{ formatDate(ev.date) }} · {{ ev.startTime }}–{{ ev.endTime }}</span>
               </div>
             </button>
           </div>
           <div class="empty-state" *ngIf="sendEventCandidates.length === 0">
             <span class="empty-icon">📅</span>
-            <p>No events found.</p>
+            <p>{{ i18n.t('noEventsFoundPeriod') }}</p>
           </div>
         </div>
       </div>
@@ -1787,13 +1800,13 @@
           <div class="weekly-day-header">
             <span class="weekly-day-label">{{ day.label }}</span>
             <span class="weekly-day-badge" *ngIf="day.isToday">{{ i18n.t('today') }}</span>
-            <span class="weekly-day-count">{{ day.events.length }} event{{ day.events.length !== 1 ? 's' : '' }}</span>
+            <span class="weekly-day-count">{{ day.events.length }} {{ day.events.length === 1 ? i18n.t('event') : i18n.t('events') }}</span>
           </div>
           <div class="weekly-day-events" *ngIf="day.events.length > 0">
             <div class="weekly-event" *ngFor="let ev of day.events">
               <span class="weekly-event-dot" [style.background]="ev.color"></span>
               <span class="weekly-event-time">{{ formatTime(ev.startTime) }}</span>
-              <span class="weekly-event-title">{{ ev.title }}</span>
+              <span class="weekly-event-title">{{ ev.title | translateTitle }}</span>
               <span class="weekly-event-cat" *ngIf="ev.category">{{ ev.category }}</span>
             </div>
           </div>
@@ -2034,7 +2047,7 @@
           >
             <span class="result-dot" [style.background]="ev.color"></span>
             <div class="result-info">
-              <span class="result-title">{{ ev.title }}</span>
+              <span class="result-title">{{ ev.title | translateTitle }}</span>
               <span class="result-meta">{{ formatDate(ev.date) }} · {{ formatTime(ev.startTime) }}</span>
             </div>
             <span class="result-check" *ngIf="selectedEventId === ev.id">✓</span>
@@ -2083,7 +2096,7 @@
             >
               <span class="result-dot" [style.background]="ev.color"></span>
               <div class="result-info">
-                <span class="result-title">{{ ev.title }}</span>
+                <span class="result-title">{{ ev.title | translateTitle }}</span>
                 <span class="result-meta">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
               </div>
               <span class="result-check" *ngIf="selectedEventId === ev.id">✓</span>
@@ -2135,7 +2148,7 @@
             >
               <span class="result-dot" [style.background]="ev.color"></span>
               <div class="result-info">
-                <span class="result-title">{{ ev.title }}</span>
+                <span class="result-title">{{ ev.title | translateTitle }}</span>
                 <span class="result-meta">{{ formatDate(ev.date) }} · {{ formatTime(ev.startTime) }}</span>
               </div>
               <span class="result-check" *ngIf="selectedEventId === ev.id">✓</span>
@@ -2184,7 +2197,7 @@
               >
                 <span class="result-dot" [style.background]="ev.color"></span>
                 <div class="result-info">
-                  <span class="result-title">{{ ev.title }}</span>
+                  <span class="result-title">{{ ev.title | translateTitle }}</span>
                   <span class="result-meta">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
                 </div>
                 <span class="result-check" *ngIf="selectedEventId === ev.id">✓</span>
@@ -2205,7 +2218,7 @@
       <ng-container *ngIf="changeStep === 'edit'">
         <div class="change-event-preview" *ngIf="selectedEvent">
           <span class="result-dot" [style.background]="selectedEvent.color"></span>
-          <strong>{{ selectedEvent.title }}</strong>
+          <strong>{{ selectedEvent.title | translateTitle }}</strong>
         </div>
         <div class="field">
           <label>{{ i18n.t('dateRequired') }}</label>
@@ -2335,7 +2348,7 @@
 >
   <div class="event-popup-header">
     <span class="event-popup-dot" [style.background]="popupEvent.color"></span>
-    <span class="event-popup-title">{{ popupEvent.title }}</span>
+    <span class="event-popup-title">{{ popupEvent.title | translateTitle }}</span>
     <button class="event-popup-close" (click)="closeEventPopup()">✕</button>
   </div>
   <div class="event-popup-time">
@@ -2371,7 +2384,7 @@
         <div class="day-panel-event" *ngFor="let ev of dayPanelEvents">
           <div class="day-panel-color-bar" [style.background]="ev.color"></div>
           <div class="day-panel-body">
-            <div class="day-panel-title">{{ ev.title }}</div>
+            <div class="day-panel-title">{{ ev.title | translateTitle }}</div>
             <div class="day-panel-time">🕐 {{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</div>
             <div class="day-panel-desc" *ngIf="ev.description">{{ ev.description }}</div>
           </div>
@@ -2410,7 +2423,7 @@
           <div class="overlap-event-item" *ngFor="let ev of overlapConflicts">
             <span class="result-dot" [style.background]="ev.color"></span>
             <div class="result-info">
-              <span class="result-title">{{ ev.title }}</span>
+              <span class="result-title">{{ ev.title | translateTitle }}</span>
               <span class="result-meta">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
             </div>
           </div>
@@ -2453,7 +2466,7 @@
           >
             <span class="result-dot" [style.background]="ev.color"></span>
             <div class="result-info">
-              <span class="result-title">{{ ev.title }}</span>
+              <span class="result-title">{{ ev.title | translateTitle }}</span>
               <span class="result-meta">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
             </div>
             <span class="result-check" *ngIf="overlapSelectedEventId === ev.id">✓</span>
@@ -2475,7 +2488,7 @@
       <div class="modal-form">
         <div class="overlap-suggest-card" *ngIf="overlapSelectedEvent">
           <span class="result-dot" [style.background]="overlapSelectedEvent.color"></span>
-          <strong>{{ overlapSelectedEvent.title }}</strong>
+          <strong>{{ overlapSelectedEvent.title | translateTitle }}</strong>
         </div>
         <p class="overlap-desc" style="margin-top:14px">Pick how you want to find a new date:</p>
         <div class="overlap-mode-cards">
@@ -2505,7 +2518,7 @@
       <div class="modal-form">
         <div class="overlap-suggest-card" *ngIf="overlapSelectedEvent">
           <span class="result-dot" [style.background]="overlapSelectedEvent.color"></span>
-          <strong>{{ overlapSelectedEvent.title }}</strong>
+          <strong>{{ overlapSelectedEvent.title | translateTitle }}</strong>
         </div>
         <div class="field" style="margin-top:16px">
           <label>New Date *</label>
@@ -2529,7 +2542,7 @@
         <ng-container *ngIf="overlapSuggestions.length > 0; else noDateFound">
           <div class="overlap-suggest-card" *ngIf="overlapSelectedEvent">
             <span class="result-dot" [style.background]="overlapSelectedEvent.color"></span>
-            <strong>{{ overlapSelectedEvent.title }}</strong>
+            <strong>{{ overlapSelectedEvent.title | translateTitle }}</strong>
           </div>
           <p class="overlap-desc">Here are open time slots (same day and nearby):</p>
           <div class="overlap-slots-list">
@@ -2569,7 +2582,7 @@
       <div class="modal-form">
         <div class="overlap-suggest-card" *ngIf="overlapSelectedEvent">
           <span class="result-dot" [style.background]="overlapSelectedEvent.color"></span>
-          <strong>{{ overlapSelectedEvent.title }}</strong>
+          <strong>{{ overlapSelectedEvent.title | translateTitle }}</strong>
           <span class="overlap-date-inline">→ {{ formatDate(overlapFinalDate) }}</span>
         </div>
 
@@ -2581,7 +2594,7 @@
           <div class="timepick-booked-list">
             <div class="timepick-booked-item" *ngFor="let ev of eventsOnDate(overlapFinalDate)">
               <span class="timepick-booked-bar" [style.background]="ev.color"></span>
-              <span class="timepick-booked-title">{{ ev.title }}</span>
+              <span class="timepick-booked-title">{{ ev.title | translateTitle }}</span>
               <span class="timepick-booked-time">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
             </div>
           </div>
@@ -2960,7 +2973,7 @@
     </div>
 
     <div class="modal-form">
-      <p class="gcal-picker-hint">Select which Google Calendars to import events from.</p>
+      <p class="gcal-picker-hint">{{ i18n.t('selectWhichCalendars') }}</p>
 
       <!-- Loading state -->
       <div *ngIf="gcalPickerLoading" class="gcal-picker-loading">
@@ -2976,11 +2989,11 @@
           <input type="checkbox" [(ngModel)]="cal.selected" [name]="'gcal_' + cal.id" />
           <span class="gcal-cal-dot" [style.background]="cal.color"></span>
           <span class="gcal-cal-name">{{ cal.name }}</span>
-          <span class="gcal-cal-primary" *ngIf="cal.primary">(Primary Calendar)</span>
+          <span class="gcal-cal-primary" *ngIf="cal.primary">{{ i18n.t('primaryCalendar') }}</span>
         </label>
 
         <div *ngIf="gcalCalendars.length === 0" class="gcal-picker-empty">
-          No calendars found in your Google account.
+          {{ i18n.t('noCalendarsFound') }}
         </div>
       </div>
 
@@ -2988,16 +3001,16 @@
       <div class="gcal-import-options" *ngIf="!gcalPickerLoading">
         <label class="gcal-option-item">
           <input type="checkbox" [(ngModel)]="gcalFutureOnly" name="gcalFutureOnly" />
-          <span>Only import events from today onwards (skip past events)</span>
+          <span>{{ i18n.t('onlyFutureEvents') }}</span>
         </label>
       </div>
 
       <div class="error-msg" *ngIf="googleSyncError">{{ googleSyncError }}</div>
 
       <div class="modal-actions">
-        <button class="btn-secondary" (click)="closeGcalPicker()" [disabled]="gcalImporting">Cancel</button>
+        <button class="btn-secondary" (click)="closeGcalPicker()" [disabled]="gcalImporting">{{ i18n.t('cancel') }}</button>
         <button class="btn-primary" (click)="importFromPicker()" [disabled]="gcalImporting || gcalPickerLoading">
-          <span *ngIf="!gcalImporting">Import Events</span>
+          <span *ngIf="!gcalImporting">{{ i18n.t('importEvents') }}</span>
           <span *ngIf="gcalImporting" class="spinner-dark"></span>
         </button>
       </div>
@@ -3019,7 +3032,7 @@
       <div class="share-event-preview">
         <span class="result-dot" [style.background]="shareTargetEvent.color"></span>
         <div>
-          <div class="share-event-title">{{ shareTargetEvent.title }}</div>
+          <div class="share-event-title">{{ shareTargetEvent.title | translateTitle }}</div>
           <div class="share-event-meta">{{ formatDate(shareTargetEvent.date) }} · {{ formatTime(shareTargetEvent.startTime) }} – {{ formatTime(shareTargetEvent.endTime) }}</div>
         </div>
       </div>
@@ -3101,13 +3114,13 @@
 <div class="modal-overlay" *ngIf="showOrganizeModal" (click)="closeOrganizeModal()">
   <div class="modal organize-modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h3>🤖 AI Organize</h3>
+      <h3>🤖 {{ i18n.t('organizeModalTitle') }}</h3>
       <button class="modal-close" (click)="closeOrganizeModal()">✕</button>
     </div>
 
     <!-- Success banner -->
     <div class="success-banner" *ngIf="organizeAccepted">
-      ✓ {{ organizeVisibleEvents.length }} events added to your calendar!
+      ✓ {{ organizeVisibleEvents.length }} {{ i18n.t('eventsAddedToCalendarSuffix') }}
     </div>
 
     <div class="modal-form" *ngIf="!organizeAccepted">
@@ -3115,36 +3128,36 @@
       <!-- Input step -->
       <div *ngIf="!organizeResult">
         <div class="organize-intro">
-          <p>Describe your schedule, activities, or routine and the AI will create events and categories for you.</p>
+          <p>{{ i18n.t('organizeIntro') }}</p>
         </div>
 
         <div class="field">
-          <label for="organize-input">Your schedule</label>
+          <label for="organize-input">{{ i18n.t('yourScheduleLabel') }}</label>
           <textarea
             id="organize-input"
             [(ngModel)]="organizeInput"
             name="organizeInput"
-            placeholder="e.g. I have soccer practice Mon/Wed/Fri 4-5:30pm, AP Calculus class every weekday 8-9am, piano lessons Tuesdays 3-4pm, and I work at the café on weekends 10am-3pm"
+            [placeholder]="i18n.t('organizeInputPlaceholder')"
             rows="5"
             [disabled]="organizeLoading"
           ></textarea>
         </div>
 
         <div class="organize-examples">
-          <span class="organize-examples-label">Try:</span>
-          <button class="organize-example-chip" (click)="organizeInput = 'Soccer practice Mon/Wed/Fri 4-5:30pm, Math tutoring Tuesdays 3-4pm, Work shift Sat/Sun 9am-3pm'">Sports + School + Work</button>
-          <button class="organize-example-chip" (click)="organizeInput = 'Gym every morning 6-7am, Team standup at 9:30am weekdays, Lunch with Sarah Thursday 12:30pm, Date night Friday 7pm'">Fitness + Work + Social</button>
-          <button class="organize-example-chip" (click)="organizeInput = 'AP Chemistry MWF 10-11am, Debate club Thursdays 3:30-5pm, Orchestra rehearsal Wednesdays 4-5:30pm, SAT prep Saturdays 10am-12pm'">Full student schedule</button>
+          <span class="organize-examples-label">{{ i18n.t('tryLabel') }}</span>
+          <button class="organize-example-chip" (click)="organizeInput = 'Soccer practice Mon/Wed/Fri 4-5:30pm, Math tutoring Tuesdays 3-4pm, Work shift Sat/Sun 9am-3pm'">{{ i18n.t('organizeExample1') }}</button>
+          <button class="organize-example-chip" (click)="organizeInput = 'Gym every morning 6-7am, Team standup at 9:30am weekdays, Lunch with Sarah Thursday 12:30pm, Date night Friday 7pm'">{{ i18n.t('organizeExample2') }}</button>
+          <button class="organize-example-chip" (click)="organizeInput = 'AP Chemistry MWF 10-11am, Debate club Thursdays 3:30-5pm, Orchestra rehearsal Wednesdays 4-5:30pm, SAT prep Saturdays 10am-12pm'">{{ i18n.t('organizeExample3') }}</button>
         </div>
 
         <div class="organize-error" *ngIf="organizeError">{{ organizeError }}</div>
 
         <div class="modal-actions">
-          <button class="btn-secondary" (click)="closeOrganizeModal()">Cancel</button>
+          <button class="btn-secondary" (click)="closeOrganizeModal()">{{ i18n.t('cancel') }}</button>
           <button class="btn-primary" (click)="submitOrganize()" [disabled]="organizeLoading">
-            <span *ngIf="!organizeLoading">✨ Organize</span>
+            <span *ngIf="!organizeLoading">{{ i18n.t('organizeBtn') }}</span>
             <span *ngIf="organizeLoading" class="organize-loading">
-              <span class="spinner-inline"></span> Thinking...
+              <span class="spinner-inline"></span> {{ i18n.t('thinkingLabel') }}
             </span>
           </button>
         </div>
@@ -3159,7 +3172,7 @@
 
         <!-- Categories created -->
         <div class="organize-categories" *ngIf="organizeResult.categories.length > 0">
-          <span class="organize-cat-label">Categories:</span>
+          <span class="organize-cat-label">{{ i18n.t('categoriesLabel') }}</span>
           <span class="organize-cat-chip" *ngFor="let cat of organizeResult.categories">{{ cat }}</span>
         </div>
 
@@ -3172,7 +3185,7 @@
           >
             <span class="organize-event-dot" [style.background]="ev.color"></span>
             <div class="organize-event-info">
-              <span class="organize-event-title">{{ ev.title }}</span>
+              <span class="organize-event-title">{{ ev.title | translateTitle }}</span>
               <span class="organize-event-meta">{{ ev.date }} · {{ ev.startTime }}–{{ ev.endTime }}</span>
               <span class="organize-event-cat">{{ ev.category }}</span>
             </div>
@@ -3180,20 +3193,20 @@
               class="organize-event-remove"
               *ngIf="!organizeRemovedIndexes.has(i)"
               (click)="removeOrganizedEvent(i)"
-              title="Remove this event"
+              [title]="i18n.t('removeThisEvent')"
             >✕</button>
-            <span class="organize-event-removed-label" *ngIf="organizeRemovedIndexes.has(i)">Removed</span>
+            <span class="organize-event-removed-label" *ngIf="organizeRemovedIndexes.has(i)">{{ i18n.t('removedLabel') }}</span>
           </div>
         </div>
 
         <div class="organize-event-count">
-          {{ organizeVisibleEvents.length }} of {{ organizePreview.length }} events will be added
+          {{ organizeVisibleEvents.length }} {{ i18n.t('organizeOfLabel') }} {{ organizePreview.length }} {{ i18n.t('eventsWillBeAddedSuffix') }}
         </div>
 
         <div class="modal-actions">
-          <button class="btn-secondary" (click)="resetOrganizePreview()">← Back</button>
+          <button class="btn-secondary" (click)="resetOrganizePreview()">{{ i18n.t('backBtn') }}</button>
           <button class="btn-primary" (click)="acceptOrganizedEvents()" [disabled]="organizeVisibleEvents.length === 0">
-            ✓ Add {{ organizeVisibleEvents.length }} Events
+            {{ i18n.t('addEventsPrefix') }} {{ organizeVisibleEvents.length }} {{ i18n.t('events') }}
           </button>
         </div>
       </div>
@@ -3215,7 +3228,7 @@
       <div class="share-event-preview">
         <span class="result-dot" [style.background]="reminderTargetEvent.color"></span>
         <div>
-          <div class="share-event-title">{{ reminderTargetEvent.title }}</div>
+          <div class="share-event-title">{{ reminderTargetEvent.title | translateTitle }}</div>
           <div class="share-event-meta">{{ formatDate(reminderTargetEvent.date) }} · {{ formatTime(reminderTargetEvent.startTime) }}</div>
         </div>
       </div>
@@ -3247,7 +3260,7 @@
 <div class="modal-overlay" *ngIf="showStreakModal" (click)="closeStreakModal()">
   <div class="modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h3>🔥 New Streak</h3>
+      <h3>🔥 {{ i18n.t('newStreakModalTitle') }}</h3>
       <button class="modal-close" (click)="closeStreakModal()">✕</button>
     </div>
     <div class="modal-form">
@@ -3271,9 +3284,35 @@
         </div>
       </ng-container>
 
+      <!-- Step 1.5: Deadline (only shown when a finite goal like "500 page book" was detected) -->
+      <ng-container *ngIf="streakStep === 'deadline'">
+        <p style="font-size:14px;color:var(--text-secondary);margin:0 0 4px">
+          🎯 {{ i18n.t('streakGoalGotItPrefix') }} <strong>{{ streakGoalTotal }} {{ streakGoalUnit }}</strong> {{ i18n.t('streakGoalTotalForLabel') }} <strong>{{ streakFormName }}</strong>.
+        </p>
+        <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px">{{ i18n.t('streakDeadlineQuestion') }}</p>
+        <div class="field">
+          <label>{{ i18n.t('finishByLabel') }}</label>
+          <input
+            type="date"
+            [(ngModel)]="streakDeadline"
+            name="streakDeadline"
+            [min]="today"
+            (keyup.enter)="streakDeadlineContinue()"
+          />
+        </div>
+        <div class="error-msg" *ngIf="streakFormError">{{ streakFormError }}</div>
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="streakDeadlineSkip()">{{ i18n.t('noDeadlineManual') }}</button>
+          <button class="btn-primary" (click)="streakDeadlineContinue()">{{ i18n.t('nextBtn') }}</button>
+        </div>
+      </ng-container>
+
       <!-- Step 2: Details (target + unit) -->
       <ng-container *ngIf="streakStep === 'details'">
         <p style="font-size:14px;color:var(--text-secondary);margin:0 0 16px">{{ i18n.t('setDailyGoal') }} <strong>{{ streakFormName }}</strong>:</p>
+        <p class="repeat-hint" style="margin:-12px 0 16px" *ngIf="streakGoalTotal">
+          🧮 {{ i18n.t('streakAutoCalcLabel') }} {{ streakGoalTotal }} {{ streakGoalUnit }} {{ i18n.t('streakByLabel') }} {{ streakDeadline }} ≈ {{ streakFormTarget }} {{ streakFormUnit }}{{ i18n.t('perDay') }}. {{ i18n.t('streakFeelFreeAdjust') }}
+        </p>
         <div class="field-row">
           <div class="field">
             <label>{{ i18n.t('dailyTarget') }}</label>
@@ -3286,7 +3325,7 @@
         </div>
         <div class="error-msg" *ngIf="streakFormError">{{ streakFormError }}</div>
         <div class="modal-actions">
-          <button class="btn-secondary" (click)="streakStep = 'name'">{{ i18n.t('backBtn') }}</button>
+          <button class="btn-secondary" (click)="streakStep = streakGoalTotal ? 'deadline' : 'name'">{{ i18n.t('backBtn') }}</button>
           <button class="btn-primary" (click)="streakAskAi()">{{ i18n.t('letAiPlan') }}</button>
         </div>
       </ng-container>
@@ -3334,7 +3373,7 @@
       <div class="share-event-preview">
         <span class="result-dot" [style.background]="inviteCategoryEvent.color"></span>
         <div>
-          <div class="share-event-title">{{ inviteCategoryEvent.title }}</div>
+          <div class="share-event-title">{{ inviteCategoryEvent.title | translateTitle }}</div>
           <div class="share-event-meta">{{ formatDate(inviteCategoryEvent.date) }} · {{ formatTime(inviteCategoryEvent.startTime) }}</div>
         </div>
       </div>

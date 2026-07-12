@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { MockAuthService, UserProfile } from '../services/mock-auth.service';
 import { EventsService } from '../services/events.service';
 import { CategoryCountPipe } from '../pipes/category-count.pipe';
+import { TranslateTitlePipe } from '../pipes/translate-title.pipe';
 import { NotificationsService, AppNotification } from '../services/notifications.service';
 import { FriendsService, Friend, FriendMessage } from '../services/friends.service';
 import { CategoryTreeService, CategoryNode, CATEGORY_SEP } from '../services/category-tree.service';
@@ -46,6 +47,10 @@ interface Streak {
   id: string; name: string; target: number; unit: string;
   checkedDays: string[]; loggedValues: Record<string, number>;
   aiPlan: string; createdAt: string;
+  // Set when the streak was created from a finite goal (e.g. "500 page book") with
+  // a deadline, so the daily target could be back-calculated automatically.
+  goalTotal?: number;
+  goalDeadline?: string; // YYYY-MM-DD
   // Cached derived values, recomputed only when the streak's data changes
   // (avoids re-sorting/re-scanning checkedDays on every change-detection cycle).
   _count?: number;
@@ -425,7 +430,7 @@ function buildCoachEvents(): CalendarEvent[] {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, CategoryCountPipe],
+  imports: [CommonModule, FormsModule, CategoryCountPipe, TranslateTitlePipe],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css',
   // Modals render as siblings of .app-shell (not descendants of it), so theme CSS
@@ -746,7 +751,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   streakHistory: (Streak & { deletedAt: string })[] = [];
 
   showStreakModal = false;
-  streakStep: 'name' | 'details' | 'planning' | 'ready' = 'name';
+  streakStep: 'name' | 'deadline' | 'details' | 'planning' | 'ready' = 'name';
   streakFormName = '';
   streakFormError = '';
   streakFormTarget = 0;
@@ -754,6 +759,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   streakAiPlan = '';
   streakAiLoading = false;
   showStreakHistory = false;
+
+  // Smart-goal detection: when the habit name implies a finite total (e.g. "500 page
+  // book", "run a marathon"), we ask for a deadline and back-calculate the daily target.
+  streakGoalTotal: number | null = null;
+  streakGoalUnit = '';
+  streakDeadline = '';
 
   loadStreaks() {
     try {
@@ -792,18 +803,17 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.streakFormTarget = 0;
     this.streakFormUnit = '';
     this.streakAiPlan = '';
+    this.streakGoalTotal = null;
+    this.streakGoalUnit = '';
+    this.streakDeadline = '';
   }
 
   closeStreakModal() {
     this.showStreakModal = false;
   }
 
-  streakNextFromName() {
-    const name = this.streakFormName.trim();
-    if (!name) { this.streakFormError = 'Give your streak a name.'; return; }
-    if (this.streaks.find(s => s.name === name)) { this.streakFormError = 'A streak with that name already exists.'; return; }
-    this.streakFormError = '';
-    this.streakStep = 'details';
+  /** Fallback keyword defaults for open-ended habits (no finite total detected). */
+  private applyStreakDefaults(name: string) {
     const lower = name.toLowerCase();
     if (lower.includes('read')) { this.streakFormUnit = 'pages'; this.streakFormTarget = 20; }
     else if (lower.includes('water') || lower.includes('drink')) { this.streakFormUnit = 'glasses'; this.streakFormTarget = 8; }
@@ -813,6 +823,80 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     else { this.streakFormUnit = 'minutes'; this.streakFormTarget = 30; }
   }
 
+  /**
+   * Detects a finite goal in a free-text habit description, e.g. "500 page book",
+   * "read War and Peace (1225 pages)", "run a marathon". Returns the total quantity
+   * and its unit so the daily target can be back-calculated from a deadline.
+   */
+  private parseStreakGoal(name: string): { total: number; unit: string } | null {
+    const lower = name.toLowerCase();
+
+    // Explicit "<number> <unit>" anywhere in the text (allows a hyphen, e.g. "500-page").
+    const match = lower.match(
+      /(\d+(?:\.\d+)?)\s*[-\s]?\s*(pages?|words?|chapters?|miles?|mi\b|kilometers?|kilometres?|km\b|laps?|reps?|sets?|books?)/
+    );
+    if (match) {
+      const total = parseFloat(match[1]);
+      const rawUnit = match[2].replace(/\.$/, '');
+      const unit = /s$/.test(rawUnit) || rawUnit === 'mi' || rawUnit === 'km' ? rawUnit : rawUnit + 's';
+      if (total > 0) return { total, unit: unit === 'mi' ? 'miles' : unit === 'km' ? 'km' : unit };
+    }
+
+    // Common named distances that don't spell out a number.
+    if (/half[\s-]?marathon/.test(lower)) return { total: 13.1, unit: 'miles' };
+    if (/\bmarathon\b/.test(lower)) return { total: 26.2, unit: 'miles' };
+    if (/\b10\s?k\b/.test(lower)) return { total: 6.2, unit: 'miles' };
+    if (/\b5\s?k\b/.test(lower)) return { total: 3.1, unit: 'miles' };
+
+    return null;
+  }
+
+  streakNextFromName() {
+    const name = this.streakFormName.trim();
+    if (!name) { this.streakFormError = 'Give your streak a name.'; return; }
+    if (this.streaks.find(s => s.name === name)) { this.streakFormError = 'A streak with that name already exists.'; return; }
+    this.streakFormError = '';
+
+    const goal = this.parseStreakGoal(name);
+    if (goal) {
+      // Finite goal detected (e.g. "500 page book") — ask when they want to finish
+      // so the daily target can be calculated for them, instead of guessing.
+      this.streakGoalTotal = goal.total;
+      this.streakGoalUnit = goal.unit;
+      this.streakDeadline = '';
+      this.streakStep = 'deadline';
+    } else {
+      this.applyStreakDefaults(name);
+      this.streakStep = 'details';
+    }
+  }
+
+  /** User picked a finish date for a finite goal — back-calculate the daily target. */
+  streakDeadlineContinue() {
+    if (!this.streakDeadline) { this.streakFormError = 'Pick a date, or skip to set a target manually.'; return; }
+    if (this.streakDeadline < this.today) { this.streakFormError = 'Pick a date in the future.'; return; }
+    this.streakFormError = '';
+    const days = Math.max(1, this.daysBetween(this.today, this.streakDeadline));
+    const total = this.streakGoalTotal ?? 0;
+    this.streakFormTarget = Math.max(1, Math.ceil(total / days));
+    this.streakFormUnit = this.streakGoalUnit;
+    this.streakStep = 'details';
+  }
+
+  /** No deadline — fall back to a generic open-ended target for this habit. */
+  streakDeadlineSkip() {
+    this.streakGoalTotal = null;
+    this.streakGoalUnit = '';
+    this.streakDeadline = '';
+    this.applyStreakDefaults(this.streakFormName.trim());
+    this.streakStep = 'details';
+  }
+
+  private daysBetween(a: string, b: string): number {
+    const ms = new Date(b + 'T00:00:00').getTime() - new Date(a + 'T00:00:00').getTime();
+    return Math.round(ms / 86400000);
+  }
+
   async streakAskAi() {
     this.streakFormError = '';
     if (!this.streakFormTarget || this.streakFormTarget <= 0) { this.streakFormError = 'Set a daily target above 0.'; return; }
@@ -820,7 +904,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.streakStep = 'planning';
     this.streakAiLoading = true;
     try {
-      const prompt = `I want to build a daily habit: "${this.streakFormName}". My daily goal is ${this.streakFormTarget} ${this.streakFormUnit}. Give me a short 2-3 sentence motivational plan for maintaining this streak. Include a tip for consistency. Be concise and encouraging.`;
+      const goalContext = this.streakGoalTotal
+        ? ` My overall goal is ${this.streakGoalTotal} ${this.streakGoalUnit} total, finishing by ${this.streakDeadline}.`
+        : '';
+      const prompt = `I want to build a daily habit: "${this.streakFormName}". My daily goal is ${this.streakFormTarget} ${this.streakFormUnit}.${goalContext} Give me a short 2-3 sentence motivational plan for maintaining this streak. Include a tip for consistency. Be concise and encouraging.`;
       const { text } = await this.bedrockChat.sendMessage(prompt, this.events, []);
       this.streakAiPlan = text.trim();
     } catch {
@@ -840,11 +927,21 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       checkedDays: [], loggedValues: {},
       aiPlan: this.streakAiPlan,
       createdAt: new Date().toISOString().split('T')[0],
+      ...(this.streakGoalTotal ? { goalTotal: this.streakGoalTotal, goalDeadline: this.streakDeadline } : {}),
     };
     this.recomputeStreakDerived(streak);
     this.streaks = [...this.streaks, streak];
     this.saveStreaks();
     this.closeStreakModal();
+  }
+
+  /** Progress toward a finite streak goal (e.g. "180 / 500 pages"), or null if this streak has no goal. */
+  getStreakGoalProgress(streak: Streak): { current: number; total: number; percent: number; daysLeft: number } | null {
+    if (!streak.goalTotal) return null;
+    const current = Object.values(streak.loggedValues).reduce((sum, v) => sum + v, 0);
+    const percent = Math.min(100, Math.round((current / streak.goalTotal) * 100));
+    const daysLeft = streak.goalDeadline ? Math.max(0, this.daysBetween(this.today, streak.goalDeadline)) : 0;
+    return { current, total: streak.goalTotal, percent, daysLeft };
   }
 
   deleteStreak(id: string) {
@@ -885,23 +982,23 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.saveStreaks();
   }
 
-  adjustStreakToday(streak: Streak, delta: number) {
-    const current = streak.loggedValues[this.today] || 0;
-    this.logStreakValue(streak, this.today, Math.max(0, current + delta));
+  /** Which date each streak's log row is currently editing (defaults to today, never a future date). */
+  private selectedLogDate: Record<string, string> = {};
+
+  getSelectedLogDate(streak: Streak): string {
+    return this.selectedLogDate[streak.id] || this.today;
   }
 
-  toggleStreakDay(streak: Streak, dateStr: string) {
-    if (dateStr > new Date().toISOString().split('T')[0]) return;
-    const idx = streak.checkedDays.indexOf(dateStr);
-    if (idx >= 0) {
-      streak.checkedDays = streak.checkedDays.filter(d => d !== dateStr);
-      delete streak.loggedValues[dateStr];
-    } else {
-      streak.checkedDays = [...streak.checkedDays, dateStr].sort();
-      streak.loggedValues[dateStr] = streak.target;
-    }
-    this.recomputeStreakDerived(streak);
-    this.saveStreaks();
+  /** Clicking a day in the week strip selects it for logging — it no longer marks the day complete by itself. */
+  selectLogDate(streak: Streak, dateStr: string) {
+    if (dateStr > this.today) return;
+    this.selectedLogDate[streak.id] = dateStr;
+  }
+
+  adjustStreakLog(streak: Streak, delta: number) {
+    const dateStr = this.getSelectedLogDate(streak);
+    const current = streak.loggedValues[dateStr] || 0;
+    this.logStreakValue(streak, dateStr, Math.max(0, current + delta));
   }
 
   // Recomputes the cached streak count/week after a mutation, instead of
@@ -936,7 +1033,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
-      days.push({ date: dateStr, label: dayNames[d.getDay()], checked: checkedSet.has(dateStr), isToday: dateStr === todayStr, isFuture: dateStr > todayStr, value: streak.loggedValues?.[dateStr] ?? 0 });
+      // Derive the weekday from dateStr itself (UTC), not d.getDay() (local) — those
+      // can disagree by a day in the evening for timezones behind UTC, which showed
+      // up as e.g. a cell labeled "Thu" actually pointing at Friday's data.
+      const label = dayNames[new Date(dateStr + 'T00:00:00Z').getUTCDay()];
+      days.push({ date: dateStr, label, checked: checkedSet.has(dateStr), isToday: dateStr === todayStr, isFuture: dateStr > todayStr, value: streak.loggedValues?.[dateStr] ?? 0 });
     }
     return days;
   }
@@ -949,6 +1050,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Returns the last-7-days view, using the cached value kept up to date by recomputeStreakDerived. */
   getStreakWeek(streak: Streak): StreakDay[] {
     return streak._week ?? this.computeStreakWeek(streak);
+  }
+
+  getStreakDayTitle(streak: Streak, day: StreakDay): string {
+    if (day.checked) return this.i18n.t('streakDayComplete');
+    if (day.value > 0) return `${day.value} / ${streak.target} ${streak.unit} — ${this.i18n.t('streakDayNotYetComplete')}`;
+    return this.i18n.t('streakDayClickToLog');
   }
 
   getStreakReminders(): { title: string; body: string }[] {
@@ -1271,10 +1378,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.bedrockChat.sendMessage(text, this.events, this.chatMessages).then(({ text: reply, actions }) => {
       console.log('[AI Chat] Actions found:', actions.length, actions);
       
-      // If no actions were parsed but the AI claims it added something, warn the user
+      // If no actions were parsed but the AI's reply opens with completion
+      // phrasing (e.g. "Adding Basketball...", "Removed Dentist..."), it
+      // believes it just made a change that never actually landed. Anchored
+      // to the start of a line so this doesn't false-positive on prose that
+      // merely mentions "scheduled" — e.g. quoting back a list of existing
+      // events while asking the user to confirm a deletion.
       let displayText = reply;
-      if (actions.length === 0 && /added|created|scheduled|set.*reminder/i.test(reply)) {
-        displayText = reply + '\n\n⚠️ _The event could not be saved automatically. Please try again or add it manually._';
+      if (actions.length === 0 && /^(adding|added|done\b|removed|deleted|moved|rescheduled|scheduling)\b/im.test(reply)) {
+        displayText = reply + '\n\n⚠️ _That change could not be saved automatically. Please try again or make it manually._';
       }
 
       const assistantMsg: ChatMessage = {
@@ -1341,6 +1453,27 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     if (action.type === 'navigate' && action.tab) {
       this.switchTab(action.tab as any);
+    }
+    if (action.type === 'delete_event' && action.title && action.date) {
+      const match = this.events.find(e =>
+        e.title.trim().toLowerCase() === action.title!.trim().toLowerCase() && e.date === action.date
+      );
+      if (match) this.deleteEvent(match.id);
+    }
+    if (action.type === 'reschedule_event' && action.title && action.date && action.newDate && action.newStartTime && action.newEndTime) {
+      const before = this.events.find(e =>
+        e.title.trim().toLowerCase() === action.title!.trim().toLowerCase() && e.date === action.date
+      );
+      if (before) {
+        const after = { ...before, date: action.newDate, startTime: action.newStartTime, endTime: action.newEndTime };
+        this.events = this.events
+          .map(e => e.id === before.id ? after : e)
+          .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+        this.recordHistory('changed', after, before);
+        this.eventsService.updateEvent(after).catch(err =>
+          console.error('[Dashboard] Failed to persist AI reschedule:', err)
+        );
+      }
     }
   }
 
