@@ -1455,15 +1455,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.switchTab(action.tab as any);
     }
     if (action.type === 'delete_event' && action.title && action.date) {
-      const match = this.events.find(e =>
-        e.title.trim().toLowerCase() === action.title!.trim().toLowerCase() && e.date === action.date
-      );
-      if (match) this.deleteEvent(match.id);
+      const match = this.findEventForAiAction(action.title, action.date);
+      if (match) {
+        this.deleteEvent(match.id);
+      } else {
+        this.reportAiActionMismatch(action.title, action.date);
+      }
     }
     if (action.type === 'reschedule_event' && action.title && action.date && action.newDate && action.newStartTime && action.newEndTime) {
-      const before = this.events.find(e =>
-        e.title.trim().toLowerCase() === action.title!.trim().toLowerCase() && e.date === action.date
-      );
+      const before = this.findEventForAiAction(action.title, action.date);
       if (before) {
         const after = { ...before, date: action.newDate, startTime: action.newStartTime, endTime: action.newEndTime };
         this.events = this.events
@@ -1473,8 +1473,49 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.eventsService.updateEvent(after).catch(err =>
           console.error('[Dashboard] Failed to persist AI reschedule:', err)
         );
+      } else {
+        this.reportAiActionMismatch(action.title, action.date);
       }
     }
+  }
+
+  /**
+   * Resolves the event an AI delete/reschedule action refers to. Falls back
+   * past an exact title+date match — whitespace differences or slight
+   * rewording from the model shouldn't turn a correct, unambiguous request
+   * into a silent no-op — but only when the fallback is itself unambiguous.
+   */
+  private findEventForAiAction(title: string, date: string): CalendarEvent | undefined {
+    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+    const wantTitle = norm(title);
+
+    const exact = this.events.find(e => norm(e.title) === wantTitle && e.date === date);
+    if (exact) return exact;
+
+    // Same date, title merely reworded/mistranscribed — only safe if that date has exactly one event.
+    const onDate = this.events.filter(e => e.date === date);
+    if (onDate.length === 1) return onDate[0];
+
+    // Same (normalized) title on a different date — only safe if the title is unique across the calendar.
+    const byTitle = this.events.filter(e => norm(e.title) === wantTitle);
+    if (byTitle.length === 1) return byTitle[0];
+
+    return undefined;
+  }
+
+  /** Tells the user exactly why an AI delete/reschedule couldn't be applied, instead of a generic "try again". */
+  private reportAiActionMismatch(title: string, date: string) {
+    const onDate = this.events.filter(e => e.date === date);
+    const listing = onDate.length > 0
+      ? `Here's what's on your calendar for ${this.formatDate(date)}: ${onDate.map(e => `"${e.title}"`).join(', ')}.`
+      : `You don't have anything on your calendar for ${this.formatDate(date)}.`;
+    this.chatMessages = [...this.chatMessages, {
+      id: `msg_${Date.now()}_mismatch`,
+      role: 'assistant',
+      text: `⚠️ I couldn't find **"${title}"** on ${this.formatDate(date)} to update. ${listing} Try naming it exactly as it appears above.`,
+      timestamp: new Date(),
+    }];
+    this.scrollChatToBottom();
   }
 
   handleChatAction(action: { label: string; type: string; tab?: string; reminderTitle?: string; reminderBody?: string; copyText?: string; payload?: any; slotIndex?: number }) {

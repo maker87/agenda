@@ -54,10 +54,15 @@ export class BedrockChatService {
       category: e.category,
     }));
 
-    // Trim conversation history to last 10 messages
+    // Trim conversation history to last 10 messages. Strip the client-side
+    // "⚠️ could not be saved..." annotation (appended in the UI when an
+    // action failed to parse/apply) before feeding a message back as
+    // history — otherwise the model sees its own failure note as an
+    // established fact and spirals into repeatedly apologizing/telling the
+    // user to do it manually instead of just retrying cleanly next turn.
     const history = conversationHistory.slice(-10).map(m => ({
       role: m.role,
-      text: m.text,
+      text: m.role === 'assistant' ? m.text.replace(/\n\n⚠️[\s\S]*$/, '') : m.text,
     }));
 
     // Prepend language instruction to the message so the AI responds in the user's language
