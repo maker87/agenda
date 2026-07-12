@@ -391,7 +391,7 @@
                 class="streak-log-input"
                 type="number"
                 min="0"
-                [placeholder]="streak.target + ' ' + streak.unit"
+                placeholder="0"
                 [ngModel]="streak.loggedValues[getSelectedLogDate(streak)] || ''"
                 (ngModelChange)="logStreakValue(streak, getSelectedLogDate(streak), +$event)"
                 [attr.name]="'streakLog_' + streak.id"
