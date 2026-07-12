@@ -91,6 +91,20 @@ const schema = a.schema({
     .returns(a.string())
     .handler(a.handler.function(bedrockChatHandler))
     .authorization((allow) => [allow.authenticated()]),
+
+  // Batch-translates short strings (event titles) into targetLang, so events
+  // entered in one language still read naturally when the display language
+  // is switched. Reuses the bedrock-chat function/model — same Lambda,
+  // routed by fieldName — rather than provisioning a second one.
+  translateTexts: a
+    .query()
+    .arguments({
+      texts: a.string().required(),      // JSON.stringify(string[])
+      targetLang: a.string().required(),
+    })
+    .returns(a.string())                 // JSON.stringify(string[]), same order/length
+    .handler(a.handler.function(bedrockChatHandler))
+    .authorization((allow) => [allow.authenticated()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

@@ -61,6 +61,41 @@ Format for reminders:
 REMINDER_CREATE|title|body
 (Reminders follow the same ask-then-confirm process before this line is ever emitted.)
 
+DELETING AND RESCHEDULING EVENTS — these act immediately, no confirmation turn needed (unlike creation above):
+
+1. IDENTIFY THE EXACT EVENT FIRST, using the user's calendar summary provided in context (title, date, time, category). Only ever refer to events that actually appear there — never invent a title or date.
+
+2. IF THE REQUEST IS UNAMBIGUOUS (matches exactly one event in the summary), act on it immediately in the SAME turn — do NOT ask "shall I?" first, just do it and confirm what you did in past tense.
+
+3. IF AMBIGUOUS (matches multiple events, e.g. several events share a title, or no date was given and there are several candidates) or NO MATCH is found, do NOT emit a structured line — instead ask a short clarifying question listing the candidates (or say you couldn't find a match).
+
+Format to delete an event (one line per event, use the title/date exactly as shown in the calendar summary):
+EVENT_DELETE|title|YYYY-MM-DD
+
+Format to reschedule an event to a new date/time (title/oldDate identify the existing event; the rest is the new date/time):
+EVENT_RESCHEDULE|title|oldYYYY-MM-DD|newYYYY-MM-DD|newHH:MM|newHH:MM
+
+Rescheduling only moves date/time — it does not rename, recategorize, or otherwise edit the event. If the user asks to rename, recategorize, or otherwise edit an event's details (not just move it), tell them that's not supported yet and to edit it manually.
+
+DELETE/RESCHEDULE EXAMPLES:
+
+User: "delete my dentist appointment"
+(calendar summary has exactly one event titled "Dentist Appointment" on 2026-07-15)
+You: EVENT_DELETE|Dentist Appointment|2026-07-15
+Removed Dentist Appointment (Jul 15) from your calendar.
+
+User: "cancel my meeting"
+(calendar summary shows three different events with "meeting" in the title)
+You: I found a few meetings — which one did you mean: "Team Sync" (Jul 12), "1:1 with Sam" (Jul 14), or "Client Call" (Jul 16)?
+
+User: "move basketball to next Thursday at 7pm"
+(calendar summary has exactly one event titled "Basketball" on 2026-07-10, 18:00-19:00)
+You: EVENT_RESCHEDULE|Basketball|2026-07-10|2026-07-16|19:00|20:00
+Moved Basketball to Thursday, Jul 16, 7-8 PM.
+
+User: "rename my meeting to Standup"
+You: I can move an event's date/time for you, but I can't rename or recategorize events yet — you'll need to edit that one manually.
+
 EXAMPLES:
 User: "add basketball next tuesday at 6pm"
 You: Got the day and time! I don't have an end time — want me to default it to 1 hour (6–7 PM), and should I file it under Fitness? Let me know and I'll get it ready to add.
@@ -100,6 +135,7 @@ You: I'm your calendar assistant — I can only help with scheduling, planning, 
 Rules:
 - NEVER emit EVENT_CREATE / EVENT_RECURRING / REMINDER_CREATE unless the user has explicitly confirmed the exact proposed details on a prior turn in this conversation
 - NEVER invent a title, date, or start time the user didn't provide or explicitly delegate to you ("you pick" etc. — and only for the specific field they delegated)
+- EVENT_DELETE / EVENT_RESCHEDULE CAN be emitted immediately, same turn, with no prior confirmation — but only when the target event unambiguously matches exactly one entry in the calendar summary; ask instead of guessing when it's ambiguous or missing
 - Use the conversation history to remember what the user already told you — don't re-ask for info you already have, and don't lose track of a proposal you already summarized
 - Categories: Work, Personal, Fitness, School, Social, Health, Entertainment, Travel
 - When you DO emit the structured line (after confirmation), it must be the FIRST line of that reply, followed by ONE short friendly confirmation
@@ -162,6 +198,35 @@ function parseAIResponse(text, today) {
       continue;
     }
 
+    // EVENT_DELETE|title|date
+    if (trimmed.startsWith('EVENT_DELETE|')) {
+      const parts = trimmed.split('|');
+      if (parts.length >= 3) {
+        actions.push({
+          type: 'delete_event',
+          title: parts[1],
+          date: parts[2],
+        });
+      }
+      continue;
+    }
+
+    // EVENT_RESCHEDULE|title|oldDate|newDate|newStartTime|newEndTime
+    if (trimmed.startsWith('EVENT_RESCHEDULE|')) {
+      const parts = trimmed.split('|');
+      if (parts.length >= 6) {
+        actions.push({
+          type: 'reschedule_event',
+          title: parts[1],
+          date: parts[2],
+          newDate: parts[3],
+          newStartTime: parts[4],
+          newEndTime: parts[5],
+        });
+      }
+      continue;
+    }
+
     cleanLines.push(line);
   }
 
@@ -179,7 +244,69 @@ function parseAIResponse(text, today) {
   return response;
 }
 
+const LANGUAGE_NAMES = {
+  en: 'English', es: 'Spanish', fr: 'French', de: 'German',
+  pt: 'Portuguese', zh: 'Chinese', ja: 'Japanese', ar: 'Arabic',
+  hi: 'Hindi', ko: 'Korean', it: 'Italian', ru: 'Russian',
+  nl: 'Dutch', sv: 'Swedish', pl: 'Polish', tr: 'Turkish',
+};
+
+/**
+ * Batch-translates arbitrary short strings (event titles) into targetLang.
+ * Texts already in the target language, or proper nouns/brand names, are
+ * returned unchanged by the model rather than force-translated.
+ */
+async function translateTexts(event) {
+  const { texts, targetLang } = event.arguments;
+  let input;
+  try {
+    input = JSON.parse(texts || '[]');
+  } catch {
+    return JSON.stringify([]);
+  }
+  if (!Array.isArray(input) || input.length === 0) return JSON.stringify([]);
+
+  // Defensive caps — this is meant for a handful of calendar event titles, not bulk text.
+  const capped = input.slice(0, 100).map((t) => String(t ?? '').slice(0, 200));
+  const languageName = LANGUAGE_NAMES[targetLang] || targetLang || 'English';
+
+  const client = new BedrockRuntimeClient({ region: 'us-east-1' });
+  const prompt = `Translate each calendar event title below into ${languageName}. If a title is already in ${languageName}, or is a proper noun/brand name that shouldn't be translated, return it unchanged. Preserve emoji, capitalization style, and punctuation. Respond with ONLY a JSON array of strings — same length and order as the input, no commentary, no markdown fences.\n\nInput:\n${JSON.stringify(capped)}`;
+
+  const body = JSON.stringify({
+    system: [{ text: 'You are a precise translation engine for a calendar app. You only ever output a raw JSON array of strings, nothing else.' }],
+    messages: [{ role: 'user', content: [{ text: prompt }] }],
+    inferenceConfig: { maxTokens: 2048, temperature: 0 },
+  });
+
+  try {
+    const command = new InvokeModelCommand({
+      modelId: 'us.amazon.nova-lite-v1:0',
+      contentType: 'application/json',
+      accept: 'application/json',
+      body: new TextEncoder().encode(body),
+    });
+    const response = await client.send(command);
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+    const rawText = responseBody.output?.message?.content?.[0]?.text || '[]';
+    const jsonMatch = rawText.match(/\[[\s\S]*\]/);
+    const translated = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
+    if (!Array.isArray(translated) || translated.length !== capped.length) {
+      // Alignment broke — fall back to the originals rather than risk mismatched titles.
+      return JSON.stringify(capped);
+    }
+    return JSON.stringify(translated.map((t) => String(t ?? '')));
+  } catch (error) {
+    console.error('Translate invocation error');
+    return JSON.stringify(capped);
+  }
+}
+
 export const handler = async (event) => {
+  if (event.info?.fieldName === 'translateTexts') {
+    return translateTexts(event);
+  }
+
   const { message, events, today, conversationHistory } = event.arguments;
 
   // ── Input validation ──────────────────────────────────────────────────────
