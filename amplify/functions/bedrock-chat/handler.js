@@ -1,4 +1,10 @@
-import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
+
+// Cross-region inference profile for Claude on Bedrock. Swapped in from
+// Nova Lite, which was too weak to reliably follow the multi-step
+// gather-info -> confirm -> act contract below and often skipped
+// confirmation or fabricated details.
+const MODEL_ID = 'us.anthropic.claude-sonnet-4-5-20250929-v1:0';
 
 const SYSTEM_PROMPT = `You are an AI assistant for a calendar/scheduling app. You help users plan their time, manage their schedule, and get the most out of their agenda.
 
@@ -280,22 +286,15 @@ async function translateTexts(event) {
   const client = new BedrockRuntimeClient({ region: 'us-east-1' });
   const prompt = `Translate each calendar event title below into ${languageName}. If a title is already in ${languageName}, or is a proper noun/brand name that shouldn't be translated, return it unchanged. Preserve emoji, capitalization style, and punctuation. Respond with ONLY a JSON array of strings — same length and order as the input, no commentary, no markdown fences.\n\nInput:\n${JSON.stringify(capped)}`;
 
-  const body = JSON.stringify({
-    system: [{ text: 'You are a precise translation engine for a calendar app. You only ever output a raw JSON array of strings, nothing else.' }],
-    messages: [{ role: 'user', content: [{ text: prompt }] }],
-    inferenceConfig: { maxTokens: 2048, temperature: 0 },
-  });
-
   try {
-    const command = new InvokeModelCommand({
-      modelId: 'us.amazon.nova-lite-v1:0',
-      contentType: 'application/json',
-      accept: 'application/json',
-      body: new TextEncoder().encode(body),
+    const command = new ConverseCommand({
+      modelId: MODEL_ID,
+      system: [{ text: 'You are a precise translation engine for a calendar app. You only ever output a raw JSON array of strings, nothing else.' }],
+      messages: [{ role: 'user', content: [{ text: prompt }] }],
+      inferenceConfig: { maxTokens: 2048, temperature: 0 },
     });
     const response = await client.send(command);
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    const rawText = responseBody.output?.message?.content?.[0]?.text || '[]';
+    const rawText = response.output?.message?.content?.[0]?.text || '[]';
     const jsonMatch = rawText.match(/\[[\s\S]*\]/);
     const translated = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
     if (!Array.isArray(translated) || translated.length !== capped.length) {
@@ -404,7 +403,7 @@ Upcoming events (next 50):\n` +
         const priorTurns = historyParsed.slice(0, -1)
           .filter(m => (m.role === 'user' || m.role === 'assistant') && typeof m.text === 'string' && m.text.trim());
 
-        // Bedrock/Nova requires strictly alternating user/assistant turns
+        // Bedrock requires strictly alternating user/assistant turns
         // starting with 'user'. Drop a leading assistant turn and collapse
         // any consecutive same-role turns defensively.
         const startIdx = priorTurns.findIndex(m => m.role === 'user');
@@ -426,27 +425,20 @@ Upcoming events (next 50):\n` +
   }
   cleanMessages.push({ role: 'user', content: [{ text: message }] });
 
-  const body = JSON.stringify({
-    system: [{ text: SYSTEM_PROMPT + eventsContext + `\n\nToday's date: ${todaySafe}` }],
-    messages: cleanMessages,
-    inferenceConfig: {
-      maxTokens: 1024,
-      temperature: 0.7,
-    },
-  });
-
   try {
-    const command = new InvokeModelCommand({
-      modelId: 'us.amazon.nova-lite-v1:0',
-      contentType: 'application/json',
-      accept: 'application/json',
-      body: new TextEncoder().encode(body),
+    const command = new ConverseCommand({
+      modelId: MODEL_ID,
+      system: [{ text: SYSTEM_PROMPT + eventsContext + `\n\nToday's date: ${todaySafe}` }],
+      messages: cleanMessages,
+      inferenceConfig: {
+        maxTokens: 1024,
+        temperature: 0.7,
+      },
     });
 
     const response = await client.send(command);
-    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-    const rawText = responseBody.output?.message?.content?.[0]?.text || 'Sorry, I could not generate a response.';
-    
+    const rawText = response.output?.message?.content?.[0]?.text || 'Sorry, I could not generate a response.';
+
     // Parse and convert to structured format
     const finalResponse = parseAIResponse(rawText, todaySafe);
     

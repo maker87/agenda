@@ -20,8 +20,8 @@ for (const construct of allConstructs) {
         effect: Effect.ALLOW,
         actions: ['bedrock:InvokeModel'],
         resources: [
-          'arn:aws:bedrock:us-east-1::foundation-model/us.amazon.nova-lite-v1:0',
-          'arn:aws:bedrock:us-east-1:*:inference-profile/us.amazon.nova-lite-v1:0',
+          'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0',
+          'arn:aws:bedrock:us-east-1:*:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0',
         ],
       })
     );

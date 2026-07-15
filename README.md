@@ -1,15 +1,13 @@
-## AWS Amplify Angular.js Starter Template
+## Agenda
 
-This repository provides a starter template for creating applications using Angular.js and AWS Amplify, emphasizing easy setup for authentication, API, and database capabilities.
-
-## Overview
-
-This template equips you with a foundational Angular.js application integrated with AWS Amplify, streamlined for scalability and performance. It is ideal for developers looking to jumpstart their project with pre-configured AWS services like Cognito, AppSync, and DynamoDB.
+Agenda is an AI-powered calendar app — add events, set reminders, track habit streaks, and plan your week just by chatting with it. Built on Angular and AWS Amplify.
 
 ## Features
 
-- **Authentication**: Setup with Amazon Cognito for secure user authentication.
-- **API**: Ready-to-use GraphQL endpoint with AWS AppSync.
+- **AI chat assistant**: Create, reschedule, or delete events, get planning advice, and set reminders through natural conversation (Amazon Bedrock / Claude).
+- **Habit streaks**: Track daily habits with goals, deadlines, and progress history.
+- **Authentication**: Secure sign-in via Amazon Cognito.
+- **API**: GraphQL endpoint with AWS AppSync.
 - **Database**: Real-time database powered by Amazon DynamoDB.
 
 ## Deploying to AWS

@@ -60,6 +60,28 @@ const schema = a.schema({
       allow.owner().identityClaim('sub'),
     ]),
 
+  Streak: a
+    .model({
+      ownerEmail:   a.string(),
+      name:         a.string().required(),
+      target:       a.integer().required(),
+      unit:         a.string().required(),
+      checkedDays:  a.string().array(),
+      loggedValues: a.json(),
+      aiPlan:       a.string(),
+      // The day the habit was started (YYYY-MM-DD) — named to avoid colliding
+      // with the model's own auto-managed createdAt/updatedAt timestamps.
+      startedOn:    a.string(),
+      goalTotal:    a.integer(),
+      goalDeadline: a.string(),
+      // Soft-delete marker so a deleted streak can still be shown/restored
+      // from the history view instead of being gone the moment it's removed.
+      deletedAt:    a.string(),
+    })
+    .authorization((allow) => [
+      allow.owner().identityClaim('sub'),
+    ]),
+
   FriendMessage: a
     .model({
       fromEmail: a.string().required(),

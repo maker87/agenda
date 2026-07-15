@@ -15,6 +15,7 @@ import { AiSchedulerService, AiSuggestion } from '../services/ai-scheduler.servi
 import { AiChatService, ChatMessage, EventDraft, getProactiveReminders } from '../services/ai-chat.service';
 import { AiOrganizeService, OrganizedEvent, OrganizeResult } from '../services/ai-organize.service';
 import { BedrockChatService, ChatAction as BedrockAction } from '../services/bedrock-chat.service';
+import { StreaksService, Streak as StreakRecord } from '../services/streaks.service';
 import { I18nService } from '../services/i18n.service';
 import { signOut } from 'aws-amplify/auth';
 
@@ -43,16 +44,10 @@ interface StreakDay {
   date: string; label: string; checked: boolean; isToday: boolean; isFuture: boolean; value: number;
 }
 
-interface Streak {
-  id: string; name: string; target: number; unit: string;
-  checkedDays: string[]; loggedValues: Record<string, number>;
-  aiPlan: string; createdAt: string;
-  // Set when the streak was created from a finite goal (e.g. "500 page book") with
-  // a deadline, so the daily target could be back-calculated automatically.
-  goalTotal?: number;
-  goalDeadline?: string; // YYYY-MM-DD
-  // Cached derived values, recomputed only when the streak's data changes
-  // (avoids re-sorting/re-scanning checkedDays on every change-detection cycle).
+// Streak's core fields/sync behavior live in StreaksService; this extends it
+// with UI-only cached derived values, recomputed only when the streak's data
+// changes (avoids re-sorting/re-scanning checkedDays on every change-detection cycle).
+interface Streak extends StreakRecord {
   _count?: number;
   _week?: StreakDay[];
 }
@@ -743,8 +738,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   activeTab: 'schedule' | 'agenda' | 'calendar' | 'history' | 'notifications' | 'categories' | 'profile' | 'ai' | 'weekly' | 'friends' = 'schedule';
 
   // ── Streaks ──
-  private readonly STREAKS_KEY = 'agenda_streaks';
-  private readonly STREAK_HISTORY_KEY = 'agenda_streak_history';
+  // Legacy pre-sync storage keys — read once to migrate any existing local-only
+  // streaks into the signed-in account, then never written to again.
+  private readonly LEGACY_STREAKS_KEY = 'agenda_streaks';
+  private readonly LEGACY_STREAK_HISTORY_KEY = 'agenda_streak_history';
 
   streaks: Streak[] = [];
 
@@ -766,33 +763,56 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   streakGoalUnit = '';
   streakDeadline = '';
 
-  loadStreaks() {
-    try {
-      const raw = localStorage.getItem(this.STREAKS_KEY);
-      this.streaks = raw ? JSON.parse(raw) : [];
-      // Migrate old format streaks (without target/unit)
-      this.streaks = this.streaks.map(s => ({
-        ...s,
-        target: s.target ?? 1,
-        unit: s.unit ?? 'times',
-        loggedValues: s.loggedValues ?? {},
-        aiPlan: s.aiPlan ?? '',
-        createdAt: s.createdAt ?? '',
-      } as Streak));
-      this.streaks.forEach(s => this.recomputeStreakDerived(s));
-    } catch { this.streaks = []; }
-    try {
-      const raw = localStorage.getItem(this.STREAK_HISTORY_KEY);
-      this.streakHistory = raw ? JSON.parse(raw) : [];
-    } catch { this.streakHistory = []; }
+  async loadStreaks() {
+    // Awaited so the one-time migration (below) lands in the backend before
+    // the first listStreaks() call, instead of racing it and showing an
+    // empty streak list until the next refresh.
+    await this.migrateLegacyStreaksIfNeeded();
+
+    const cached = this.streaksService.listStreaks(this.userEmail, (synced) => {
+      this.applySyncedStreaks(synced);
+    });
+    this.applySyncedStreaks(cached);
   }
 
-  private saveStreaks() {
-    localStorage.setItem(this.STREAKS_KEY, JSON.stringify(this.streaks));
+  private applySyncedStreaks(all: Streak[]) {
+    const active: Streak[] = [];
+    const history: (Streak & { deletedAt: string })[] = [];
+    for (const s of all) {
+      if (s.deletedAt) {
+        history.push(s as Streak & { deletedAt: string });
+      } else {
+        this.recomputeStreakDerived(s);
+        active.push(s);
+      }
+    }
+    this.streaks = active;
+    this.streakHistory = history;
   }
 
-  private saveStreakHistory() {
-    localStorage.setItem(this.STREAK_HISTORY_KEY, JSON.stringify(this.streakHistory));
+  /**
+   * One-time import, per account, of streaks created before backend sync
+   * existed (they lived only in this browser's localStorage under a flat,
+   * account-independent key — which is exactly why they didn't follow the
+   * user to a different login/device). Guarded so it only ever runs once.
+   */
+  private async migrateLegacyStreaksIfNeeded() {
+    if (!this.userEmail) return;
+    const migratedFlag = `agenda_streaks_migrated_${this.userEmail}`;
+    if (localStorage.getItem(migratedFlag)) return;
+    try {
+      const rawActive = localStorage.getItem(this.LEGACY_STREAKS_KEY);
+      const rawHistory = localStorage.getItem(this.LEGACY_STREAK_HISTORY_KEY);
+      const legacyActive: Streak[] = rawActive ? JSON.parse(rawActive) : [];
+      const legacyHistory: (Streak & { deletedAt: string })[] = rawHistory ? JSON.parse(rawHistory) : [];
+      const combined = [...legacyActive, ...legacyHistory];
+      if (combined.length) {
+        await this.streaksService.migrateLegacyStreaks(combined, this.userEmail);
+      }
+    } catch (err) {
+      console.error('[Dashboard] Failed to migrate legacy streaks:', err);
+    }
+    localStorage.setItem(migratedFlag, '1');
   }
 
   openStreakModal() {
@@ -917,11 +937,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.streakStep = 'ready';
   }
 
-  createStreak() {
+  async createStreak() {
     const name = this.streakFormName.trim();
     if (!name) return;
-    const streak: Streak = {
-      id: `streak_${Date.now()}`, name,
+    const streak: Omit<Streak, 'id'> = {
+      name,
       target: this.streakFormTarget || 1,
       unit: this.streakFormUnit.trim() || 'times',
       checkedDays: [], loggedValues: {},
@@ -929,9 +949,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       createdAt: new Date().toISOString().split('T')[0],
       ...(this.streakGoalTotal ? { goalTotal: this.streakGoalTotal, goalDeadline: this.streakDeadline } : {}),
     };
-    this.recomputeStreakDerived(streak);
-    this.streaks = [...this.streaks, streak];
-    this.saveStreaks();
+    const saved = await this.streaksService.createStreak(streak, this.userEmail);
+    this.recomputeStreakDerived(saved);
+    this.streaks = [...this.streaks, saved];
     this.closeStreakModal();
   }
 
@@ -944,30 +964,31 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return { current, total: streak.goalTotal, percent, daysLeft };
   }
 
-  deleteStreak(id: string) {
+  async deleteStreak(id: string) {
     const streak = this.streaks.find(s => s.id === id);
     if (streak) {
-      this.streakHistory = [...this.streakHistory, { ...streak, deletedAt: new Date().toISOString() }];
-      this.saveStreakHistory();
+      const deletedAt = new Date().toISOString();
+      const updated = { ...streak, deletedAt } as Streak & { deletedAt: string };
+      this.streakHistory = [...this.streakHistory, updated];
+      await this.streaksService.updateStreak(updated, this.userEmail);
     }
     this.streaks = this.streaks.filter(s => s.id !== id);
-    this.saveStreaks();
   }
 
-  restoreStreak(id: string) {
+  async restoreStreak(id: string) {
     const entry = this.streakHistory.find(s => s.id === id);
     if (!entry) return;
-    const { deletedAt: _d, ...streak } = entry;
+    const { deletedAt: _d, ...rest } = entry;
+    const streak = rest as Streak;
     this.recomputeStreakDerived(streak);
     this.streaks = [...this.streaks, streak];
     this.streakHistory = this.streakHistory.filter(s => s.id !== id);
-    this.saveStreaks();
-    this.saveStreakHistory();
+    await this.streaksService.updateStreak({ ...streak, deletedAt: undefined }, this.userEmail);
   }
 
-  permanentlyDeleteStreak(id: string) {
+  async permanentlyDeleteStreak(id: string) {
     this.streakHistory = this.streakHistory.filter(s => s.id !== id);
-    this.saveStreakHistory();
+    await this.streaksService.deleteStreak(id, this.userEmail);
   }
 
   logStreakValue(streak: Streak, dateStr: string, value: number) {
@@ -979,7 +1000,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       streak.checkedDays = streak.checkedDays.filter(d => d !== dateStr);
     }
     this.recomputeStreakDerived(streak);
-    this.saveStreaks();
+    this.streaksService.updateStreak(streak, this.userEmail).catch(err =>
+      console.error('[Dashboard] Failed to persist streak log:', err)
+    );
   }
 
   /** Which date each streak's log row is currently editing (defaults to today, never a future date). */
@@ -1358,20 +1381,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     };
     this.chatMessages = [...this.chatMessages, userMsg];
 
-    // Check if we're in a local event creation wizard
+    // Check if we're in a local event creation wizard (e.g. mid slot-pick flow)
     if (this.chatEventDraft) {
       this.handleEventWizardStep(text);
       return;
     }
 
-    // Check if user wants to create an event — start the wizard locally
-    if (/\b(add|create|schedule|new|put|book)\b.*\b(event|meeting|appointment|class|session|practice|game|exam|test|workout|lunch|dinner|call)\b/i.test(text) ||
-        /^(add|create|schedule|new)\s+\w/i.test(text)) {
-      this.startEventWizard(text);
-      return;
-    }
-
-    // For everything else, use Bedrock AI
+    // Event creation/scheduling requests go to Bedrock AI too — its system
+    // prompt already runs the full gather-info -> confirm -> act flow, so
+    // routing these into the local step-by-step wizard instead just threw
+    // away everything the user said except the title and re-asked for it.
     this.chatTyping = true;
     this.scrollChatToBottom();
 
@@ -3393,6 +3412,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     private aiChatService: AiChatService,
     private aiOrganize: AiOrganizeService,
     private bedrockChat: BedrockChatService,
+    private streaksService: StreaksService,
     public i18n: I18nService,
   ) {}
 
