@@ -6,6 +6,10 @@ import { I18nService, LangCode } from './i18n.service';
 const CACHE_KEY = 'agenda_title_translations';
 const MAX_CACHE_ENTRIES = 3000;
 const FLUSH_DEBOUNCE_MS = 120;
+// Matches the backend's per-call cap (amplify/functions/bedrock-chat/handler.js)
+// so a large pending set (e.g. opening a long chat history) gets split into
+// multiple calls instead of silently losing anything past the backend's cap.
+const MAX_ITEMS_PER_CALL = 25;
 
 let _client: ReturnType<typeof generateClient<Schema>> | null = null;
 function getClient() {
@@ -75,9 +79,13 @@ export class TranslationService {
     }
     this.pending.clear();
 
-    await Promise.all(
-      Array.from(byLang.entries()).map(([lang, texts]) => this.translateBatch(lang as LangCode, texts))
-    );
+    const calls: Promise<void>[] = [];
+    for (const [lang, texts] of byLang.entries()) {
+      for (let i = 0; i < texts.length; i += MAX_ITEMS_PER_CALL) {
+        calls.push(this.translateBatch(lang as LangCode, texts.slice(i, i + MAX_ITEMS_PER_CALL)));
+      }
+    }
+    await Promise.all(calls);
   }
 
   private async translateBatch(lang: LangCode, texts: string[]) {

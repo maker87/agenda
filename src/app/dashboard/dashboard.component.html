@@ -81,8 +81,8 @@
           <span *ngIf="n.type === 'friend_request'">👥</span>
         </div>
         <div class="notif-panel-item-body">
-          <div class="notif-panel-item-title">{{ n.title }}</div>
-          <div class="notif-panel-item-sub" *ngIf="n.body">{{ n.body }}</div>
+          <div class="notif-panel-item-title">{{ n.title | translateTitle }}</div>
+          <div class="notif-panel-item-sub" *ngIf="n.body">{{ n.body | translateTitle }}</div>
           <div class="notif-panel-item-time" *ngIf="n.createdAt">{{ formatNotifTime(n.createdAt) }}</div>
           <!-- Accept / Decline buttons for pending event invites -->
           <div class="notif-invite-actions" *ngIf="n.type === 'event_invite' && n.status === 'pending'">
@@ -478,7 +478,7 @@
               <div class="event-header">
                 <div class="event-title-group">
                   <span class="event-title">{{ event.title | translateTitle }}</span>
-                  <span class="event-cat-badge" *ngIf="event.category">{{ event.category }}</span>
+                  <span class="event-cat-badge" *ngIf="event.category">{{ event.category | translateTitle }}</span>
                 </div>
                 <div class="event-actions">
                   <button class="reminder-btn" (click)="openReminderModal(event)" [title]="i18n.t('setReminder')">🔔</button>
@@ -510,7 +510,7 @@
               <div class="event-header">
                 <div class="event-title-group">
                   <span class="event-title">{{ event.title | translateTitle }}</span>
-                  <span class="event-cat-badge" *ngIf="event.category">{{ event.category }}</span>
+                  <span class="event-cat-badge" *ngIf="event.category">{{ event.category | translateTitle }}</span>
                 </div>
                 <div class="event-actions">
                   <button class="reminder-btn" (click)="openReminderModal(event)" [title]="i18n.t('setReminder')">🔔</button>
@@ -546,7 +546,7 @@
               <div class="event-header">
                 <div class="event-title-group">
                   <span class="event-title">{{ event.title | translateTitle }}</span>
-                  <span class="event-cat-badge" *ngIf="event.category">{{ event.category }}</span>
+                  <span class="event-cat-badge" *ngIf="event.category">{{ event.category | translateTitle }}</span>
                 </div>
                 <div class="event-actions">
                   <button class="reminder-btn" (click)="openReminderModal(event)" [title]="i18n.t('setReminder')">🔔</button>
@@ -989,8 +989,8 @@
 
             <!-- Content -->
             <div class="notif-body">
-              <div class="notif-title">{{ n.title }}</div>
-              <div class="notif-sub" *ngIf="n.body">{{ n.body }}</div>
+              <div class="notif-title">{{ n.title | translateTitle }}</div>
+              <div class="notif-sub" *ngIf="n.body">{{ n.body | translateTitle }}</div>
               <div class="notif-time" *ngIf="n.createdAt">{{ formatNotifTime(n.createdAt) }}</div>
               <!-- Accept / Decline buttons for pending event invites -->
               <div class="notif-invite-actions" *ngIf="n.type === 'event_invite' && n.status === 'pending'">
@@ -1807,7 +1807,7 @@
               <span class="weekly-event-dot" [style.background]="ev.color"></span>
               <span class="weekly-event-time">{{ formatTime(ev.startTime) }}</span>
               <span class="weekly-event-title">{{ ev.title | translateTitle }}</span>
-              <span class="weekly-event-cat" *ngIf="ev.category">{{ ev.category }}</span>
+              <span class="weekly-event-cat" *ngIf="ev.category">{{ ev.category | translateTitle }}</span>
             </div>
           </div>
           <div class="weekly-day-empty" *ngIf="day.events.length === 0">
@@ -1867,7 +1867,7 @@
                   [class.user-bubble]="msg.role === 'user'"
                   [class.assistant-bubble]="msg.role === 'assistant'"
                 >
-                  <div class="chat-bubble-text" [innerHTML]="renderChatMarkdown(msg.text)"></div>
+                  <div class="chat-bubble-text" [innerHTML]="renderChatMarkdown(msg.text | translateTitle)"></div>
                 </div>
               </div>
 
@@ -1928,7 +1928,7 @@
         <!-- Name (show input when renaming, otherwise plain text) -->
         <ng-container *ngIf="renamingCatPath !== node.fullPath">
           <span class="cat-node-color-dot" [style.background]="getCategoryColor(node.fullPath)" (click)="toggleCatColorPicker(node.fullPath)" title="Change color"></span>
-          <span class="cat-node-name">{{ node.name }}</span>
+          <span class="cat-node-name">{{ node.name | translateTitle }}</span>
         </ng-container>
         <ng-container *ngIf="renamingCatPath === node.fullPath">
           <input
@@ -1981,7 +1981,7 @@
 
       <!-- Inline color picker for category -->
       <div class="cat-node-color-picker" *ngIf="catColorPickerPath === node.fullPath">
-        <span class="cat-node-color-label">Pick a color for "{{ node.name }}" (applies to all its events):</span>
+        <span class="cat-node-color-label">Pick a color for "{{ node.name | translateTitle }}" (applies to all its events):</span>
         <div class="color-picker">
           <button
             type="button"
@@ -2000,7 +2000,7 @@
           ⚠️ This category has <strong>{{ countEventsUnder(node.fullPath) }}</strong> event(s). They will be unassigned.
         </div>
         <div class="cat-delete-msg" *ngIf="countEventsUnder(node.fullPath) === 0">
-          Delete "{{ node.name }}"?
+          Delete "{{ node.name | translateTitle }}"?
         </div>
         <div class="cat-delete-actions">
           <button class="btn-danger cat-delete-yes" (click)="confirmDeleteCategory(node.fullPath, '')">Delete</button>
@@ -2281,7 +2281,7 @@
                 <div class="cat-picker-item" *ngFor="let node of changeCategoryPickerFiltered">
                   <button type="button" class="cat-picker-item-name" (click)="changeCategoryPickerSelectNode(node)">
                     <span class="cat-picker-item-icon">{{ node.children.length > 0 ? '📂' : '🏷️' }}</span>
-                    <span>{{ node.name }}</span>
+                    <span>{{ node.name | translateTitle }}</span>
                   </button>
                   <button type="button" class="cat-picker-item-sub-btn" *ngIf="node.children.length > 0" (click)="changeCategoryPickerDrillDown(node)" title="View subcategories">
                     {{ node.children.length }} sub ›
@@ -2865,7 +2865,7 @@
                 <!-- Click the name to select it as the category -->
                 <button type="button" class="cat-picker-item-name" (click)="categoryPickerSelectNode(node)">
                   <span class="cat-picker-item-icon">{{ node.children.length > 0 ? '📂' : '🏷️' }}</span>
-                  <span>{{ node.name }}</span>
+                  <span>{{ node.name | translateTitle }}</span>
                 </button>
                 <!-- Drill into subcategories -->
                 <button
@@ -2930,7 +2930,7 @@
         <label>{{ i18n.t('eventColor') }}</label>
         <div class="category-color-info" *ngIf="form.category">
           <span class="category-color-dot" [style.background]="getCategoryColor(form.category)"></span>
-          <span class="category-color-text">Using <strong>{{ form.category }}</strong> category color</span>
+          <span class="category-color-text">Using <strong>{{ form.category | translateTitle }}</strong> category color</span>
           <button type="button" class="category-color-change-btn" (click)="showCategoryColorPicker = !showCategoryColorPicker">Change</button>
         </div>
         <div class="category-color-info" *ngIf="!form.category">
@@ -2948,7 +2948,7 @@
           ></button>
         </div>
         <p class="category-color-hint" *ngIf="showCategoryColorPicker && form.category">
-          Changing this color will update <strong>all</strong> events in "{{ form.category }}".
+          Changing this color will update <strong>all</strong> events in "{{ form.category | translateTitle }}".
         </p>
       </div>
 
@@ -3051,7 +3051,7 @@
       <div class="share-scope-toggle" *ngIf="shareTargetEvent.category">
         <label class="share-scope-label">
           <input type="checkbox" [(ngModel)]="shareCategoryOnly" name="shareCategoryOnly" />
-          Share all <strong>{{ shareTargetEvent.category }}</strong> events
+          Share all <strong>{{ shareTargetEvent.category | translateTitle }}</strong> events
           ({{ events | categoryCount: shareTargetEvent.category }} events)
         </label>
         <p class="share-scope-hint" *ngIf="shareCategoryOnly">
@@ -3187,7 +3187,7 @@
             <div class="organize-event-info">
               <span class="organize-event-title">{{ ev.title | translateTitle }}</span>
               <span class="organize-event-meta">{{ ev.date }} · {{ ev.startTime }}–{{ ev.endTime }}</span>
-              <span class="organize-event-cat">{{ ev.category }}</span>
+              <span class="organize-event-cat">{{ ev.category | translateTitle }}</span>
             </div>
             <button
               class="organize-event-remove"
@@ -3473,7 +3473,7 @@
         [class.user-bubble]="msg.role === 'user'"
         [class.assistant-bubble]="msg.role === 'assistant'"
       >
-        <div class="chat-bubble-text" [innerHTML]="renderChatMarkdown(msg.text)"></div>
+        <div class="chat-bubble-text" [innerHTML]="renderChatMarkdown(msg.text | translateTitle)"></div>
         <div class="chat-actions" *ngIf="msg.actions && msg.actions.length > 0">
           <button
             class="chat-action-btn"

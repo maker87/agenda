@@ -1272,9 +1272,20 @@ export class AiChatService {
     };
   }
 
-  /** Render markdown-style bold (**text**) and italic (_text_) to HTML. */
+  /**
+   * Render markdown-style bold (**text**) and italic (_text_) to HTML.
+   * Escapes HTML first — this text can come from user input, the AI (Bedrock),
+   * or the translation model, none of which are trusted to emit raw markup,
+   * and the result is injected via [innerHTML].
+   */
   renderMarkdown(text: string): string {
-    return text
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    return escaped
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/_(.+?)_/g, '<em>$1</em>')
       .replace(/\n/g, '<br>');

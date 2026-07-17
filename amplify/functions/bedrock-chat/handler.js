@@ -265,9 +265,11 @@ const LANGUAGE_NAMES = {
 };
 
 /**
- * Batch-translates arbitrary short strings (event titles) into targetLang.
+ * Batch-translates arbitrary strings — event titles, reminder/notification
+ * titles and bodies, and full past AI chat messages — into targetLang.
  * Texts already in the target language, or proper nouns/brand names, are
- * returned unchanged by the model rather than force-translated.
+ * returned unchanged by the model rather than force-translated. Markdown
+ * formatting (bold, bullets, etc.) in chat messages is preserved as-is.
  */
 async function translateTexts(event) {
   const { texts, targetLang } = event.arguments;
@@ -279,19 +281,21 @@ async function translateTexts(event) {
   }
   if (!Array.isArray(input) || input.length === 0) return JSON.stringify([]);
 
-  // Defensive caps — this is meant for a handful of calendar event titles, not bulk text.
-  const capped = input.slice(0, 100).map((t) => String(t ?? '').slice(0, 200));
+  // Defensive caps — the frontend already chunks requests to stay under
+  // these, this is just a backstop. Long enough to cover a full AI chat
+  // reply (maxTokens:1024 on the chat handler is roughly 3-4k characters).
+  const capped = input.slice(0, 25).map((t) => String(t ?? '').slice(0, 4000));
   const languageName = LANGUAGE_NAMES[targetLang] || targetLang || 'English';
 
   const client = new BedrockRuntimeClient({ region: 'us-east-1' });
-  const prompt = `Translate each calendar event title below into ${languageName}. If a title is already in ${languageName}, or is a proper noun/brand name that shouldn't be translated, return it unchanged. Preserve emoji, capitalization style, and punctuation. Respond with ONLY a JSON array of strings — same length and order as the input, no commentary, no markdown fences.\n\nInput:\n${JSON.stringify(capped)}`;
+  const prompt = `Translate each text below into ${languageName}. Entries may be short calendar event/reminder titles or full multi-sentence AI chat messages containing Markdown (bold **like this**, bullet points, line breaks). If a text is already in ${languageName}, or is a proper noun/brand name that shouldn't be translated, return it unchanged. Preserve emoji, Markdown formatting/structure, capitalization style, and punctuation exactly — only translate the natural-language words. Respond with ONLY a JSON array of strings — same length and order as the input, no commentary, no markdown fences around the array itself.\n\nInput:\n${JSON.stringify(capped)}`;
 
   try {
     const command = new ConverseCommand({
       modelId: MODEL_ID,
       system: [{ text: 'You are a precise translation engine for a calendar app. You only ever output a raw JSON array of strings, nothing else.' }],
       messages: [{ role: 'user', content: [{ text: prompt }] }],
-      inferenceConfig: { maxTokens: 2048, temperature: 0 },
+      inferenceConfig: { maxTokens: 8192, temperature: 0 },
     });
     const response = await client.send(command);
     const rawText = response.output?.message?.content?.[0]?.text || '[]';
