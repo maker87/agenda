@@ -228,15 +228,18 @@ async function toolListReminders(ownerEmail) {
 }
 
 async function toolCreateReminder(ownerEmail, args) {
+  const now = new Date().toISOString();
   const item = {
     id: randomUUID(),
+    __typename: 'Notification',
     recipientEmail: ownerEmail,
     type: 'reminder',
     title: args.title,
     body: args.body ?? '',
     senderEmail: 'mcp',
     read: false,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
   };
   await ddb.send(new PutCommand({ TableName: TABLES.notification, Item: item }));
   return { created: true, title: item.title };
