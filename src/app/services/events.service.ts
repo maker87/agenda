@@ -227,14 +227,33 @@ export class EventsService {
 
   // ── Background sync ───────────────────────────────────────────────────────
 
+  /**
+   * AppSync's list() only returns one page (defaults to 100 items) unless
+   * you follow nextToken yourself — without this, accounts with more than a
+   * page of events silently lose the rest on every sync.
+   */
+  private async listAllPages(filter: { filter: Record<string, unknown> }): Promise<Schema['CalendarEvent']['type'][]> {
+    const items: Schema['CalendarEvent']['type'][] = [];
+    let nextToken: string | null | undefined;
+    do {
+      const { data, errors, nextToken: token } = await getClient().models.CalendarEvent.list({
+        ...filter,
+        nextToken,
+      } as any);
+      if (errors?.length) throw new Error(errors[0].message);
+      items.push(...(data ?? []));
+      nextToken = token;
+    } while (nextToken);
+    return items;
+  }
+
   /** Fetch events that other users have shared with the given email. */
   async listSharedEvents(recipientEmail: string): Promise<CalendarEvent[]> {
     try {
       // Use a server-side filter to avoid fetching all records
-      const { data, errors } = await getClient().models.CalendarEvent.list({
+      const data = await this.listAllPages({
         filter: { sharedWith: { contains: recipientEmail } },
       });
-      if (errors?.length) throw new Error(errors[0].message);
       // Filter out events owned by the recipient (already in their own list)
       const shared = (data ?? [])
         .filter(record => record.ownerEmail !== recipientEmail)
@@ -251,10 +270,9 @@ export class EventsService {
     this.syncing = true;
     try {
       await this.flushPending(ownerEmail);
-      const { data, errors } = await getClient().models.CalendarEvent.list({
+      const data = await this.listAllPages({
         filter: { ownerEmail: { eq: ownerEmail } },
       });
-      if (errors?.length) throw new Error(errors[0].message);
       const remote = (data ?? []).map(this.toLocal);
       const cache = this.readCache(ownerEmail);
       // Keep local-only items AND any cached items not yet in remote
