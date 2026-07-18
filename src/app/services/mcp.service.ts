@@ -8,16 +8,18 @@ function getClient() {
   return _client;
 }
 
-// Lambda Function URLs are stable once created — they don't change on
-// redeploy unless the URL resource itself is replaced. Wiring this through
+// API Gateway invoke URLs are stable once created — they don't change on
+// redeploy unless the API resource itself is replaced. Wiring this through
 // CDK (env var or backend.addOutput) created a circular dependency between
 // the data stack and the mcp-server function stack, so instead it's fetched
-// once via the AWS CLI after deploy and hardcoded here.
-const MCP_ENDPOINT_URL = 'https://j2lntgdub2awy5vqk3ttcaia2m0xvems.lambda-url.us-east-1.on.aws/';
+// once via the AWS CLI after deploy and hardcoded here. (Originally a Lambda
+// Function URL, but this AWS account rejects anonymous Function URL
+// invocations with a platform-level 403 — switched to API Gateway instead.)
+const MCP_ENDPOINT_URL = 'https://ggblve74q1.execute-api.us-east-1.amazonaws.com/';
 
 /**
  * Manages the personal access token external MCP clients (Claude Desktop,
- * etc.) use to authenticate against the mcp-server Lambda's Function URL.
+ * etc.) use to authenticate against the mcp-server API Gateway endpoint.
  */
 @Injectable({ providedIn: 'root' })
 export class McpService {
