@@ -16,7 +16,10 @@ const backend = defineBackend({
 // external MCP clients (Claude Desktop, etc.), authenticated via a personal
 // access token (ApiToken model) rather than full OAuth — the token is
 // generated from the app's Settings UI and checked inside the handler.
-const mcpLambda = backend.mcpServerFunction.resources.lambda;
+// resources.lambda is typed as the IFunction interface, which doesn't expose
+// addEnvironment() (only the concrete Function class does) — cast since
+// defineFunction() always creates a real, owned Function under the hood.
+const mcpLambda = backend.mcpServerFunction.resources.lambda as LambdaFunction;
 
 const mcpFunctionUrl = mcpLambda.addFunctionUrl({
   authType: FunctionUrlAuthType.NONE, // auth is handled inside the handler via bearer token
