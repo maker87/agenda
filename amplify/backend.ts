@@ -82,6 +82,11 @@ mcpLambda.addEnvironment('API_TOKEN_TABLE', 'ApiToken-mvjyhqvbi5hajc6rcdnhqwva24
 // stack, and mcp-server's grants above already make the function stack
 // depend on the data stack, so a reverse reference here would create a
 // circular dependency between the two nested stacks.)
+//
+// TEMPORARY: resources target Nova Lite, matching the temporary MODEL_ID
+// revert in bedrock-chat/handler.js (this account hasn't completed Bedrock's
+// Anthropic use-case-details form yet). Restore the claude-sonnet-4-5
+// foundation-model/inference-profile ARNs here when switching back.
 const dataStack = Stack.of(backend.data);
 const allConstructs = dataStack.node.findAll();
 for (const construct of allConstructs) {
@@ -91,8 +96,8 @@ for (const construct of allConstructs) {
         effect: Effect.ALLOW,
         actions: ['bedrock:InvokeModel'],
         resources: [
-          'arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0',
-          'arn:aws:bedrock:us-east-1:*:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+          'arn:aws:bedrock:us-east-1::foundation-model/us.amazon.nova-lite-v1:0',
+          'arn:aws:bedrock:us-east-1:*:inference-profile/us.amazon.nova-lite-v1:0',
         ],
       })
     );

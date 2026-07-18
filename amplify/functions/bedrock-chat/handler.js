@@ -1,10 +1,14 @@
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 
-// Cross-region inference profile for Claude on Bedrock. Swapped in from
-// Nova Lite, which was too weak to reliably follow the multi-step
-// gather-info -> confirm -> act contract below and often skipped
-// confirmation or fabricated details.
-const MODEL_ID = 'us.anthropic.claude-sonnet-4-5-20250929-v1:0';
+// TEMPORARY: reverted to Nova Lite. Claude Sonnet 4.5 (see git history) is
+// the intended model long-term -- it's meaningfully better at following the
+// multi-step gather-info -> confirm -> act contract below -- but this AWS
+// account hasn't completed Bedrock's one-time "Anthropic use case details"
+// intake form, so every Claude invocation fails with ResourceNotFoundException.
+// Submit that form in the Bedrock console (Model access page), wait ~15 min,
+// then switch MODEL_ID back to 'us.anthropic.claude-sonnet-4-5-20250929-v1:0'
+// and restore the matching resources in amplify/backend.ts.
+const MODEL_ID = 'us.amazon.nova-lite-v1:0';
 
 const SYSTEM_PROMPT = `You are an AI assistant for a calendar/scheduling app. You help users plan their time, manage their schedule, and get the most out of their agenda.
 
@@ -307,7 +311,7 @@ async function translateTexts(event) {
     }
     return JSON.stringify(translated.map((t) => String(t ?? '')));
   } catch (error) {
-    console.error('Translate invocation error');
+    console.error('Translate invocation error:', error);
     return JSON.stringify(capped);
   }
 }
@@ -448,7 +452,7 @@ Upcoming events (next 50):\n` +
     
     return finalResponse;
   } catch (error) {
-    console.error('Bedrock invocation error');
+    console.error('Bedrock invocation error:', error);
     return 'I\'m having trouble connecting right now. Please try again in a moment.';
   }
 };
