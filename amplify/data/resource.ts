@@ -140,16 +140,6 @@ const schema = a.schema({
     .returns(a.string())                 // JSON.stringify(string[]), same order/length
     .handler(a.handler.function(bedrockChatHandler))
     .authorization((allow) => [allow.authenticated()]),
-
-  // Returns the mcp-server Lambda's Function URL. That URL is only known
-  // after CDK synth (AWS assigns the subdomain), so it can't live in
-  // amplify_outputs.json — surfaced instead via the same "route by
-  // fieldName" bedrock-chat Lambda already used for chat/translateTexts.
-  getMcpEndpoint: a
-    .query()
-    .returns(a.string())
-    .handler(a.handler.function(bedrockChatHandler))
-    .authorization((allow) => [allow.authenticated()]),
 });
 
 export type Schema = ClientSchema<typeof schema>;

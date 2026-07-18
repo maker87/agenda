@@ -313,9 +313,6 @@ async function translateTexts(event) {
 }
 
 export const handler = async (event) => {
-  if (event.info?.fieldName === 'getMcpEndpoint') {
-    return process.env.MCP_ENDPOINT_URL || '';
-  }
   if (event.info?.fieldName === 'translateTexts') {
     return translateTexts(event);
   }

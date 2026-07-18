@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { generateClient } from 'aws-amplify/data';
+import { Amplify } from 'aws-amplify';
 import type { Schema } from '../../../amplify/data/resource';
 
 let _client: ReturnType<typeof generateClient<Schema>> | null = null;
@@ -11,17 +12,19 @@ function getClient() {
 /**
  * Manages the personal access token external MCP clients (Claude Desktop,
  * etc.) use to authenticate against the mcp-server Lambda's Function URL,
- * and looks up that URL (which only exists after CDK synth, so it's
- * surfaced via a query rather than baked into amplify_outputs.json).
+ * and looks up that URL — published into amplify_outputs.json's `custom`
+ * section (via backend.addOutput in amplify/backend.ts) rather than routed
+ * through a GraphQL resolver, since the latter would need bedrock-chat's
+ * Lambda (which lives in the data stack) to reference a resource from the
+ * mcp-server stack, creating a circular stack dependency.
  */
 @Injectable({ providedIn: 'root' })
 export class McpService {
 
   async getEndpointUrl(): Promise<string> {
     try {
-      const { data, errors } = await getClient().queries.getMcpEndpoint();
-      if (errors?.length) throw new Error(errors[0].message);
-      return data ?? '';
+      const config = Amplify.getConfig() as unknown as { custom?: { mcpEndpointUrl?: string } };
+      return config.custom?.mcpEndpointUrl ?? '';
     } catch (err) {
       console.warn('[McpService] getEndpointUrl failed:', err);
       return '';

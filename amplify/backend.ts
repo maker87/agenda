@@ -40,9 +40,12 @@ backend.data.resources.tables['Notification'].grantReadWriteData(mcpLambda);
 backend.data.resources.tables['Streak'].grantReadWriteData(mcpLambda);
 backend.data.resources.tables['ApiToken'].grantReadData(mcpLambda);
 
-// Find the bedrock-chat Lambda in the CDK construct tree, grant Bedrock
-// permissions, and hand it the mcp-server Function URL (only known after
-// synth) so getMcpEndpoint can return it to the frontend.
+// Find the bedrock-chat Lambda in the CDK construct tree and grant Bedrock permissions.
+// (Deliberately NOT adding an environment variable here referencing anything
+// from the mcp-server stack — bedrock-chat's Lambda lives inside the data
+// stack, and mcp-server's grants above already make the function stack
+// depend on the data stack, so a reverse reference here would create a
+// circular dependency between the two nested stacks.)
 const dataStack = Stack.of(backend.data);
 const allConstructs = dataStack.node.findAll();
 for (const construct of allConstructs) {
@@ -57,6 +60,14 @@ for (const construct of allConstructs) {
         ],
       })
     );
-    construct.addEnvironment('MCP_ENDPOINT_URL', mcpFunctionUrl.url);
   }
 }
+
+// Publish the mcp-server Function URL (only known after synth) into
+// amplify_outputs.json's `custom` section, so the frontend can read it
+// without any cross-stack Lambda reference.
+backend.addOutput({
+  custom: {
+    mcpEndpointUrl: mcpFunctionUrl.url,
+  },
+});
