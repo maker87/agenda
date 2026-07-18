@@ -45,8 +45,15 @@ export class BedrockChatService {
     const today = new Date().toISOString().split('T')[0];
     const lang = this.i18n.getLanguage();
 
-    // Trim events to essential fields to save tokens
-    const trimmedEvents = events.slice(0, 50).map(e => ({
+    // Trim events to essential fields to save tokens. Prioritize upcoming
+    // events (soonest first) before backfilling with the most recent past
+    // ones — `events` is sorted ascending by date across the user's whole
+    // history, so a plain slice(0, 50) on an account with many past events
+    // (e.g. an imported/synced backlog) would only ever see old events and
+    // never anything from tomorrow onward.
+    const upcoming = events.filter(e => e.date >= today);
+    const past = events.filter(e => e.date < today).slice().reverse();
+    const trimmedEvents = [...upcoming, ...past].slice(0, 50).map(e => ({
       title: e.title,
       date: e.date,
       startTime: e.startTime,
