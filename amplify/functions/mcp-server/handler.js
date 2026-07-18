@@ -159,8 +159,10 @@ async function toolListEvents(ownerEmail, args) {
 }
 
 async function toolCreateEvent(ownerEmail, args) {
+  const now = new Date().toISOString();
   const item = {
     id: randomUUID(),
+    __typename: 'CalendarEvent',
     ownerEmail,
     title: args.title,
     date: args.date,
@@ -170,6 +172,8 @@ async function toolCreateEvent(ownerEmail, args) {
     description: args.description ?? '',
     color: '#6c63ff',
     sharedWith: [],
+    createdAt: now,
+    updatedAt: now,
   };
   await ddb.send(new PutCommand({ TableName: TABLES.event, Item: item }));
   return { created: true, title: item.title, date: item.date };
