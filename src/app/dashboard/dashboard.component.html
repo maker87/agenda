@@ -465,7 +465,7 @@
           *ngFor="let cat of allCategories"
           [class.active]="activeCategoryFilter === cat"
           (click)="setCategoryFilter(cat)"
-        ><span class="cat-pill-dot" [style.background]="getCategoryColor(cat)"></span>{{ cat }}</button>
+        ><span class="cat-pill-dot" [style.background]="getCategoryColor(cat)"></span>{{ cat | translateTitle }}</button>
       </div>
 
       <!-- Past -->
@@ -634,7 +634,7 @@
         <span class="cal-legend-label">{{ i18n.t('categoriesLabel') }}</span>
         <span class="cal-legend-item" *ngFor="let cat of allCategories">
           <span class="cal-legend-dot" [style.background]="getCategoryColor(cat)"></span>
-          <span class="cal-legend-name">{{ cat }}</span>
+          <span class="cal-legend-name">{{ cat | translateTitle }}</span>
         </span>
       </div>
 
@@ -1158,36 +1158,36 @@
           </div>
 
           <div class="field" style="margin-bottom:20px">
-            <label class="share-field-label">Share Type</label>
+            <label class="share-field-label">{{ i18n.t('shareType') }}</label>
             <div class="share-type-pills">
               <button
                 class="share-type-pill"
                 [class.active]="shareType === 'calendar'"
                 (click)="shareType = 'calendar'; onShareTypeChange()"
-              >🗓 Entire Calendar</button>
+              >🗓 {{ i18n.t('entireCalendar') }}</button>
               <button
                 class="share-type-pill"
                 [class.active]="shareType === 'category'"
                 (click)="shareType = 'category'; onShareTypeChange()"
-              >📂 Category</button>
+              >📂 {{ i18n.t('category') }}</button>
               <button
                 class="share-type-pill"
                 [class.active]="shareType === 'subcategory'"
                 (click)="shareType = 'subcategory'; onShareTypeChange()"
-              >📁 Subcategory</button>
+              >📁 {{ i18n.t('subcategory') }}</button>
               <button
                 class="share-type-pill"
                 [class.active]="shareType === 'friend'"
                 (click)="shareType = 'friend'; onShareTypeChange()"
-              >👥 Friend Request</button>
+              >👥 {{ i18n.t('friendRequest') }}</button>
             </div>
           </div>
 
           <!-- Category picker (shown when shareType is 'category') -->
           <div class="field" *ngIf="shareType === 'category'" style="margin-bottom:20px">
-            <label class="share-field-label">Select Category</label>
+            <label class="share-field-label">{{ i18n.t('selectCategory') }}</label>
             <div *ngIf="shareTopLevelCategories.length === 0" class="share-empty-hint">
-              No categories found. Add events with categories first.
+              {{ i18n.t('noCategoriesFound') }}
             </div>
             <div class="share-category-list" *ngIf="shareTopLevelCategories.length > 0">
               <button
@@ -1197,7 +1197,7 @@
                 (click)="shareSelectedCategory = cat"
               >
                 <span class="share-cat-icon">📂</span>
-                {{ cat }}
+                {{ cat | translateTitle }}
                 <span class="share-cat-count">({{ countEventsUnder(cat) }})</span>
               </button>
             </div>
@@ -1205,15 +1205,15 @@
 
           <!-- Subcategory picker (shown when shareType is 'subcategory') -->
           <div class="field" *ngIf="shareType === 'subcategory'" style="margin-bottom:20px">
-            <label class="share-field-label">Select Subcategory</label>
+            <label class="share-field-label">{{ i18n.t('selectSubcategory') }}</label>
 
             <!-- Step 1: pick parent category first -->
             <div *ngIf="shareTopLevelCategories.length === 0" class="share-empty-hint">
-              No categories found. Add events with categories first.
+              {{ i18n.t('noCategoriesFound') }}
             </div>
             <div *ngIf="shareTopLevelCategories.length > 0">
               <p class="share-step-hint" *ngIf="!shareSelectedCategory || !shareSelectedCategory.includes(' > ')">
-                First pick a parent category:
+                {{ i18n.t('firstPickParent') }}
               </p>
               <div class="share-category-list">
                 <button
@@ -1223,13 +1223,13 @@
                   (click)="shareSelectedCategory = cat"
                 >
                   <span class="share-cat-icon">📂</span>
-                  {{ cat }}
+                  {{ cat | translateTitle }}
                 </button>
               </div>
 
               <!-- Step 2: pick subcategory -->
               <ng-container *ngIf="shareSelectedCategory && shareSubcategories.length > 0">
-                <p class="share-step-hint" style="margin-top:12px">Now pick a subcategory:</p>
+                <p class="share-step-hint" style="margin-top:12px">{{ i18n.t('nowPickSub') }}</p>
                 <div class="share-category-list">
                   <button
                     *ngFor="let sub of shareSubcategories"
@@ -1238,7 +1238,7 @@
                     (click)="shareSelectedCategory = sub"
                   >
                     <span class="share-cat-icon">📁</span>
-                    {{ sub.split(' > ').slice(1).join(' › ') }}
+                    {{ sub.split(' > ').slice(1).join(' › ') | translateTitle }}
                     <span class="share-cat-count">({{ countEventsUnder(sub) }})</span>
                   </button>
                 </div>
@@ -1249,7 +1249,7 @@
                 class="share-empty-hint"
                 style="margin-top:8px"
               >
-                No subcategories under "{{ shareSelectedCategory }}".
+                {{ i18n.t('noSubcategoriesUnder') }} "{{ shareSelectedCategory | translateTitle }}".
               </div>
             </div>
           </div>
@@ -1257,7 +1257,7 @@
           <!-- Calendar share summary -->
           <div class="share-summary" *ngIf="shareType === 'calendar'">
             <span class="share-summary-icon">🗓</span>
-            <span>Sharing your entire calendar ({{ events.length }} event{{ events.length !== 1 ? 's' : '' }})</span>
+            <span>{{ i18n.t('sharingEntireCalendar') }} ({{ events.length }} {{ events.length !== 1 ? i18n.t('events') : i18n.t('event') }})</span>
           </div>
 
           <!-- Error / success feedback -->
@@ -1272,27 +1272,27 @@
             (click)="submitShareSubTab()"
             [disabled]="!shareSubTabEmail.trim() || !shareType || ((shareType === 'category' || shareType === 'subcategory') && !shareSelectedCategory)"
           >
-            Send Share Request
+            {{ i18n.t('sendShareBtn') }}
           </button>
         </div>
 
         <!-- Sent share requests log -->
         <div class="friend-list-section" *ngIf="sentShareRequests.length > 0" style="margin-top:24px">
-          <h3 class="section-label">Sent Requests ({{ sentShareRequests.length }})</h3>
+          <h3 class="section-label">{{ i18n.t('sentRequests') }} ({{ sentShareRequests.length }})</h3>
           <div class="friend-results">
             <div class="friend-result-item" *ngFor="let req of sentShareRequests">
               <div class="friend-avatar" style="background:#ede9fe;color:#6c63ff">↗</div>
               <div class="friend-info">
                 <span class="friend-display-name">&#64;{{ req.username }}</span>
                 <span class="friend-username">
-                  {{ req.type === 'calendar'    ? '🗓 Entire Calendar' :
-                     req.type === 'category'    ? '📂 Category: ' + req.label :
-                     req.type === 'subcategory' ? '📁 Subcategory: ' + req.label :
-                     req.type === 'friend'      ? '👥 Friend Request' :
-                                                  '📅 Event' }}
+                  {{ req.type === 'calendar'    ? '🗓 ' + i18n.t('entireCalendar') :
+                     req.type === 'category'    ? '📂 ' + i18n.t('category') + ': ' + (req.label | translateTitle) :
+                     req.type === 'subcategory' ? '📁 ' + i18n.t('subcategory') + ': ' + (req.label | translateTitle) :
+                     req.type === 'friend'      ? '👥 ' + i18n.t('friendRequest') :
+                                                  '📅 ' + i18n.t('event') }}
                 </span>
               </div>
-              <span class="friend-pending-btn" style="cursor:default">✓ Sent</span>
+              <span class="friend-pending-btn" style="cursor:default">{{ i18n.t('sent') }}</span>
             </div>
           </div>
         </div>
@@ -2028,14 +2028,14 @@
       <!-- Delete confirmation -->
       <div class="cat-delete-confirm" *ngIf="deletingCatPath === node.fullPath">
         <div class="cat-delete-msg" *ngIf="countEventsUnder(node.fullPath) > 0">
-          ⚠️ This category has <strong>{{ countEventsUnder(node.fullPath) }}</strong> event(s). They will be unassigned.
+          ⚠️ {{ i18n.t('categoryHasEvents') }} <strong>{{ countEventsUnder(node.fullPath) }}</strong> {{ i18n.t('eventsWillBeUnassigned') }}
         </div>
         <div class="cat-delete-msg" *ngIf="countEventsUnder(node.fullPath) === 0">
-          Delete "{{ node.name | translateTitle }}"?
+          {{ i18n.t('deleteConfirm') }} "{{ node.name | translateTitle }}"?
         </div>
         <div class="cat-delete-actions">
-          <button class="btn-danger cat-delete-yes" (click)="confirmDeleteCategory(node.fullPath, '')">Delete</button>
-          <button class="btn-secondary cat-delete-no" (click)="cancelDeleteCategory()">Cancel</button>
+          <button class="btn-danger cat-delete-yes" (click)="confirmDeleteCategory(node.fullPath, '')">{{ i18n.t('delete') }}</button>
+          <button class="btn-secondary cat-delete-no" (click)="cancelDeleteCategory()">{{ i18n.t('cancel') }}</button>
         </div>
       </div>
 
@@ -2272,10 +2272,10 @@
           <div class="category-picker-field">
             <div class="category-picker-display" (click)="openChangeCategoryPicker()">
               <span class="category-picker-icon">📂</span>
-              <span *ngIf="!changeForm.category" class="category-picker-placeholder">Select or create a category…</span>
+              <span *ngIf="!changeForm.category" class="category-picker-placeholder">{{ i18n.t('selectOrCreate') }}</span>
               <span *ngIf="changeForm.category" class="category-picker-value">
                 <span *ngFor="let seg of changeForm.category.split(' > '); let last = last">
-                  <span class="cat-breadcrumb-seg">{{ seg }}</span>
+                  <span class="cat-breadcrumb-seg">{{ seg | translateTitle }}</span>
                   <span *ngIf="!last" class="cat-breadcrumb-sep"> › </span>
                 </span>
               </span>
@@ -2288,11 +2288,11 @@
                 <button type="button" class="cat-picker-back-btn" (click)="changeCategoryPickerGoUp()">‹ Back</button>
                 <span class="cat-picker-breadcrumb-path">
                   <span *ngFor="let seg of changeCategoryPickerPath; let last = last">
-                    <span>{{ seg }}</span><span *ngIf="!last"> › </span>
+                    <span>{{ seg | translateTitle }}</span><span *ngIf="!last"> › </span>
                   </span>
                 </span>
                 <button type="button" class="cat-picker-use-btn" (click)="changeCategoryPickerSelect()">
-                  Use "{{ changeCategoryPickerPath[changeCategoryPickerPath.length - 1] }}"
+                  Use "{{ changeCategoryPickerPath[changeCategoryPickerPath.length - 1] | translateTitle }}"
                 </button>
               </div>
 
@@ -2843,10 +2843,10 @@
           <!-- Trigger button -->
           <div class="category-picker-display" (click)="openCategoryPicker()">
             <span class="category-picker-icon">📂</span>
-            <span *ngIf="!form.category" class="category-picker-placeholder">Select or create a category…</span>
+            <span *ngIf="!form.category" class="category-picker-placeholder">{{ i18n.t('selectOrCreate') }}</span>
             <span *ngIf="form.category" class="category-picker-value">
               <span *ngFor="let seg of form.category.split(' > '); let last = last">
-                <span class="cat-breadcrumb-seg">{{ seg }}</span>
+                <span class="cat-breadcrumb-seg">{{ seg | translateTitle }}</span>
                 <span *ngIf="!last" class="cat-breadcrumb-sep"> › </span>
               </span>
             </span>
@@ -2864,11 +2864,11 @@
               </button>
               <span class="cat-picker-breadcrumb-path">
                 <span *ngFor="let seg of categoryPickerPath; let last = last">
-                  <span>{{ seg }}</span><span *ngIf="!last"> › </span>
+                  <span>{{ seg | translateTitle }}</span><span *ngIf="!last"> › </span>
                 </span>
               </span>
               <button type="button" class="cat-picker-use-btn" (click)="categoryPickerSelect()">
-                Use "{{ categoryPickerPath[categoryPickerPath.length - 1] }}"
+                Use "{{ categoryPickerPath[categoryPickerPath.length - 1] | translateTitle }}"
               </button>
             </div>
 
@@ -2961,12 +2961,12 @@
         <label>{{ i18n.t('eventColor') }}</label>
         <div class="category-color-info" *ngIf="form.category">
           <span class="category-color-dot" [style.background]="getCategoryColor(form.category)"></span>
-          <span class="category-color-text">Using <strong>{{ form.category | translateTitle }}</strong> category color</span>
-          <button type="button" class="category-color-change-btn" (click)="showCategoryColorPicker = !showCategoryColorPicker">Change</button>
+          <span class="category-color-text">{{ i18n.t('usingCategoryColor') }} <strong>{{ form.category | translateTitle }}</strong> {{ i18n.t('categoryColorSuffix') }}</span>
+          <button type="button" class="category-color-change-btn" (click)="showCategoryColorPicker = !showCategoryColorPicker">{{ i18n.t('change') }}</button>
         </div>
         <div class="category-color-info" *ngIf="!form.category">
           <span class="category-color-dot" [style.background]="selectedColor"></span>
-          <span class="category-color-text muted">Select a category to assign a color, or pick one:</span>
+          <span class="category-color-text muted">{{ i18n.t('selectCategoryForColor') }}</span>
         </div>
         <div class="color-picker" *ngIf="showCategoryColorPicker || !form.category">
           <button
@@ -2979,7 +2979,7 @@
           ></button>
         </div>
         <p class="category-color-hint" *ngIf="showCategoryColorPicker && form.category">
-          Changing this color will update <strong>all</strong> events in "{{ form.category | translateTitle }}".
+          {{ i18n.t('changingColorWarning') }} "{{ form.category | translateTitle }}".
         </p>
       </div>
 
@@ -3082,11 +3082,11 @@
       <div class="share-scope-toggle" *ngIf="shareTargetEvent.category">
         <label class="share-scope-label">
           <input type="checkbox" [(ngModel)]="shareCategoryOnly" name="shareCategoryOnly" />
-          Share all <strong>{{ shareTargetEvent.category | translateTitle }}</strong> events
-          ({{ events | categoryCount: shareTargetEvent.category }} events)
+          {{ i18n.t('shareAllCategory') }} <strong>{{ shareTargetEvent.category | translateTitle }}</strong> {{ i18n.t('events') }}
+          ({{ events | categoryCount: shareTargetEvent.category }} {{ i18n.t('events') }})
         </label>
         <p class="share-scope-hint" *ngIf="shareCategoryOnly">
-          The recipient will see every event in this category.
+          {{ i18n.t('recipientWillSee') }}
         </p>
       </div>
 
@@ -3204,7 +3204,7 @@
         <!-- Categories created -->
         <div class="organize-categories" *ngIf="organizeResult.categories.length > 0">
           <span class="organize-cat-label">{{ i18n.t('categoriesLabel') }}</span>
-          <span class="organize-cat-chip" *ngFor="let cat of organizeResult.categories">{{ cat }}</span>
+          <span class="organize-cat-chip" *ngFor="let cat of organizeResult.categories">{{ cat | translateTitle }}</span>
         </div>
 
         <!-- Event list -->
@@ -3395,7 +3395,7 @@
 <div class="modal-overlay" *ngIf="showInviteCategoryModal" (click)="skipInviteCategory()">
   <div class="modal invite-category-modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h3>📂 Categorize Event</h3>
+      <h3>{{ i18n.t('categorizeEvent') }}</h3>
       <button class="modal-close" (click)="skipInviteCategory()">✕</button>
     </div>
     <div class="modal-form" *ngIf="inviteCategoryEvent">
@@ -3409,40 +3409,40 @@
         </div>
       </div>
 
-      <p class="invite-category-desc">This event has been added to your calendar. Would you like to assign it a category?</p>
+      <p class="invite-category-desc">{{ i18n.t('eventAddedToCalendar') }}</p>
 
       <!-- AI loading state -->
       <div class="invite-category-loading" *ngIf="inviteCategoryLoading">
         <span class="invite-category-spinner">🤖</span>
-        <span>AI is suggesting a category...</span>
+        <span>{{ i18n.t('aiSuggestingCategory') }}</span>
       </div>
 
       <!-- AI suggestion -->
       <div class="invite-category-suggestion" *ngIf="!inviteCategoryLoading && inviteCategorySuggestion">
-        <div class="invite-category-label">AI Suggestion:</div>
+        <div class="invite-category-label">{{ i18n.t('aiSuggestionLabel') }}</div>
         <button
           class="invite-category-pill suggested"
           (click)="confirmInviteCategory(inviteCategorySuggestion)"
         >
-          ✨ {{ inviteCategorySuggestion }}
+          ✨ {{ inviteCategorySuggestion | translateTitle }}
         </button>
       </div>
 
       <!-- Existing categories -->
       <div class="invite-category-existing" *ngIf="!inviteCategoryLoading && allCategories.length > 0">
-        <div class="invite-category-label">Or pick an existing category:</div>
+        <div class="invite-category-label">{{ i18n.t('orPickExisting') }}</div>
         <div class="invite-category-pills">
           <button
             class="invite-category-pill"
             *ngFor="let cat of allCategories"
             (click)="confirmInviteCategory(cat)"
-          >{{ cat }}</button>
+          >{{ cat | translateTitle }}</button>
         </div>
       </div>
 
       <!-- Custom input -->
       <div class="invite-category-custom" *ngIf="!inviteCategoryLoading">
-        <div class="invite-category-label">Or type a new one:</div>
+        <div class="invite-category-label">{{ i18n.t('orTypeNew') }}</div>
         <div class="invite-category-input-wrap">
           <input
             class="input"
@@ -3455,12 +3455,12 @@
             class="btn-primary btn-sm"
             [disabled]="!inviteCategoryCustom.trim()"
             (click)="confirmInviteCategory(inviteCategoryCustom)"
-          >Apply</button>
+          >{{ i18n.t('apply') }}</button>
         </div>
       </div>
 
       <div class="modal-actions">
-        <button class="btn-secondary" (click)="skipInviteCategory()">Skip (No Category)</button>
+        <button class="btn-secondary" (click)="skipInviteCategory()">{{ i18n.t('skipNoCategory') }}</button>
       </div>
     </div>
   </div>
