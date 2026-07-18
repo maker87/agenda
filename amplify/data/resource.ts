@@ -82,6 +82,19 @@ const schema = a.schema({
       allow.owner().identityClaim('sub'),
     ]),
 
+  // Personal access token for the MCP server (amplify/functions/mcp-server),
+  // so external MCP clients (Claude Desktop, etc.) can authenticate as this
+  // user without exposing their Cognito credentials.
+  ApiToken: a
+    .model({
+      ownerEmail: a.string().required(),
+      token:      a.string().required(),
+      createdAt:  a.string(),
+    })
+    .authorization((allow) => [
+      allow.owner().identityClaim('sub'),
+    ]),
+
   FriendMessage: a
     .model({
       fromEmail: a.string().required(),
@@ -125,6 +138,16 @@ const schema = a.schema({
       targetLang: a.string().required(),
     })
     .returns(a.string())                 // JSON.stringify(string[]), same order/length
+    .handler(a.handler.function(bedrockChatHandler))
+    .authorization((allow) => [allow.authenticated()]),
+
+  // Returns the mcp-server Lambda's Function URL. That URL is only known
+  // after CDK synth (AWS assigns the subdomain), so it can't live in
+  // amplify_outputs.json — surfaced instead via the same "route by
+  // fieldName" bedrock-chat Lambda already used for chat/translateTexts.
+  getMcpEndpoint: a
+    .query()
+    .returns(a.string())
     .handler(a.handler.function(bedrockChatHandler))
     .authorization((allow) => [allow.authenticated()]),
 });

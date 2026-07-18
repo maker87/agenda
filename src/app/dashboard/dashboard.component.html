@@ -1728,6 +1728,37 @@
           </div>
         </div>
 
+        <!-- ── MCP / Developer Access card ── -->
+        <div class="profile-card">
+          <h3 class="profile-card-title">Developer Access (MCP)</h3>
+          <p class="profile-field-hint">Connect external AI tools (like Claude Desktop) to your calendar, reminders, and streaks via the Model Context Protocol.</p>
+
+          <div class="profile-field-group" style="margin-top:12px">
+            <label class="profile-label">Endpoint URL</label>
+            <div class="profile-region-row">
+              <input #mcpUrlInput class="profile-input" [value]="mcpEndpointUrl" readonly (click)="mcpUrlInput.select()" />
+              <button class="btn-secondary" (click)="copyMcpValue(mcpEndpointUrl, 'Endpoint URL copied!')" [disabled]="!mcpEndpointUrl">Copy</button>
+            </div>
+          </div>
+
+          <div class="profile-field-group" style="margin-top:12px">
+            <label class="profile-label">Access Token</label>
+            <div class="profile-region-row" *ngIf="mcpToken">
+              <input #mcpTokenInput class="profile-input" [value]="mcpToken" readonly (click)="mcpTokenInput.select()" />
+              <button class="btn-secondary" (click)="copyMcpValue(mcpToken, 'Token copied!')">Copy</button>
+            </div>
+            <p class="profile-field-hint" *ngIf="!mcpToken">No token generated yet.</p>
+            <button
+              class="btn-primary"
+              style="align-self:flex-start;margin-top:10px"
+              (click)="regenerateMcpToken()"
+              [disabled]="mcpTokenLoading"
+            >{{ mcpToken ? 'Regenerate Token' : 'Generate Token' }}</button>
+            <p class="profile-field-hint" *ngIf="mcpToken" style="margin-top:6px">Regenerating replaces this token immediately — any client using the old one will stop working.</p>
+            <p class="profile-field-success" *ngIf="mcpStatusMsg">✓ {{ mcpStatusMsg }}</p>
+          </div>
+        </div>
+
         <!-- ── Sign Out card ── -->
         <div class="profile-card profile-card-signout">
           <button class="btn-secondary profile-signout-btn" (click)="logout()">

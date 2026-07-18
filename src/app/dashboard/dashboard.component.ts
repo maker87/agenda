@@ -16,6 +16,7 @@ import { AiChatService, ChatMessage, EventDraft, getProactiveReminders } from '.
 import { AiOrganizeService, OrganizedEvent, OrganizeResult } from '../services/ai-organize.service';
 import { BedrockChatService, ChatAction as BedrockAction } from '../services/bedrock-chat.service';
 import { StreaksService, Streak as StreakRecord } from '../services/streaks.service';
+import { McpService } from '../services/mcp.service';
 import { I18nService } from '../services/i18n.service';
 import { signOut } from 'aws-amplify/auth';
 
@@ -762,6 +763,43 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   streakGoalTotal: number | null = null;
   streakGoalUnit = '';
   streakDeadline = '';
+
+  // ── MCP / Developer access ──
+  mcpEndpointUrl = '';
+  mcpToken: string | null = null;
+  mcpTokenLoading = false;
+  mcpStatusMsg = '';
+
+  async loadMcpSettings() {
+    const [url, token] = await Promise.all([
+      this.mcpService.getEndpointUrl(),
+      this.mcpService.getToken(),
+    ]);
+    this.mcpEndpointUrl = url;
+    this.mcpToken = token;
+  }
+
+  async regenerateMcpToken() {
+    this.mcpTokenLoading = true;
+    this.mcpStatusMsg = '';
+    try {
+      this.mcpToken = await this.mcpService.regenerateToken(this.userEmail);
+      this.mcpStatusMsg = 'New token generated.';
+    } catch (err) {
+      console.error('[Dashboard] Failed to generate MCP token:', err);
+      this.mcpStatusMsg = 'Failed to generate token. Please try again.';
+    }
+    this.mcpTokenLoading = false;
+  }
+
+  copyMcpValue(value: string, successMsg: string) {
+    if (!value) return;
+    navigator.clipboard.writeText(value).then(() => {
+      this.mcpStatusMsg = successMsg;
+    }).catch(() => {
+      this.mcpStatusMsg = 'Copy failed — please select and copy manually.';
+    });
+  }
 
   async loadStreaks() {
     // Awaited so the one-time migration (below) lands in the backend before
@@ -3413,6 +3451,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     private aiOrganize: AiOrganizeService,
     private bedrockChat: BedrockChatService,
     private streaksService: StreaksService,
+    private mcpService: McpService,
     public i18n: I18nService,
   ) {}
 
@@ -3430,6 +3469,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadHistory();
     this.loadSavedCategories();
     this.loadStreaks();
+    this.loadMcpSettings();
     this.loadCategoryColors();
     this.loadAiConversations();
     await this.loadFriends();
