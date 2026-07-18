@@ -30,15 +30,30 @@ const mcpFunctionUrl = mcpLambda.addFunctionUrl({
   },
 });
 
-mcpLambda.addEnvironment('CALENDAR_EVENT_TABLE', backend.data.resources.tables['CalendarEvent'].tableName);
-mcpLambda.addEnvironment('NOTIFICATION_TABLE', backend.data.resources.tables['Notification'].tableName);
-mcpLambda.addEnvironment('STREAK_TABLE', backend.data.resources.tables['Streak'].tableName);
-mcpLambda.addEnvironment('API_TOKEN_TABLE', backend.data.resources.tables['ApiToken'].tableName);
-
-backend.data.resources.tables['CalendarEvent'].grantReadWriteData(mcpLambda);
-backend.data.resources.tables['Notification'].grantReadWriteData(mcpLambda);
-backend.data.resources.tables['Streak'].grantReadWriteData(mcpLambda);
-backend.data.resources.tables['ApiToken'].grantReadData(mcpLambda);
+// NOTE: deliberately NOT using backend.data.resources.tables['X'].tableName
+// or .grantReadWriteData() here. bedrock-chat's Lambda lives in this exact
+// same shared "function" nested stack, and AppSync's chat/translateTexts
+// resolvers already require data-stack -> function-stack (to reference
+// bedrock-chat's ARN). Referencing ANY data-stack table token from mcp-server
+// (whether via a grant or a plain env var) adds the reverse edge and forms a
+// circular dependency between the two stacks. A wildcard-suffix IAM policy
+// (using only account/region pseudo-parameters, not stack tokens) grants the
+// needed permissions without creating that reference. Actual table names are
+// hardcoded as plain string literals (not tokens) once known post-deploy —
+// see mcp-server/handler.js comments.
+const mcpStack = Stack.of(mcpLambda);
+mcpLambda.addToRolePolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:DeleteItem', 'dynamodb:Scan', 'dynamodb:Query'],
+    resources: [
+      `arn:aws:dynamodb:${mcpStack.region}:${mcpStack.account}:table/CalendarEvent-*`,
+      `arn:aws:dynamodb:${mcpStack.region}:${mcpStack.account}:table/Notification-*`,
+      `arn:aws:dynamodb:${mcpStack.region}:${mcpStack.account}:table/Streak-*`,
+      `arn:aws:dynamodb:${mcpStack.region}:${mcpStack.account}:table/ApiToken-*`,
+    ],
+  })
+);
 
 // Find the bedrock-chat Lambda in the CDK construct tree and grant Bedrock permissions.
 // (Deliberately NOT adding an environment variable here referencing anything
