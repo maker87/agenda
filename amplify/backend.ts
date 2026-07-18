@@ -4,7 +4,9 @@ import { data } from './data/resource';
 import { mcpServerFunction } from './functions/mcp-server/resource';
 import { Effect, PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { Stack } from 'aws-cdk-lib';
-import { Function as LambdaFunction, FunctionUrlAuthType, HttpMethod } from 'aws-cdk-lib/aws-lambda';
+import { Function as LambdaFunction } from 'aws-cdk-lib/aws-lambda';
+import { HttpApi, CorsHttpMethod, HttpMethod as ApiHttpMethod } from 'aws-cdk-lib/aws-apigatewayv2';
+import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 
 const backend = defineBackend({
   auth,
@@ -21,13 +23,24 @@ const backend = defineBackend({
 // defineFunction() always creates a real, owned Function under the hood.
 const mcpLambda = backend.mcpServerFunction.resources.lambda as LambdaFunction;
 
-const mcpFunctionUrl = mcpLambda.addFunctionUrl({
-  authType: FunctionUrlAuthType.NONE, // auth is handled inside the handler via bearer token
-  cors: {
-    allowedOrigins: ['*'],
-    allowedMethods: [HttpMethod.POST],
-    allowedHeaders: ['*'],
+// Using API Gateway (HTTP API) rather than a Lambda Function URL — this AWS
+// account rejects anonymous Function URL invocations with a 403
+// AccessDeniedException at the platform edge (before the request ever
+// reaches the Lambda), despite AuthType.NONE and the resource policy being
+// configured correctly. API Gateway isn't subject to that same restriction.
+const mcpStack = Stack.of(mcpLambda);
+const mcpHttpApi = new HttpApi(mcpStack, 'McpHttpApi', {
+  apiName: 'agenda-mcp-server',
+  corsPreflight: {
+    allowOrigins: ['*'],
+    allowMethods: [CorsHttpMethod.POST],
+    allowHeaders: ['*'],
   },
+});
+mcpHttpApi.addRoutes({
+  path: '/',
+  methods: [ApiHttpMethod.POST],
+  integration: new HttpLambdaIntegration('McpIntegration', mcpLambda),
 });
 
 // NOTE: deliberately NOT using backend.data.resources.tables['X'].tableName
@@ -41,7 +54,6 @@ const mcpFunctionUrl = mcpLambda.addFunctionUrl({
 // needed permissions without creating that reference. Actual table names are
 // hardcoded as plain string literals (not tokens) once known post-deploy —
 // see mcp-server/handler.js comments.
-const mcpStack = Stack.of(mcpLambda);
 mcpLambda.addToRolePolicy(
   new PolicyStatement({
     effect: Effect.ALLOW,
@@ -90,6 +102,6 @@ for (const construct of allConstructs) {
 // NOTE: deliberately not calling backend.addOutput() here — it still
 // attaches the resulting CfnOutput to the data stack under the hood, which
 // recreates the same circular dependency the grants above already require in
-// the other direction. The URL itself is hardcoded in mcp.service.ts
-// (fetched once via `aws lambda get-function-url-config`) instead.
-void mcpFunctionUrl;
+// the other direction. The API's invoke URL is hardcoded in mcp.service.ts
+// instead (fetched once via `aws apigatewayv2 get-apis` after deploy).
+void mcpHttpApi;
