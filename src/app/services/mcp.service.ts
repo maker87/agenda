@@ -1,6 +1,5 @@
 import { Injectable } from '@angular/core';
 import { generateClient } from 'aws-amplify/data';
-import { Amplify } from 'aws-amplify';
 import type { Schema } from '../../../amplify/data/resource';
 
 let _client: ReturnType<typeof generateClient<Schema>> | null = null;
@@ -9,26 +8,24 @@ function getClient() {
   return _client;
 }
 
+// Lambda Function URLs are stable once created — they don't change on
+// redeploy unless the URL resource itself is replaced. Wiring this through
+// CDK (env var or backend.addOutput) created a circular dependency between
+// the data stack and the mcp-server function stack, so instead it's fetched
+// once via the AWS CLI after deploy and hardcoded here.
+// TODO: fill in after the mcp-server Function URL is confirmed via
+// `aws lambda get-function-url-config --function-name <mcp-server-lambda>`.
+const MCP_ENDPOINT_URL = '';
+
 /**
  * Manages the personal access token external MCP clients (Claude Desktop,
- * etc.) use to authenticate against the mcp-server Lambda's Function URL,
- * and looks up that URL — published into amplify_outputs.json's `custom`
- * section (via backend.addOutput in amplify/backend.ts) rather than routed
- * through a GraphQL resolver, since the latter would need bedrock-chat's
- * Lambda (which lives in the data stack) to reference a resource from the
- * mcp-server stack, creating a circular stack dependency.
+ * etc.) use to authenticate against the mcp-server Lambda's Function URL.
  */
 @Injectable({ providedIn: 'root' })
 export class McpService {
 
   async getEndpointUrl(): Promise<string> {
-    try {
-      const config = Amplify.getConfig() as unknown as { custom?: { mcpEndpointUrl?: string } };
-      return config.custom?.mcpEndpointUrl ?? '';
-    } catch (err) {
-      console.warn('[McpService] getEndpointUrl failed:', err);
-      return '';
-    }
+    return MCP_ENDPOINT_URL;
   }
 
   /** Returns the current active token for this account, if one has been generated. */

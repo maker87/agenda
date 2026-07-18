@@ -63,11 +63,12 @@ for (const construct of allConstructs) {
   }
 }
 
-// Publish the mcp-server Function URL (only known after synth) into
-// amplify_outputs.json's `custom` section, so the frontend can read it
-// without any cross-stack Lambda reference.
-backend.addOutput({
-  custom: {
-    mcpEndpointUrl: mcpFunctionUrl.url,
-  },
-});
+// NOTE: deliberately not calling backend.addOutput() here — it still
+// attaches the resulting CfnOutput to the data stack under the hood, which
+// recreates the same circular dependency (data stack -> function stack) that
+// the grants above already require in the other direction. Lambda Function
+// URLs are stable once created (they don't change on redeploy unless the
+// URL resource itself is replaced), so once this deploys successfully the
+// URL is fetched once via the AWS CLI and hardcoded into mcp.service.ts
+// instead of being wired through CDK.
+void mcpFunctionUrl;
