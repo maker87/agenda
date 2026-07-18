@@ -55,6 +55,15 @@ mcpLambda.addToRolePolicy(
   })
 );
 
+// Table names are plain string literals (not backend.data tokens) for the
+// same reason as the policy above — confirmed once via
+// `aws dynamodb list-tables` after the first successful mcp-server deploy.
+// App id d2v5f8amhdhhjl -> AppSync API id mvjyhqvbi5hajc6rcdnhqwva24.
+mcpLambda.addEnvironment('CALENDAR_EVENT_TABLE', 'CalendarEvent-mvjyhqvbi5hajc6rcdnhqwva24-NONE');
+mcpLambda.addEnvironment('NOTIFICATION_TABLE', 'Notification-mvjyhqvbi5hajc6rcdnhqwva24-NONE');
+mcpLambda.addEnvironment('STREAK_TABLE', 'Streak-mvjyhqvbi5hajc6rcdnhqwva24-NONE');
+mcpLambda.addEnvironment('API_TOKEN_TABLE', 'ApiToken-mvjyhqvbi5hajc6rcdnhqwva24-NONE');
+
 // Find the bedrock-chat Lambda in the CDK construct tree and grant Bedrock permissions.
 // (Deliberately NOT adding an environment variable here referencing anything
 // from the mcp-server stack — bedrock-chat's Lambda lives inside the data
@@ -80,10 +89,7 @@ for (const construct of allConstructs) {
 
 // NOTE: deliberately not calling backend.addOutput() here — it still
 // attaches the resulting CfnOutput to the data stack under the hood, which
-// recreates the same circular dependency (data stack -> function stack) that
-// the grants above already require in the other direction. Lambda Function
-// URLs are stable once created (they don't change on redeploy unless the
-// URL resource itself is replaced), so once this deploys successfully the
-// URL is fetched once via the AWS CLI and hardcoded into mcp.service.ts
-// instead of being wired through CDK.
+// recreates the same circular dependency the grants above already require in
+// the other direction. The URL itself is hardcoded in mcp.service.ts
+// (fetched once via `aws lambda get-function-url-config`) instead.
 void mcpFunctionUrl;

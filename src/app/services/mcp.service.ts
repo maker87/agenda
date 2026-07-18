@@ -13,9 +13,7 @@ function getClient() {
 // CDK (env var or backend.addOutput) created a circular dependency between
 // the data stack and the mcp-server function stack, so instead it's fetched
 // once via the AWS CLI after deploy and hardcoded here.
-// TODO: fill in after the mcp-server Function URL is confirmed via
-// `aws lambda get-function-url-config --function-name <mcp-server-lambda>`.
-const MCP_ENDPOINT_URL = '';
+const MCP_ENDPOINT_URL = 'https://j2lntgdub2awy5vqk3ttcaia2m0xvems.lambda-url.us-east-1.on.aws/';
 
 /**
  * Manages the personal access token external MCP clients (Claude Desktop,
