@@ -209,7 +209,7 @@
     <div class="sidebar-footer">
       <div class="user-info" (click)="openProfileTab()" style="cursor:pointer" [title]="i18n.t('viewProfile')">
         <div class="user-avatar">
-          <img *ngIf="profile.avatarUrl" [src]="profile.avatarUrl" alt="avatar" class="user-avatar-img" />
+          <img *ngIf="profile.avatarUrl" [src]="profile.avatarUrl" [attr.alt]="i18n.t('avatar')" class="user-avatar-img" />
           <span *ngIf="!profile.avatarUrl">{{ userInitial }}</span>
         </div>
         <div class="user-details">
@@ -594,9 +594,9 @@
 
         <!-- Year jump dropdown -->
         <div class="cal-input-group" *ngIf="calendarView === 'year'">
-          <button class="cal-year-nav-btn" (click)="prevYear()" aria-label="Previous year">←</button>
+          <button class="cal-year-nav-btn" (click)="prevYear()" [attr.aria-label]="i18n.t('prevYear')">←</button>
           <span class="cal-year-label">{{ currentYear }}</span>
-          <button class="cal-year-nav-btn" (click)="nextYear()" aria-label="Next year">→</button>
+          <button class="cal-year-nav-btn" (click)="nextYear()" [attr.aria-label]="i18n.t('nextYear')">→</button>
         </div>
         <div class="cal-input-group" *ngIf="calendarView === 'year'">
           <label class="cal-input-label">{{ i18n.t('jumpTo') }}</label>
@@ -686,7 +686,7 @@
 
         <!-- Top bar: prev / month name + jump dropdown / next -->
         <div class="slide-topbar">
-          <button class="slide-arrow" (click)="prevSlideMonth()" [disabled]="slideAnimating" aria-label="Previous month">&#8592;</button>
+          <button class="slide-arrow" (click)="prevSlideMonth()" [disabled]="slideAnimating" [attr.aria-label]="i18n.t('prevMonth')">&#8592;</button>
 
           <div class="slide-title-group">
             <span class="slide-month-title">{{ monthNames[slideMonthIndex] }} {{ currentYear }}</span>
@@ -705,7 +705,7 @@
             </select>
           </div>
 
-          <button class="slide-arrow" (click)="nextSlideMonth()" [disabled]="slideAnimating" aria-label="Next month">&#8594;</button>
+          <button class="slide-arrow" (click)="nextSlideMonth()" [disabled]="slideAnimating" [attr.aria-label]="i18n.t('nextMonth')">&#8594;</button>
         </div>
 
         <!-- Slide panel -->
@@ -1020,7 +1020,7 @@
             <div class="notif-unread-dot" *ngIf="!n.read"></div>
 
             <!-- Delete -->
-            <button class="notif-delete-btn" (click)="$event.stopPropagation(); deleteNotif(n)" title="Dismiss">✕</button>
+            <button class="notif-delete-btn" (click)="$event.stopPropagation(); deleteNotif(n)" [title]="i18n.t('dismiss')">✕</button>
           </div>
         </div>
 
@@ -1146,13 +1146,13 @@
                 type="email"
                 [(ngModel)]="shareSubTabEmail"
                 name="shareSubTabEmail"
-                placeholder="Enter email address…"
+                [placeholder]="i18n.t('enterEmailPlaceholder')"
               />
               <button
                 class="history-search-clear"
                 *ngIf="shareSubTabEmail"
                 (click)="shareSubTabEmail = ''"
-                title="Clear"
+                [title]="i18n.t('clearLabel')"
               >✕</button>
             </div>
           </div>
@@ -1319,9 +1319,9 @@
 
         <!-- Parent breadcrumb -->
         <div class="cat-parent-row" *ngIf="catForm.parentPath">
-          <span class="cat-parent-label">Under:</span>
+          <span class="cat-parent-label">{{ i18n.t('under') }}</span>
           <span class="cat-parent-path">{{ catForm.parentPath }}</span>
-          <button class="cat-parent-clear" (click)="startAddTopLevel()" title="Switch to top-level">✕</button>
+          <button class="cat-parent-clear" (click)="startAddTopLevel()" [title]="i18n.t('switchToTopLevel')">✕</button>
         </div>
 
         <div class="cat-form-row">
@@ -1330,7 +1330,7 @@
             type="text"
             [(ngModel)]="catForm.name"
             name="catFormName"
-            [placeholder]="catForm.parentPath ? 'Subcategory name…' : 'Category name…'"
+            [placeholder]="catForm.parentPath ? i18n.t('subcategoryNamePlaceholder') : i18n.t('categoryNamePlaceholder')"
             (keyup.enter)="submitCatForm()"
           />
           <button class="btn-primary cat-submit-btn" (click)="submitCatForm()">
@@ -1377,11 +1377,11 @@
                   <span class="event-title">{{ event.title | translateTitle }}</span>
                 </div>
                 <div class="event-actions">
-                  <button class="upload-btn" (click)="triggerAttachmentUpload(event)" title="Attach a file to share">
+                  <button class="upload-btn" (click)="triggerAttachmentUpload(event)" [title]="i18n.t('attachFileToShare')">
                     📎<span class="upload-badge" *ngIf="getEventAttachments(event.id).length > 0">{{ getEventAttachments(event.id).length }}</span>
                   </button>
-                  <button class="share-btn" (click)="openShareModal(event)" title="Share event">↗</button>
-                  <button class="delete-btn" (click)="deleteEvent(event.id)" title="Delete event">✕</button>
+                  <button class="share-btn" (click)="openShareModal(event)" [title]="i18n.t('shareEventTitle')">↗</button>
+                  <button class="delete-btn" (click)="deleteEvent(event.id)" [title]="i18n.t('deleteEvent')">✕</button>
                 </div>
               </div>
               <div class="event-time">
@@ -1563,7 +1563,7 @@
           </div>
           <div class="profile-avatar-area">
             <div class="profile-avatar-circle">
-              <img *ngIf="profileAvatarPreview" [src]="profileAvatarPreview" alt="Your avatar" class="profile-avatar-img" />
+              <img *ngIf="profileAvatarPreview" [src]="profileAvatarPreview" [attr.alt]="i18n.t('yourAvatarAlt')" class="profile-avatar-img" />
               <span *ngIf="!profileAvatarPreview" class="profile-avatar-initial">{{ userInitial }}</span>
             </div>
             <div class="profile-avatar-actions">
@@ -1624,7 +1624,7 @@
                 class="profile-input"
                 type="text"
                 [(ngModel)]="profileUsernameInput"
-                placeholder="Enter username"
+                [placeholder]="i18n.t('enterUsername')"
                 maxlength="32"
               />
             </div>
@@ -1646,7 +1646,7 @@
                 class="profile-input"
                 type="password"
                 [(ngModel)]="profileOldPassword"
-                placeholder="Enter current password"
+                [placeholder]="i18n.t('enterCurrentPassword')"
                 autocomplete="current-password"
               />
             </div>
@@ -1656,7 +1656,7 @@
                 class="profile-input"
                 type="password"
                 [(ngModel)]="profileNewPassword"
-                placeholder="At least 8 characters"
+                [placeholder]="i18n.t('atLeast8Chars')"
                 autocomplete="new-password"
               />
             </div>
@@ -1666,7 +1666,7 @@
                 class="profile-input"
                 type="password"
                 [(ngModel)]="profileConfirmPassword"
-                placeholder="Repeat new password"
+                [placeholder]="i18n.t('repeatNewPassword')"
                 autocomplete="new-password"
               />
             </div>
@@ -1773,16 +1773,16 @@
             <h3 class="profile-card-title profile-danger-title">{{ i18n.t('deleteAccount') }}</h3>
           </div>
           <div *ngIf="!profileDeleteConfirm">
-            <p class="profile-field-hint">This will permanently delete your account and all your data. This action cannot be undone.</p>
+            <p class="profile-field-hint">{{ i18n.t('deleteAccountWarning') }}</p>
             <button class="btn-danger" (click)="confirmDeleteAccount()">{{ i18n.t('deleteMyAccount') }}</button>
           </div>
           <div *ngIf="profileDeleteConfirm" class="profile-delete-confirm">
-            <p class="profile-delete-warning">Enter your password to confirm deletion.</p>
+            <p class="profile-delete-warning">{{ i18n.t('enterPasswordConfirm') }}</p>
             <input
               class="profile-input"
               type="password"
               [(ngModel)]="profileDeletePassword"
-              placeholder="Your password"
+              [placeholder]="i18n.t('yourPassword')"
               autocomplete="current-password"
             />
             <p class="profile-field-error" *ngIf="profileDeleteError">{{ profileDeleteError }}</p>
@@ -1869,7 +1869,7 @@
           >
             <div class="ai-conv-title">{{ conv.title }}</div>
             <div class="ai-conv-date">{{ conv.createdAt | date:'MMM d, h:mm a' }}</div>
-            <button class="ai-conv-delete" (click)="$event.stopPropagation(); deleteAiConversation(conv.id)" title="Delete">✕</button>
+            <button class="ai-conv-delete" (click)="$event.stopPropagation(); deleteAiConversation(conv.id)" [title]="i18n.t('delete')">✕</button>
           </div>
           <div *ngIf="aiConversations.length === 0" class="ai-conv-empty">
             <p>{{ i18n.t('noConversations') }}</p>
@@ -1919,7 +1919,7 @@
                 class="chat-input"
                 [(ngModel)]="chatInput"
                 name="aiTabChatInput"
-                placeholder="Ask anything about your schedule..."
+                [placeholder]="i18n.t('askAnything')"
                 rows="1"
                 (keydown)="onChatKeydown($event)"
                 [disabled]="chatTyping"
@@ -1928,7 +1928,7 @@
                 class="chat-send-btn"
                 (click)="sendChatMessage()"
                 [disabled]="!chatInput.trim() || chatTyping"
-                title="Send"
+                [title]="i18n.t('sendLabel')"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                   <path d="M22 2L11 13" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1952,13 +1952,13 @@
           class="cat-node-toggle"
           *ngIf="node.children.length > 0"
           (click)="toggleCatNode(node.fullPath)"
-          [attr.aria-label]="isCatNodeExpanded(node.fullPath) ? 'Collapse' : 'Expand'"
+          [attr.aria-label]="isCatNodeExpanded(node.fullPath) ? i18n.t('collapseLabel') : i18n.t('expandLabel')"
         >{{ isCatNodeExpanded(node.fullPath) ? '▾' : '▸' }}</button>
         <span class="cat-node-toggle-spacer" *ngIf="node.children.length === 0"></span>
 
         <!-- Name (show input when renaming, otherwise plain text) -->
         <ng-container *ngIf="renamingCatPath !== node.fullPath">
-          <span class="cat-node-color-dot" [style.background]="getCategoryColor(node.fullPath)" (click)="toggleCatColorPicker(node.fullPath)" title="Change color"></span>
+          <span class="cat-node-color-dot" [style.background]="getCategoryColor(node.fullPath)" (click)="toggleCatColorPicker(node.fullPath)" [title]="i18n.t('changeColor')"></span>
           <span class="cat-node-name">{{ node.name | translateTitle }}</span>
         </ng-container>
         <ng-container *ngIf="renamingCatPath === node.fullPath">
@@ -1971,8 +1971,8 @@
             (keyup.escape)="cancelRenameCategory()"
             autofocus
           />
-          <button class="cat-node-btn cat-rename-save" (click)="submitRenameCategory(node.fullPath)" title="Save">✓</button>
-          <button class="cat-node-btn cat-rename-cancel" (click)="cancelRenameCategory()" title="Cancel">✕</button>
+          <button class="cat-node-btn cat-rename-save" (click)="submitRenameCategory(node.fullPath)" [title]="i18n.t('save')">✓</button>
+          <button class="cat-node-btn cat-rename-cancel" (click)="cancelRenameCategory()" [title]="i18n.t('cancel')">✕</button>
         </ng-container>
 
         <!-- Event count badge -->
@@ -1985,22 +1985,22 @@
           <button
             class="cat-node-btn cat-node-rename"
             (click)="startRenameCategory(node.fullPath, node.name)"
-            title="Rename category"
+            [title]="i18n.t('renameCat')"
           >✏️</button>
           <button
             class="cat-node-btn cat-node-color"
             (click)="toggleCatColorPicker(node.fullPath)"
-            title="Change color"
+            [title]="i18n.t('changeColor')"
           >🎨</button>
           <button
             class="cat-node-btn cat-node-add"
             (click)="startAddSubcategory(node.fullPath); expandedCatNodes.add(node.fullPath)"
-            title="Add subcategory"
+            [title]="i18n.t('addSubcategory')"
           >+ Sub</button>
           <button
             class="cat-node-btn cat-node-delete"
             (click)="startDeleteCategory(node.fullPath)"
-            title="Delete category"
+            [title]="i18n.t('deleteCategoryTitle')"
           >🗑️</button>
         </div>
       </div>
@@ -2066,8 +2066,8 @@
       <!-- Search mode -->
       <ng-container *ngIf="browseMode === 'search'">
         <div class="field">
-          <label>Search event name</label>
-          <input type="text" [(ngModel)]="searchQuery" name="deleteSearch" placeholder="e.g. Standup" (ngModelChange)="onSearchChange()" class="search-input" autofocus />
+          <label>{{ i18n.t('searchEventName') }}</label>
+          <input type="text" [(ngModel)]="searchQuery" name="deleteSearch" [placeholder]="i18n.t('searchPlaceholderDelete')" (ngModelChange)="onSearchChange()" class="search-input" autofocus />
         </div>
         <div class="search-results" *ngIf="searchResults.length > 0">
           <div
@@ -2167,8 +2167,8 @@
         <!-- Search mode -->
         <ng-container *ngIf="browseMode === 'search'">
           <div class="field">
-            <label>Search event name</label>
-            <input type="text" [(ngModel)]="searchQuery" name="changeSearch" placeholder="e.g. Design Review" (ngModelChange)="onSearchChange()" class="search-input" autofocus />
+            <label>{{ i18n.t('searchEventName') }}</label>
+            <input type="text" [(ngModel)]="searchQuery" name="changeSearch" [placeholder]="i18n.t('searchPlaceholderChange')" (ngModelChange)="onSearchChange()" class="search-input" autofocus />
           </div>
           <div class="search-results" *ngIf="searchResults.length > 0">
             <div
@@ -2258,11 +2258,11 @@
         <div class="field-row">
           <div class="field">
             <label>{{ i18n.t('startTime') }}</label>
-            <input type="text" inputmode="numeric" [(ngModel)]="changeForm.startTime" name="changeStart" placeholder="HH:MM (e.g. 09:00)" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" />
+            <input type="text" inputmode="numeric" [(ngModel)]="changeForm.startTime" name="changeStart" [placeholder]="i18n.t('startTimePlaceholder')" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" />
           </div>
           <div class="field">
             <label>{{ i18n.t('endTime') }}</label>
-            <input type="text" inputmode="numeric" [(ngModel)]="changeForm.endTime" name="changeEnd" placeholder="HH:MM (e.g. 10:00)" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" />
+            <input type="text" inputmode="numeric" [(ngModel)]="changeForm.endTime" name="changeEnd" [placeholder]="i18n.t('endTimePlaceholder')" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" />
           </div>
         </div>
 
@@ -2279,20 +2279,20 @@
                   <span *ngIf="!last" class="cat-breadcrumb-sep"> › </span>
                 </span>
               </span>
-              <button type="button" class="category-picker-clear" *ngIf="changeForm.category" (click)="$event.stopPropagation(); clearChangeCategory()" title="Clear">✕</button>
+              <button type="button" class="category-picker-clear" *ngIf="changeForm.category" (click)="$event.stopPropagation(); clearChangeCategory()" [title]="i18n.t('clearLabel')">✕</button>
               <span class="category-picker-arrow" [class.open]="showChangeCategoryPicker">▾</span>
             </div>
 
             <div class="category-picker-dropdown" *ngIf="showChangeCategoryPicker" (click)="$event.stopPropagation()">
               <div class="cat-picker-breadcrumb" *ngIf="changeCategoryPickerPath.length > 0">
-                <button type="button" class="cat-picker-back-btn" (click)="changeCategoryPickerGoUp()">‹ Back</button>
+                <button type="button" class="cat-picker-back-btn" (click)="changeCategoryPickerGoUp()">‹ {{ i18n.t('back') }}</button>
                 <span class="cat-picker-breadcrumb-path">
                   <span *ngFor="let seg of changeCategoryPickerPath; let last = last">
                     <span>{{ seg | translateTitle }}</span><span *ngIf="!last"> › </span>
                   </span>
                 </span>
                 <button type="button" class="cat-picker-use-btn" (click)="changeCategoryPickerSelect()">
-                  Use "{{ changeCategoryPickerPath[changeCategoryPickerPath.length - 1] | translateTitle }}"
+                  {{ i18n.t('useLabel') }} "{{ changeCategoryPickerPath[changeCategoryPickerPath.length - 1] | translateTitle }}"
                 </button>
               </div>
 
@@ -2303,7 +2303,7 @@
                   class="cat-picker-search-input"
                   [(ngModel)]="changeCategoryPickerSearch"
                   name="changeCategoryPickerSearch"
-                  [placeholder]="changeCategoryPickerPath.length > 0 ? 'Search subcategories…' : 'Search categories…'"
+                  [placeholder]="changeCategoryPickerPath.length > 0 ? i18n.t('searchSubcategories') : i18n.t('searchCategories')"
                 />
                 <button type="button" class="cat-picker-search-clear" *ngIf="changeCategoryPickerSearch" (click)="changeCategoryPickerSearch = ''">✕</button>
               </div>
@@ -2314,26 +2314,26 @@
                     <span class="cat-picker-item-icon">{{ node.children.length > 0 ? '📂' : '🏷️' }}</span>
                     <span>{{ node.name | translateTitle }}</span>
                   </button>
-                  <button type="button" class="cat-picker-item-sub-btn" *ngIf="node.children.length > 0" (click)="changeCategoryPickerDrillDown(node)" title="View subcategories">
+                  <button type="button" class="cat-picker-item-sub-btn" *ngIf="node.children.length > 0" (click)="changeCategoryPickerDrillDown(node)" [title]="i18n.t('viewSubcategories')">
                     {{ node.children.length }} sub ›
                   </button>
-                  <button type="button" class="cat-picker-item-sub-btn cat-picker-item-add-sub" *ngIf="node.children.length === 0" (click)="changeCategoryPickerDrillDown(node)" title="Add a subcategory">
+                  <button type="button" class="cat-picker-item-sub-btn cat-picker-item-add-sub" *ngIf="node.children.length === 0" (click)="changeCategoryPickerDrillDown(node)" [title]="i18n.t('addSubcategory')">
                     + sub
                   </button>
                 </div>
                 <div class="cat-picker-empty" *ngIf="changeCategoryPickerFiltered.length === 0 && changeCategoryPickerSearch">
-                  No matches for "{{ changeCategoryPickerSearch }}"
+                  {{ i18n.t('noMatchesFor') }} "{{ changeCategoryPickerSearch }}"
                 </div>
                 <div class="cat-picker-empty" *ngIf="changeCategoryPickerLevel.length === 0 && !changeCategoryPickerSearch && !showChangeNewCategoryInput">
-                  <span *ngIf="changeCategoryPickerPath.length === 0">No categories yet — create one below.</span>
-                  <span *ngIf="changeCategoryPickerPath.length > 0">No subcategories yet — add one below.</span>
+                  <span *ngIf="changeCategoryPickerPath.length === 0">{{ i18n.t('noCategoriesCreate') }}</span>
+                  <span *ngIf="changeCategoryPickerPath.length > 0">{{ i18n.t('noSubcategoriesAdd') }}</span>
                 </div>
               </div>
 
               <div class="cat-picker-footer">
                 <div class="cat-picker-add-row" *ngIf="!showChangeNewCategoryInput">
                   <button type="button" class="cat-picker-add-btn" (click)="showChangeNewCategoryInput = true; changeNewCategoryName = changeCategoryPickerSearch">
-                    + Create {{ changeCategoryPickerPath.length > 0 ? 'subcategory' : 'category' }}<span *ngIf="changeCategoryPickerSearch"> "{{ changeCategoryPickerSearch }}"</span>
+                    + {{ i18n.t('create') }} {{ changeCategoryPickerPath.length > 0 ? i18n.t('subcategory') : i18n.t('category') }}<span *ngIf="changeCategoryPickerSearch"> "{{ changeCategoryPickerSearch }}"</span>
                   </button>
                 </div>
                 <div class="cat-picker-new-input-row" *ngIf="showChangeNewCategoryInput">
@@ -2341,11 +2341,11 @@
                     type="text"
                     [(ngModel)]="changeNewCategoryName"
                     name="changeNewCategoryName"
-                    [placeholder]="changeCategoryPickerPath.length > 0 ? 'Subcategory name…' : 'Category name…'"
+                    [placeholder]="changeCategoryPickerPath.length > 0 ? i18n.t('subcategoryNamePlaceholder') : i18n.t('categoryNamePlaceholder')"
                     class="cat-picker-new-input"
                     (keydown.enter)="changeCategoryPickerAddNew()"
                   />
-                  <button type="button" class="cat-picker-confirm-btn" (click)="changeCategoryPickerAddNew()" [disabled]="!changeNewCategoryName.trim()">Add</button>
+                  <button type="button" class="cat-picker-confirm-btn" (click)="changeCategoryPickerAddNew()" [disabled]="!changeNewCategoryName.trim()">{{ i18n.t('create') }}</button>
                   <button type="button" class="cat-picker-cancel-btn" (click)="showChangeNewCategoryInput = false; changeNewCategoryName = ''">✕</button>
                 </div>
               </div>
@@ -2420,8 +2420,8 @@
             <div class="day-panel-desc" *ngIf="ev.description">{{ ev.description }}</div>
           </div>
           <div class="day-panel-actions">
-            <button class="day-panel-edit-btn" (click)="editEventFromPanel(ev); closeDayPanel()" title="Edit event">✏️</button>
-            <button class="day-panel-delete-btn" (click)="deleteEvent(ev.id)" title="Delete event">🗑️</button>
+            <button class="day-panel-edit-btn" (click)="editEventFromPanel(ev); closeDayPanel()" [title]="i18n.t('editEvent')">✏️</button>
+            <button class="day-panel-delete-btn" (click)="deleteEvent(ev.id)" [title]="i18n.t('deleteEvent')">🗑️</button>
           </div>
         </div>
       </div>
@@ -2640,11 +2640,11 @@
         <div class="field-row" style="margin-top:14px">
           <div class="field">
             <label>{{ i18n.t('startTime') }}</label>
-            <input type="text" inputmode="numeric" [(ngModel)]="overlapTimeStart" name="overlapTimeStart" placeholder="HH:MM (e.g. 09:00)" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" />
+            <input type="text" inputmode="numeric" [(ngModel)]="overlapTimeStart" name="overlapTimeStart" [placeholder]="i18n.t('startTimePlaceholder')" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" />
           </div>
           <div class="field">
             <label>{{ i18n.t('endTime') }}</label>
-            <input type="text" inputmode="numeric" [(ngModel)]="overlapTimeEnd" name="overlapTimeEnd" placeholder="HH:MM (e.g. 10:00)" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" />
+            <input type="text" inputmode="numeric" [(ngModel)]="overlapTimeEnd" name="overlapTimeEnd" [placeholder]="i18n.t('endTimePlaceholder')" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" />
           </div>
         </div>
 
@@ -2681,7 +2681,7 @@
           type="text"
           [(ngModel)]="form.title"
           name="title"
-          placeholder="e.g. Team Meeting"
+          [placeholder]="i18n.t('eventTitlePlaceholder')"
           required
         />
       </div>
@@ -2739,9 +2739,9 @@
         <label>Select the dates this event spans</label>
         <div class="mini-cal">
           <div class="mini-cal-header">
-            <button type="button" class="mini-cal-nav" (click)="prevMultiDayPickerMonth()" title="Previous month">‹</button>
+            <button type="button" class="mini-cal-nav" (click)="prevMultiDayPickerMonth()" [title]="i18n.t('prevMonth')">‹</button>
             <span class="mini-cal-title">{{ monthNames[multiDayPickerMonth] }} {{ multiDayPickerYear }}</span>
-            <button type="button" class="mini-cal-nav" (click)="nextMultiDayPickerMonth()" title="Next month">›</button>
+            <button type="button" class="mini-cal-nav" (click)="nextMultiDayPickerMonth()" [title]="i18n.t('nextMonth')">›</button>
           </div>
           <div class="mini-cal-daynames">
             <span *ngFor="let d of dayNames">{{ d }}</span>
@@ -2765,7 +2765,7 @@
         <div class="multi-date-chips" *ngIf="form.multiDates.length > 0">
           <span class="multi-date-chip" *ngFor="let d of multiDatesSorted">
             {{ formatDate(d) }}
-            <button type="button" (click)="toggleMultiDate(d)" title="Remove this date">✕</button>
+            <button type="button" (click)="toggleMultiDate(d)" [title]="i18n.t('removeThisDate')">✕</button>
           </span>
         </div>
         <p class="repeat-hint">
@@ -2777,27 +2777,27 @@
 
       <div class="field-row">
         <div class="field">
-          <label for="start-time">{{ isMultiDay ? 'Start Time (first day)' : i18n.t('startTime') }}</label>
+          <label for="start-time">{{ isMultiDay ? i18n.t('startTimeFirstDay') : i18n.t('startTime') }}</label>
           <input
             id="start-time"
             type="text"
             inputmode="numeric"
             [(ngModel)]="form.startTime"
             name="startTime"
-            placeholder="HH:MM (e.g. 09:00)"
+            [placeholder]="i18n.t('startTimePlaceholder')"
             pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
             required
           />
         </div>
         <div class="field">
-          <label for="end-time">{{ isMultiDay ? 'End Time (last day)' : i18n.t('endTime') }}</label>
+          <label for="end-time">{{ isMultiDay ? i18n.t('endTimeLastDay') : i18n.t('endTime') }}</label>
           <input
             id="end-time"
             type="text"
             inputmode="numeric"
             [(ngModel)]="form.endTime"
             name="endTime"
-            placeholder="HH:MM (e.g. 10:00)"
+            [placeholder]="i18n.t('endTimePlaceholder')"
             pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
             required
           />
@@ -2810,7 +2810,7 @@
           id="event-desc"
           [(ngModel)]="form.description"
           name="description"
-          placeholder="Optional notes about this event..."
+          [placeholder]="i18n.t('descriptionPlaceholder')"
           rows="3"
         ></textarea>
       </div>
@@ -2824,7 +2824,7 @@
             type="text"
             [(ngModel)]="form.location"
             name="location"
-            placeholder="Add a location…"
+            [placeholder]="i18n.t('locationPlaceholder')"
           />
         </div>
         <a
@@ -2850,7 +2850,7 @@
                 <span *ngIf="!last" class="cat-breadcrumb-sep"> › </span>
               </span>
             </span>
-            <button type="button" class="category-picker-clear" *ngIf="form.category" (click)="$event.stopPropagation(); clearCategory()" title="Clear">✕</button>
+            <button type="button" class="category-picker-clear" *ngIf="form.category" (click)="$event.stopPropagation(); clearCategory()" [title]="i18n.t('clearLabel')">✕</button>
             <span class="category-picker-arrow" [class.open]="showCategoryPicker">▾</span>
           </div>
 
@@ -2860,7 +2860,7 @@
             <!-- Breadcrumb nav when drilled into a category -->
             <div class="cat-picker-breadcrumb" *ngIf="categoryPickerPath.length > 0">
               <button type="button" class="cat-picker-back-btn" (click)="categoryPickerGoUp()">
-                ‹ Back
+                ‹ {{ i18n.t('back') }}
               </button>
               <span class="cat-picker-breadcrumb-path">
                 <span *ngFor="let seg of categoryPickerPath; let last = last">
@@ -2868,7 +2868,7 @@
                 </span>
               </span>
               <button type="button" class="cat-picker-use-btn" (click)="categoryPickerSelect()">
-                Use "{{ categoryPickerPath[categoryPickerPath.length - 1] | translateTitle }}"
+                {{ i18n.t('useLabel') }} "{{ categoryPickerPath[categoryPickerPath.length - 1] | translateTitle }}"
               </button>
             </div>
 
@@ -2880,7 +2880,7 @@
                 class="cat-picker-search-input"
                 [(ngModel)]="categoryPickerSearch"
                 name="categoryPickerSearch"
-                [placeholder]="categoryPickerPath.length > 0 ? 'Search subcategories…' : 'Search categories…'"
+                [placeholder]="categoryPickerPath.length > 0 ? i18n.t('searchSubcategories') : i18n.t('searchCategories')"
                 autofocus
               />
               <button type="button" class="cat-picker-search-clear" *ngIf="categoryPickerSearch" (click)="categoryPickerSearch = ''">✕</button>
@@ -2904,7 +2904,7 @@
                   class="cat-picker-item-sub-btn"
                   *ngIf="node.children.length > 0"
                   (click)="categoryPickerDrillDown(node)"
-                  title="View subcategories"
+                  [title]="i18n.t('viewSubcategories')"
                 >
                   {{ node.children.length }} sub ›
                 </button>
@@ -2913,7 +2913,7 @@
                   class="cat-picker-item-sub-btn cat-picker-item-add-sub"
                   *ngIf="node.children.length === 0"
                   (click)="categoryPickerDrillDown(node)"
-                  title="Add a subcategory"
+                  [title]="i18n.t('addSubcategory')"
                 >
                   + sub
                 </button>
@@ -2921,13 +2921,13 @@
 
               <!-- No results from search -->
               <div class="cat-picker-empty" *ngIf="categoryPickerFiltered.length === 0 && categoryPickerSearch">
-                No matches for "{{ categoryPickerSearch }}"
+                {{ i18n.t('noMatchesFor') }} "{{ categoryPickerSearch }}"
               </div>
 
               <!-- Truly empty level -->
               <div class="cat-picker-empty" *ngIf="categoryPickerLevel.length === 0 && !categoryPickerSearch && !showNewCategoryInput">
-                <span *ngIf="categoryPickerPath.length === 0">No categories yet — create one below.</span>
-                <span *ngIf="categoryPickerPath.length > 0">No subcategories yet — add one below.</span>
+                <span *ngIf="categoryPickerPath.length === 0">{{ i18n.t('noCategoriesCreate') }}</span>
+                <span *ngIf="categoryPickerPath.length > 0">{{ i18n.t('noSubcategoriesAdd') }}</span>
               </div>
             </div>
 
@@ -2935,7 +2935,7 @@
             <div class="cat-picker-footer">
               <div class="cat-picker-add-row" *ngIf="!showNewCategoryInput">
                 <button type="button" class="cat-picker-add-btn" (click)="showNewCategoryInput = true; newCategoryName = categoryPickerSearch">
-                  + Create {{ categoryPickerPath.length > 0 ? 'subcategory' : 'category' }}<span *ngIf="categoryPickerSearch"> "{{ categoryPickerSearch }}"</span>
+                  + {{ i18n.t('create') }} {{ categoryPickerPath.length > 0 ? i18n.t('subcategory') : i18n.t('category') }}<span *ngIf="categoryPickerSearch"> "{{ categoryPickerSearch }}"</span>
                 </button>
               </div>
               <div class="cat-picker-new-input-row" *ngIf="showNewCategoryInput">
@@ -2943,12 +2943,12 @@
                   type="text"
                   [(ngModel)]="newCategoryName"
                   name="newCategoryName"
-                  [placeholder]="categoryPickerPath.length > 0 ? 'Subcategory name…' : 'Category name…'"
+                  [placeholder]="categoryPickerPath.length > 0 ? i18n.t('subcategoryNamePlaceholder') : i18n.t('categoryNamePlaceholder')"
                   class="cat-picker-new-input"
                   (keydown.enter)="categoryPickerAddNew()"
                   autofocus
                 />
-                <button type="button" class="cat-picker-confirm-btn" (click)="categoryPickerAddNew()" [disabled]="!newCategoryName.trim()">Add</button>
+                <button type="button" class="cat-picker-confirm-btn" (click)="categoryPickerAddNew()" [disabled]="!newCategoryName.trim()">{{ i18n.t('create') }}</button>
                 <button type="button" class="cat-picker-cancel-btn" (click)="showNewCategoryInput = false; newCategoryName = ''">✕</button>
               </div>
             </div>
@@ -3073,7 +3073,7 @@
         <span class="share-existing-label">Attachments</span>
         <div class="share-attachment-chip" *ngFor="let a of getEventAttachments(shareTargetEvent.id); let i = index">
           📎 {{ a.name }}
-          <button class="share-chip-remove" (click)="removeEventAttachment(shareTargetEvent.id, i)" title="Remove">✕</button>
+          <button class="share-chip-remove" (click)="removeEventAttachment(shareTargetEvent.id, i)" [title]="i18n.t('remove')">✕</button>
         </div>
         <button type="button" class="share-attachment-add-btn" (click)="triggerAttachmentUpload(shareTargetEvent)">+ Attach file</button>
       </div>
@@ -3099,7 +3099,7 @@
           (ngModelChange)="onShareInputChange()"
           (blur)="dismissShareSuggestions()"
           name="shareEmail"
-          placeholder="friend@example.com or nickname"
+          [placeholder]="i18n.t('recipientPlaceholder')"
           class="search-input"
           autocomplete="off"
           autofocus
@@ -3126,7 +3126,7 @@
           *ngFor="let email of shareTargetEvent.sharedWith"
         >
           {{ email }}
-          <button class="share-chip-remove" (click)="removeShare(shareTargetEvent!, email)" title="Remove">✕</button>
+          <button class="share-chip-remove" (click)="removeShare(shareTargetEvent!, email)" [title]="i18n.t('remove')">✕</button>
         </span>
       </div>
 
@@ -3448,7 +3448,7 @@
             class="input"
             type="text"
             [(ngModel)]="inviteCategoryCustom"
-            placeholder="e.g. Social, Study Group..."
+            [placeholder]="i18n.t('inviteCategoryPlaceholder')"
             (keydown.enter)="confirmInviteCategory(inviteCategoryCustom)"
           />
           <button
@@ -3481,13 +3481,13 @@
       <div>
         <div class="float-chat-title">{{ i18n.t('aiAssistant') }}</div>
         <div class="float-chat-subtitle" *ngIf="!chatEventDraft">{{ i18n.t('remindersDraftsHelp') }}</div>
-        <div class="float-chat-subtitle float-chat-wizard-badge" *ngIf="chatEventDraft">📌 Adding event…</div>
+        <div class="float-chat-subtitle float-chat-wizard-badge" *ngIf="chatEventDraft">{{ i18n.t('addingEvent') }}</div>
       </div>
     </div>
     <div class="float-chat-header-actions">
-      <button class="float-chat-clear" *ngIf="chatEventDraft" (click)="cancelEventCreation()" title="Cancel event creation">✕ Cancel</button>
-      <button class="float-chat-clear" *ngIf="!chatEventDraft && chatMessages.length > 1" (click)="chatMessages = []" title="Clear chat">🗑</button>
-      <button class="float-chat-close" (click)="showFloatingChat = false" title="Close" aria-label="Close chat">✕</button>
+      <button class="float-chat-clear" *ngIf="chatEventDraft" (click)="cancelEventCreation()" [title]="i18n.t('cancelCreation')">✕ {{ i18n.t('cancelCreation') }}</button>
+      <button class="float-chat-clear" *ngIf="!chatEventDraft && chatMessages.length > 1" (click)="chatMessages = []" [title]="i18n.t('clearChat')">🗑</button>
+      <button class="float-chat-close" (click)="showFloatingChat = false" [title]="i18n.t('close')" [attr.aria-label]="i18n.t('closeChatAria')">✕</button>
     </div>
   </div>
 
@@ -3529,13 +3529,13 @@
   <!-- Suggestion chips (only on first open) -->
   <div class="chat-suggestions float-suggestions" *ngIf="chatMessages.length <= 1">
     <button class="chat-chip" (click)="chatInput = 'Add a new event'; sendChatMessage()">➕ {{ i18n.t('chipAddEvent') }}</button>
-    <button class="chat-chip" (click)="chatInput = 'What\'s on today?'; sendChatMessage()">Today</button>
-    <button class="chat-chip" (click)="chatInput = 'Show me this week'; sendChatMessage()">This week</button>
-    <button class="chat-chip" (click)="chatInput = 'When am I free?'; sendChatMessage()">Free time</button>
-    <button class="chat-chip" (click)="chatInput = 'What\'s my next event?'; sendChatMessage()">Next event</button>
-    <button class="chat-chip" (click)="chatInput = 'When should I start studying for my test?'; sendChatMessage()">Study reminder</button>
-    <button class="chat-chip" (click)="chatInput = 'When did I last have a doctor appointment?'; sendChatMessage()">Health check</button>
-    <button class="chat-chip" (click)="chatInput = 'Draft an absence email for my next event'; sendChatMessage()">Draft email</button>
+    <button class="chat-chip" (click)="chatInput = 'What\'s on today?'; sendChatMessage()">{{ i18n.t('chipToday') }}</button>
+    <button class="chat-chip" (click)="chatInput = 'Show me this week'; sendChatMessage()">{{ i18n.t('chipThisWeek') }}</button>
+    <button class="chat-chip" (click)="chatInput = 'When am I free?'; sendChatMessage()">{{ i18n.t('chipFreeTime') }}</button>
+    <button class="chat-chip" (click)="chatInput = 'What\'s my next event?'; sendChatMessage()">{{ i18n.t('chipNextEvent') }}</button>
+    <button class="chat-chip" (click)="chatInput = 'When should I start studying for my test?'; sendChatMessage()">{{ i18n.t('chipStudyReminder') }}</button>
+    <button class="chat-chip" (click)="chatInput = 'When did I last have a doctor appointment?'; sendChatMessage()">{{ i18n.t('chipHealthCheck') }}</button>
+    <button class="chat-chip" (click)="chatInput = 'Draft an absence email for my next event'; sendChatMessage()">{{ i18n.t('chipDraftEmail') }}</button>
   </div>
 
   <!-- Input bar -->
@@ -3544,7 +3544,7 @@
       class="chat-input"
       [(ngModel)]="chatInput"
       name="floatChatInput"
-      [placeholder]="chatEventDraft ? 'Reply to continue adding your event…' : 'Ask about your schedule, add an event…'"
+      [placeholder]="chatEventDraft ? i18n.t('replyToContinue') : i18n.t('askAboutSchedule')"
       rows="1"
       (keydown)="onChatKeydown($event)"
       [disabled]="chatTyping"
@@ -3553,8 +3553,8 @@
       class="chat-send-btn"
       (click)="sendChatMessage()"
       [disabled]="!chatInput.trim() || chatTyping"
-      title="Send (Enter)"
-      aria-label="Send message"
+      [title]="i18n.t('sendEnterHint')"
+      [attr.aria-label]="i18n.t('sendMessageAria')"
     >
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <path d="M22 2L11 13" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -3570,8 +3570,8 @@
   class="float-chat-btn"
   (click)="toggleFloatingChat()"
   [class.float-chat-btn-open]="showFloatingChat"
-  title="AI Assistant"
-  aria-label="Open AI Assistant"
+  [title]="i18n.t('aiAssistant')"
+  [attr.aria-label]="i18n.t('openAiAssistant')"
 >
   <span class="float-chat-btn-icon" *ngIf="!showFloatingChat">✨</span>
   <span class="float-chat-btn-icon" *ngIf="showFloatingChat">✕</span>
