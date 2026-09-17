@@ -8994,3 +8994,93 @@
   margin: 0;
   line-height: 1.5;
 }
+
+/* ── Mobile-first conversational UI ──
+   On a phone the floating 380×560 panel is the wrong shape: it leaves dead
+   space at the edges and puts the composer mid-screen. Below 640px the same
+   markup becomes a bottom-anchored drawer instead — full width, thumb-reachable
+   composer, and the chip row scrolls sideways rather than wrapping into rows
+   that push the input off-screen. */
+@media (max-width: 640px) {
+  .float-chat-panel {
+    /* Anchored to the bottom edge; the trigger button is hidden while open, so
+       the drawer can use the full height it needs. */
+    right: 0;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 78vh;
+    /* Small viewport units track the mobile URL bar; the vh above is the
+       fallback for browsers without dvh support. */
+    height: 78dvh;
+    max-height: 78dvh;
+    border-radius: 20px 20px 0 0;
+    /* Clear the home indicator on gesture-nav devices. */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* Slide up from the bottom rather than scaling from a corner. */
+    transform: translateY(100%) scale(1);
+    transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .float-chat-open {
+    transform: translateY(0) scale(1);
+  }
+
+  /* Grab handle, so the drawer reads as one. */
+  .float-chat-header {
+    position: relative;
+    padding-top: 18px;
+  }
+
+  .float-chat-header::before {
+    content: '';
+    position: absolute;
+    top: 7px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--border);
+  }
+
+  /* One sideways-scrolling row instead of a wrapping block. */
+  .float-suggestions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .float-suggestions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .float-suggestions .chat-chip {
+    flex: 0 0 auto;
+  }
+
+  /* 16px keeps iOS Safari from zooming the viewport on focus. */
+  .float-input-bar .chat-input {
+    font-size: 16px;
+  }
+
+  /* Bigger tap target than the desktop send button. */
+  .float-input-bar .chat-send-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  /* The drawer covers the screen, so the trigger underneath it is noise. */
+  .float-chat-btn-open {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Calendar reads cleanly behind the drawer rather than showing through it. */
+  .float-chat-backdrop {
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(2px);
+  }
+}
