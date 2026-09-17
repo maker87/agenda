@@ -1,0 +1,104 @@
+<div class="wizard-wrap">
+  <div class="wizard">
+    <!-- Progress -->
+    <div class="wizard-progress" role="group" [attr.aria-label]="'Step ' + (stepIndex + 1) + ' of ' + steps.length">
+      <div class="progress-track">
+        <div class="progress-fill" [style.width.%]="progressPercent"></div>
+      </div>
+      <span class="progress-label">Step {{ stepIndex + 1 }} of {{ steps.length }}</span>
+    </div>
+
+    <header class="wizard-head">
+      <h1 class="wizard-title">{{ steps[stepIndex].title }}</h1>
+      <p class="wizard-blurb">{{ steps[stepIndex].blurb }}</p>
+    </header>
+
+    <!-- Step 1 — working hours -->
+    <section class="wizard-step" *ngIf="stepIndex === 0">
+      <div class="field-row">
+        <label class="field">
+          <span class="field-label">Day starts</span>
+          <input type="time" [(ngModel)]="workStart" name="workStart" />
+        </label>
+        <label class="field">
+          <span class="field-label">Day ends</span>
+          <input type="time" [(ngModel)]="workEnd" name="workEnd" />
+        </label>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Default event length</span>
+        <div class="choice-row">
+          <button
+            type="button"
+            class="choice"
+            *ngFor="let d of durationChoices"
+            [class.choice-on]="defaultDurationMinutes === d"
+            (click)="defaultDurationMinutes = d"
+          >
+            {{ d }} min
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 2 — category colours -->
+    <section class="wizard-step" *ngIf="stepIndex === 1">
+      <div class="cat-row" *ngFor="let cat of categories">
+        <span class="cat-name">
+          <span class="cat-dot" [style.background]="categoryColors[cat]"></span>
+          {{ cat }}
+        </span>
+        <div class="swatches">
+          <button
+            type="button"
+            class="swatch"
+            *ngFor="let color of palette"
+            [style.background]="color"
+            [class.swatch-on]="categoryColors[cat] === color"
+            (click)="setCategoryColor(cat, color)"
+            [attr.aria-label]="'Set ' + cat + ' to ' + color"
+          ></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 3 — notifications & timezone -->
+    <section class="wizard-step" *ngIf="stepIndex === 2">
+      <div class="field">
+        <span class="field-label">Remind me</span>
+        <div class="choice-row">
+          <button
+            type="button"
+            class="choice"
+            *ngFor="let lead of leadTimeChoices"
+            [class.choice-on]="isLeadSelected(lead)"
+            (click)="toggleLead(lead)"
+          >
+            {{ leadLabel(lead) }}
+          </button>
+        </div>
+      </div>
+
+      <label class="field">
+        <span class="field-label">Timezone</span>
+        <select [(ngModel)]="timezone" name="timezone">
+          <option *ngFor="let zone of timezones" [value]="zone">{{ zone }}</option>
+        </select>
+      </label>
+    </section>
+
+    <p class="wizard-error" *ngIf="error">{{ error }}</p>
+
+    <!-- Actions -->
+    <footer class="wizard-actions">
+      <button type="button" class="btn-ghost" (click)="skip()">Skip for now</button>
+      <div class="action-right">
+        <button type="button" class="btn-ghost" *ngIf="stepIndex > 0" (click)="back()">Back</button>
+        <button type="button" class="btn-primary" (click)="next()">
+          {{ isLastStep ? 'Finish setup' : 'Continue' }}
+        </button>
+      </div>
+    </footer>
+  </div>
+</div>

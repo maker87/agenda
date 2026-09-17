@@ -1,0 +1,289 @@
+/* ── Onboarding wizard ──
+   Self-contained tokens: the dashboard's theme variables are :host-scoped to
+   that component, so they don't reach this one. */
+
+:host {
+  --accent: #6c63ff;
+  --accent-deep: #9333ea;
+  --surface: #ffffff;
+  --page: #f0f2f5;
+  --text: #1a1a2e;
+  --text-soft: #6b7280;
+  --border: #e3e5ec;
+
+  display: block;
+  min-height: 100vh;
+  background: var(--page);
+  color: var(--text);
+}
+
+.wizard-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.wizard {
+  width: 100%;
+  max-width: 560px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 18px 48px rgba(26, 26, 46, 0.1);
+}
+
+/* ── Progress ── */
+
+.wizard-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  transition: width 0.3s ease;
+}
+
+.progress-label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+/* ── Header ── */
+
+.wizard-head {
+  margin-bottom: 22px;
+}
+
+.wizard-title {
+  margin: 0 0 6px;
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.wizard-blurb {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+
+/* ── Fields ── */
+
+.wizard-step {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.field-row {
+  display: flex;
+  gap: 12px;
+}
+
+.field-row .field {
+  flex: 1;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.field input,
+.field select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ── Choice chips ── */
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choice {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.choice:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.choice-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Category colours ── */
+
+.cat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.cat-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cat-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.swatch:hover {
+  transform: scale(1.12);
+}
+
+.swatch-on {
+  border-color: var(--text);
+}
+
+/* ── Footer ── */
+
+.wizard-error {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+.wizard-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.action-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-ghost,
+.btn-primary {
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-ghost {
+  background: none;
+  border: 1.5px solid transparent;
+  color: var(--text-soft);
+}
+
+.btn-ghost:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.btn-primary {
+  border: none;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  box-shadow: 0 4px 16px rgba(108, 99, 255, 0.32);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 7px 22px rgba(108, 99, 255, 0.4);
+}
+
+@media (max-width: 520px) {
+  .wizard {
+    padding: 22px 18px;
+  }
+
+  .field-row {
+    flex-direction: column;
+  }
+
+  .cat-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
