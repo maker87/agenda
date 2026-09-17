@@ -1,0 +1,77 @@
+<div class="sandbox">
+  <div class="sandbox-head">
+    <span class="sandbox-pill">Live sandbox · no sign-up</span>
+    <button type="button" class="sandbox-reset" (click)="reset()">Reset day</button>
+  </div>
+
+  <div class="sandbox-body">
+    <!-- Conversation -->
+    <div class="sandbox-chat">
+      <div class="chat-log" role="log" aria-live="polite">
+        <div
+          *ngFor="let m of messages; trackBy: trackById"
+          class="chat-msg"
+          [class.chat-msg-user]="m.role === 'user'"
+        >
+          <div class="chat-bubble">{{ m.text }}</div>
+
+          <div class="chat-options" *ngIf="m.options?.length">
+            <button
+              type="button"
+              class="chat-option"
+              *ngFor="let slot of m.options"
+              (click)="chooseOption(slot)"
+            >
+              {{ formatOption(slot) }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-chips">
+        <button
+          type="button"
+          class="chip"
+          *ngFor="let action of quickActions"
+          (click)="runQuickAction(action.prompt)"
+        >
+          {{ action.label }}
+        </button>
+      </div>
+
+      <form class="chat-composer" (ngSubmit)="send()">
+        <label class="sr-only" for="sandbox-input">Ask Agenda to schedule something</label>
+        <input
+          id="sandbox-input"
+          type="text"
+          name="sandboxInput"
+          [(ngModel)]="input"
+          placeholder="Book lunch with Priya tomorrow at noon…"
+          autocomplete="off"
+        />
+        <button type="submit" class="chat-send" [disabled]="!input.trim()" aria-label="Send">→</button>
+      </form>
+    </div>
+
+    <!-- Mock calendar -->
+    <aside class="sandbox-agenda" aria-label="Sample day agenda">
+      <div class="agenda-head">
+        <span class="agenda-title">Sample day</span>
+        <span class="agenda-date">{{ todayLabel }}</span>
+      </div>
+
+      <p class="agenda-empty" *ngIf="!sortedEvents.length">Nothing scheduled — the day is yours.</p>
+
+      <ul class="agenda-list">
+        <li class="agenda-item" *ngFor="let ev of sortedEvents; trackBy: trackById">
+          <span class="agenda-bar" [style.background]="categoryColor(ev.category)"></span>
+          <span class="agenda-text">
+            <span class="agenda-event">{{ ev.title }}</span>
+            <span class="agenda-time">{{ formatRange(ev) }}</span>
+          </span>
+          <span class="agenda-tag">{{ ev.category }}</span>
+        </li>
+      </ul>
+    </aside>
+  </div>
+</div>

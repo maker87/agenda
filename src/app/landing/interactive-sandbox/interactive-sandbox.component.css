@@ -1,0 +1,332 @@
+/* ── Interactive sandbox ──
+   Glass panel on the landing page's dark canvas, matching the hero's
+   #6c63ff → #9333ea accent and 12–20px radii. */
+
+.sandbox {
+  width: 100%;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(17, 15, 35, 0.72);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.sandbox-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sandbox-pill {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  color: #c9c4ff;
+  background: rgba(108, 99, 255, 0.16);
+  border: 1px solid rgba(108, 99, 255, 0.35);
+}
+
+.sandbox-reset {
+  background: none;
+  border: none;
+  color: rgba(240, 240, 240, 0.55);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.2s;
+}
+
+.sandbox-reset:hover {
+  color: #f0f0f0;
+}
+
+.sandbox-body {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+}
+
+/* ── Conversation ── */
+
+.sandbox-chat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 14px;
+  gap: 10px;
+}
+
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.chat-msg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.chat-msg-user {
+  align-items: flex-end;
+}
+
+.chat-bubble {
+  max-width: 88%;
+  padding: 10px 13px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  /* Agenda listings arrive as newline-separated lines. */
+  white-space: pre-line;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e8e8f0;
+}
+
+.chat-msg-user .chat-bubble {
+  background: linear-gradient(135deg, #6c63ff, #9333ea);
+  border-color: transparent;
+  color: #fff;
+}
+
+.chat-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chat-option {
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #c9c4ff;
+  background: rgba(108, 99, 255, 0.14);
+  border: 1px solid rgba(108, 99, 255, 0.4);
+  transition: background 0.2s, color 0.2s, transform 0.15s;
+}
+
+.chat-option:hover {
+  background: rgba(108, 99, 255, 0.3);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+/* ── Quick-action chips ── */
+
+.chat-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  color: rgba(240, 240, 240, 0.8);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(108, 99, 255, 0.5);
+  color: #fff;
+}
+
+/* ── Composer ── */
+
+.chat-composer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: border-color 0.2s;
+}
+
+.chat-composer:focus-within {
+  border-color: rgba(108, 99, 255, 0.65);
+}
+
+.chat-composer input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  color: #f0f0f0;
+  font-family: inherit;
+  font-size: 13.5px;
+  padding: 8px 0;
+}
+
+.chat-composer input::placeholder {
+  color: rgba(240, 240, 240, 0.4);
+}
+
+.chat-send {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #6c63ff, #9333ea);
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.chat-send:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.chat-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Agenda panel ── */
+
+.sandbox-agenda {
+  padding: 14px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  min-width: 0;
+}
+
+.agenda-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+
+.agenda-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f0f0f0;
+}
+
+.agenda-date {
+  font-size: 11.5px;
+  color: rgba(240, 240, 240, 0.5);
+}
+
+.agenda-empty {
+  margin: 0;
+  font-size: 12.5px;
+  color: rgba(240, 240, 240, 0.45);
+}
+
+.agenda-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agenda-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.agenda-bar {
+  flex: 0 0 auto;
+  width: 3px;
+  align-self: stretch;
+  border-radius: 3px;
+}
+
+.agenda-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.agenda-event {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #f0f0f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agenda-time {
+  font-size: 11px;
+  color: rgba(240, 240, 240, 0.5);
+}
+
+.agenda-tag {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 6px;
+  color: rgba(240, 240, 240, 0.65);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Mobile ── */
+
+@media (max-width: 860px) {
+  .sandbox-body {
+    grid-template-columns: 1fr;
+  }
+
+  .sandbox-agenda {
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .chat-log {
+    height: 220px;
+  }
+}
