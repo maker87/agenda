@@ -771,3 +771,35 @@
     display: none;
   }
 }
+
+/* ── Interactive sandbox section ── */
+.sandbox-section {
+  position: relative;
+  z-index: 1;
+  padding: 60px 40px 20px;
+}
+
+.sandbox-header {
+  max-width: 760px;
+  margin: 0 auto 28px;
+  text-align: center;
+}
+
+.sandbox-lede {
+  margin: 14px auto 0;
+  max-width: 580px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: rgba(240, 240, 240, 0.6);
+}
+
+.sandbox-holder {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+@media (max-width: 640px) {
+  .sandbox-section {
+    padding: 44px 16px 12px;
+  }
+}

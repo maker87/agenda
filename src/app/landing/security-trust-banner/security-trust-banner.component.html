@@ -1,0 +1,16 @@
+<section class="trust" aria-labelledby="trust-heading">
+  <div class="trust-inner">
+    <h2 id="trust-heading" class="trust-heading">Your calendar stays yours</h2>
+    <p class="trust-sub">
+      Agenda reads your schedule to answer you — and for nothing else.
+    </p>
+
+    <ul class="trust-grid">
+      <li class="trust-card" *ngFor="let point of points">
+        <span class="trust-icon" aria-hidden="true">{{ point.icon }}</span>
+        <h3 class="trust-title">{{ point.title }}</h3>
+        <p class="trust-detail">{{ point.detail }}</p>
+      </li>
+    </ul>
+  </div>
+</section>

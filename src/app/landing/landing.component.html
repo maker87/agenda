@@ -23,20 +23,20 @@
     <div class="hero-content">
       <div class="hero-badge">✨ AI-Powered Calendar</div>
       <h1 class="hero-title">
-        Stop managing time.<br/>
-        <span class="hero-gradient-text">Start owning it.</span>
+        Your Calendar,<br/>
+        <span class="hero-gradient-text">Managed in Plain English.</span>
       </h1>
       <p class="hero-subtitle">
-        Agenda finds free slots in your schedule and suggests the best event times,
-        imports from Google Calendar, and sends reminders — so you can focus on what matters.
+        Add events, resolve conflicts, and organize your week just by chatting.
+        Syncs seamlessly with Google Calendar in seconds.
       </p>
       <div class="hero-actions">
         <button class="hero-btn hero-btn-primary" (click)="goToSignup()">
           <span class="btn-shine"></span>
           Get Started Free
         </button>
-        <button class="hero-btn hero-btn-ghost" (click)="goToLogin()">
-          I have an account →
+        <button class="hero-btn hero-btn-ghost" (click)="scrollToSandbox()">
+          Try Interactive Sandbox →
         </button>
       </div>
     </div>
@@ -102,6 +102,21 @@
     </div>
   </section>
 
+  <!-- Interactive Sandbox — try the scheduler before signing up -->
+  <section class="sandbox-section" id="sandbox">
+    <div class="sandbox-header">
+      <span class="features-label">TRY IT NOW</span>
+      <h2 class="features-title">Schedule something. No account needed.</h2>
+      <p class="sandbox-lede">
+        This is the real parser running on a sample day — ask it for a time that's already
+        taken and watch it offer you the next best ones.
+      </p>
+    </div>
+    <div class="sandbox-holder">
+      <app-interactive-sandbox />
+    </div>
+  </section>
+
   <!-- Features Section -->
   <section class="features">
     <div class="features-header">
@@ -159,6 +174,9 @@
       </div>
     </div>
   </section>
+
+  <!-- Trust & Security -->
+  <app-security-trust-banner />
 
   <!-- CTA Section -->
   <section class="cta">
