@@ -79,6 +79,81 @@ interface ScheduleForm {
   multiDates: string[];   // dates selected by clicking the multi-day picker (YYYY-MM-DD)
 }
 
+type Meridiem = 'AM' | 'PM';
+
+/**
+ * A time while it is being typed. Events always store 24-hour "HH:MM", so this
+ * only holds the shape the input shows: on a 12-hour clock `text` is the clock
+ * part ("9:30") and `meridiem` the half of the day, on a 24-hour clock `text`
+ * is the value itself and `meridiem` is unused.
+ */
+interface TimeField {
+  text: string;
+  meridiem: Meridiem;
+}
+
+// A trailing half-of-day marker, however it gets typed: "pm", "PM", "p.m.", "p".
+const MERIDIEM_SUFFIX = /\s*([ap])\.?\s*m?\.?$/i;
+
+// An hour, then optionally minutes — separated by ":", "." or nothing at all,
+// so "9", "9:30", "9.30" and "930" all land on the same time.
+const TYPED_TIME = /^(\d{1,2})(?:[:. ]?([0-5]\d))?$/;
+
+// A stored time: 24-hour "HH:MM", the only shape events are ever saved in.
+const STORED_TIME = /^(\d{1,2}):([0-5]\d)$/;
+
+function emptyTimeField(): TimeField {
+  return { text: '', meridiem: 'AM' };
+}
+
+/** Split a stored 24-hour "HH:MM" into the shape the input shows. */
+function toTimeField(hhmm: string, twelveHour: boolean): TimeField {
+  const parts = STORED_TIME.exec(hhmm ?? '');
+  if (!parts) return emptyTimeField();
+  const hour = Number(parts[1]);
+  if (hour > 23) return emptyTimeField();
+
+  const meridiem: Meridiem = hour < 12 ? 'AM' : 'PM';
+  if (!twelveHour) return { text: `${String(hour).padStart(2, '0')}:${parts[2]}`, meridiem };
+  return { text: `${hour % 12 === 0 ? 12 : hour % 12}:${parts[2]}`, meridiem };
+}
+
+/**
+ * Read a typed time back as 24-hour "HH:MM", or null if it isn't a time.
+ *
+ * A marker typed into the text itself outranks the AM/PM toggle, so "9:30pm"
+ * means half past nine in the evening even while the toggle still says AM. On a
+ * 12-hour clock an hour past 12 is read as the 24-hour time it can only be, so
+ * someone who types "14:00" out of habit still gets 2 PM rather than an error.
+ */
+function parseTimeField(field: TimeField, twelveHour: boolean): string | null {
+  let text = (field.text ?? '').trim();
+  if (!text) return null;
+
+  const suffix = MERIDIEM_SUFFIX.exec(text);
+  let meridiem: Meridiem | null = null;
+  if (suffix) {
+    meridiem = suffix[1].toUpperCase() === 'P' ? 'PM' : 'AM';
+    text = text.slice(0, suffix.index).trim();
+  }
+
+  const parts = TYPED_TIME.exec(text);
+  if (!parts) return null;
+  let hour = Number(parts[1]);
+  const minute = parts[2] ?? '00';
+
+  if (meridiem) {
+    if (hour < 1 || hour > 12) return null;
+    hour = (hour % 12) + (meridiem === 'PM' ? 12 : 0);
+  } else if (twelveHour && hour >= 1 && hour <= 12) {
+    hour = (hour % 12) + (field.meridiem === 'PM' ? 12 : 0);
+  } else if (hour > 23) {
+    return null;
+  }
+
+  return `${String(hour).padStart(2, '0')}:${minute}`;
+}
+
 // Helper to build a date string relative to today
 function relDate(offsetDays: number): string {
   const d = new Date();
@@ -2871,6 +2946,74 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     multiDates: [],
   };
 
+  // ── Time entry ──────────────────────────────────────────────────────────
+  // Events are stored as 24-hour "HH:MM", but the inputs follow the language's
+  // own clock so the form reads the way formatTime() writes.
+
+  formStartTime: TimeField = emptyTimeField();
+  formEndTime: TimeField = emptyTimeField();
+  changeStartTime: TimeField = emptyTimeField();
+  changeEndTime: TimeField = emptyTimeField();
+  overlapStartTime: TimeField = emptyTimeField();
+  overlapEndTime: TimeField = emptyTimeField();
+
+  // Both are read on every change-detection pass, so the Intl lookups behind
+  // them are cached and only redone when the language changes.
+  private clockLocale = '';
+  private clockIsTwelveHour = false;
+  private meridiemLabels: Record<Meridiem, string> = { AM: 'AM', PM: 'PM' };
+
+  /** True when the current language writes times on a 12-hour clock (9:30 PM). */
+  get usesTwelveHourClock(): boolean {
+    this.refreshClockCache();
+    return this.clockIsTwelveHour;
+  }
+
+  /** The language's own word for a half of the day ("PM", "p. m.", "午後"). */
+  meridiemLabel(meridiem: Meridiem): string {
+    this.refreshClockCache();
+    return this.meridiemLabels[meridiem];
+  }
+
+  private refreshClockCache() {
+    const locale = this.i18n.getLocale();
+    if (locale === this.clockLocale) return;
+    this.clockLocale = locale;
+    this.clockIsTwelveHour =
+      new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions().hour12 ?? false;
+    this.meridiemLabels = { AM: this.readMeridiemLabel(9), PM: this.readMeridiemLabel(21) };
+  }
+
+  private readMeridiemLabel(hour: number): string {
+    const parts = new Intl.DateTimeFormat(this.clockLocale, { hour: 'numeric', hour12: true })
+      .formatToParts(new Date(2000, 0, 1, hour, 0));
+    return parts.find(p => p.type === 'dayPeriod')?.value ?? (hour < 12 ? 'AM' : 'PM');
+  }
+
+  get timePlaceholder(): string {
+    // The HH:MM hint is already translated everywhere, so reuse it for the
+    // 24-hour clock rather than carrying a second copy of the same string.
+    return this.usesTwelveHourClock ? this.i18n.t('timePlaceholder12') : this.i18n.t('startTimePlaceholder');
+  }
+
+  toggleMeridiem(field: TimeField) {
+    field.meridiem = field.meridiem === 'AM' ? 'PM' : 'AM';
+  }
+
+  /** Re-render a typed time in its canonical shape once the field loses focus. */
+  normalizeTimeField(field: TimeField) {
+    const stored = parseTimeField(field, this.usesTwelveHourClock);
+    if (!stored) return;
+    const next = toTimeField(stored, this.usesTwelveHourClock);
+    field.text = next.text;
+    field.meridiem = next.meridiem;
+  }
+
+  private invalidTimeError(which: 'start' | 'end'): string {
+    const example = this.usesTwelveHourClock ? `9:30 ${this.meridiemLabel('AM')}` : '09:30';
+    return `Please enter a valid ${which} time (e.g. ${example}).`;
+  }
+
   dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   get repeatHintVisible(): boolean {
@@ -3950,6 +4093,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       repeatUntil: '',
       multiDates: [],
     };
+    this.setFormTimes(this.form.startTime, this.form.endTime);
     this.isMultiDay = false;
     this.formShareInput = '';
     this.formShareSuggestions = [];
@@ -3999,8 +4143,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   applyAiSuggestion(s: AiSuggestion) {
     this.form.date = s.date;
-    this.form.startTime = s.startTime;
-    this.form.endTime = s.endTime;
+    this.setFormTimes(s.startTime, s.endTime);
     this.showAiPanel = false;
     this.aiSuggestions = [];
   }
@@ -4009,6 +4152,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   closeModal() {
     this.showScheduleModal = false;
+  }
+
+  /** Point the stored 24-hour times and the two inputs at the same value. */
+  private setFormTimes(start: string, end: string) {
+    this.form.startTime = start;
+    this.form.endTime = end;
+    this.formStartTime = toTimeField(start, this.usesTwelveHourClock);
+    this.formEndTime = toTimeField(end, this.usesTwelveHourClock);
   }
 
   submitSchedule() {
@@ -4020,18 +4171,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.scheduleError = 'Please select a date.';
       return;
     }
-    const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (!this.form.startTime || !timeRegex.test(this.form.startTime)) {
-      this.scheduleError = 'Please enter a valid start time (HH:MM).';
+    // What was typed is only a display shape; store the 24-hour time it means.
+    const start = parseTimeField(this.formStartTime, this.usesTwelveHourClock);
+    if (!start) {
+      this.scheduleError = this.invalidTimeError('start');
       return;
     }
-    if (!this.form.endTime || !timeRegex.test(this.form.endTime)) {
-      this.scheduleError = 'Please enter a valid end time (HH:MM).';
+    const end = parseTimeField(this.formEndTime, this.usesTwelveHourClock);
+    if (!end) {
+      this.scheduleError = this.invalidTimeError('end');
       return;
     }
-    // Normalize single-digit hour (e.g. "9:00" → "09:00")
-    this.form.startTime = this.form.startTime.padStart(5, '0');
-    this.form.endTime = this.form.endTime.padStart(5, '0');
+    this.setFormTimes(start, end);
 
     if (this.form.startTime >= this.form.endTime) {
       this.scheduleError = 'End time must be after start time.';
@@ -4149,8 +4300,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.overlapManualDate = '';
       this.overlapManualError = '';
       this.overlapFinalDate = '';
-      this.overlapTimeStart = '';
-      this.overlapTimeEnd = '';
+      this.setOverlapTimes('', '');
       this.overlapTimeError = '';
       return;
     }
@@ -4454,14 +4604,26 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private proceedToTimepickOrApply(date: string) {
     const ev = this.overlapSelectedEvent;
     this.overlapFinalDate  = date;
-    this.overlapTimeStart  = ev ? ev.startTime : '09:00';
-    this.overlapTimeEnd    = ev ? ev.endTime   : '10:00';
+    this.setOverlapTimes(ev ? ev.startTime : '09:00', ev ? ev.endTime : '10:00');
     this.overlapTimeError  = '';
     this.overlapStep = 'timepick';
   }
 
+  /** Point the reschedule step's stored 24-hour times and its inputs at the same value. */
+  private setOverlapTimes(start: string, end: string) {
+    this.overlapTimeStart = start;
+    this.overlapTimeEnd = end;
+    this.overlapStartTime = toTimeField(start, this.usesTwelveHourClock);
+    this.overlapEndTime = toTimeField(end, this.usesTwelveHourClock);
+  }
+
   overlapConfirmTime() {
     this.overlapTimeError = '';
+    const start = parseTimeField(this.overlapStartTime, this.usesTwelveHourClock);
+    if (!start) { this.overlapTimeError = this.invalidTimeError('start'); return; }
+    const end = parseTimeField(this.overlapEndTime, this.usesTwelveHourClock);
+    if (!end) { this.overlapTimeError = this.invalidTimeError('end'); return; }
+    this.setOverlapTimes(start, end);
     if (this.overlapTimeStart >= this.overlapTimeEnd) {
       this.overlapTimeError = 'End time must be after start time.';
       return;
@@ -4603,6 +4765,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       repeatUntil: '',
       multiDates: [],
     };
+    this.setFormTimes(this.form.startTime, this.form.endTime);
     this.isMultiDay = false;
     this.formShareInput = '';
     this.formShareSuggestions = [];
@@ -4621,6 +4784,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   editEventFromPanel(ev: CalendarEvent) {
     this.selectedEventId = ev.id;
     this.changeForm = { date: ev.date, startTime: ev.startTime, endTime: ev.endTime, category: ev.category };
+    this.setChangeTimes(ev.startTime, ev.endTime);
     this.changeError = '';
     this.changeStep = 'edit';
     this.showChangeModal = true;
@@ -4836,12 +5000,26 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.selectedEventId) return;
     const ev = this.selectedEvent!;
     this.changeForm = { date: ev.date, startTime: ev.startTime, endTime: ev.endTime, category: ev.category };
+    this.setChangeTimes(ev.startTime, ev.endTime);
     this.changeError = '';
     this.changeStep = 'edit';
   }
 
+  /** Point the change form's stored 24-hour times and its inputs at the same value. */
+  private setChangeTimes(start: string, end: string) {
+    this.changeForm.startTime = start;
+    this.changeForm.endTime = end;
+    this.changeStartTime = toTimeField(start, this.usesTwelveHourClock);
+    this.changeEndTime = toTimeField(end, this.usesTwelveHourClock);
+  }
+
   confirmChange() {
     if (!this.changeForm.date) { this.changeError = 'Please select a date.'; return; }
+    const start = parseTimeField(this.changeStartTime, this.usesTwelveHourClock);
+    if (!start) { this.changeError = this.invalidTimeError('start'); return; }
+    const end = parseTimeField(this.changeEndTime, this.usesTwelveHourClock);
+    if (!end) { this.changeError = this.invalidTimeError('end'); return; }
+    this.setChangeTimes(start, end);
     if (this.changeForm.startTime >= this.changeForm.endTime) {
       this.changeError = 'End time must be after start time.'; return;
     }

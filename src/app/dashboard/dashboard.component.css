@@ -998,6 +998,45 @@
   gap: 12px;
 }
 
+/* Time entry: the typed clock time, plus an AM/PM toggle on a 12-hour clock.
+   The toggle is absent entirely on a 24-hour clock, so the input keeps the
+   full width every other field has. */
+.time-input {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.time-input input {
+  min-width: 0;
+}
+
+.meridiem-toggle {
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border: 1.5px solid var(--border-input);
+  border-radius: 9px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.meridiem-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.meridiem-toggle:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.1);
+}
+
 /* Multi-day toggle */
 .multi-day-toggle {
   margin-top: -4px;

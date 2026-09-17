@@ -226,6 +226,10 @@ const TRANSLATIONS: Record<LangCode, Translations> = {
     endTime: 'End Time *',
     startTimePlaceholder: 'HH:MM (e.g. 09:00)',
     endTimePlaceholder: 'HH:MM (e.g. 10:00)',
+    // Shown instead of the HH:MM placeholders where the language uses a
+    // 12-hour clock; the AM/PM half of the day is picked with a toggle.
+    timePlaceholder12: 'h:mm (e.g. 9:30)',
+    toggleMeridiem: 'Switch between AM and PM',
     description: 'Description',
     descriptionPlaceholder: 'Optional notes about this event...',
     location: 'Location',
