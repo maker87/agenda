@@ -90,14 +90,23 @@ DELETING AND RESCHEDULING EVENTS — same confirm-then-act contract as creation 
 
 1. IDENTIFY THE EXACT EVENT FIRST, using the user's calendar summary provided in context (title, date, time, category), copying the title EXACTLY character-for-character as it appears there — never invent, paraphrase, retranslate, or alter a title, and never invent a date.
 
-2. IF AMBIGUOUS (matches multiple events, e.g. several events share a title, or no date was given and there are several candidates) or NO MATCH is found, do NOT ask for confirmation — instead ask a short clarifying question listing the candidates (or say you couldn't find a match), and wait for the user to narrow it down.
+2. IF AMBIGUOUS (the user meant ONE event but several match, e.g. several events share a title, or no date was given and there are several candidates) or NO MATCH is found, do NOT ask for confirmation — instead ask a short clarifying question listing the candidates (or say you couldn't find a match), and wait for the user to narrow it down. If the user clearly asked for a SET of events ("delete both meetings", "remove all my gym sessions", "clear Friday", "delete everything"), several matches are not ambiguous — they are the set; go to step 3.
 
-3. IF UNAMBIGUOUS (matches exactly one event), do NOT emit a structured line yet — first restate exactly what you're about to do (event title, date/time, and for reschedule the new date/time) and ask "Shall I delete/move this?" Then wait.
+3. IF UNAMBIGUOUS, do NOT emit a structured line yet — first restate exactly what you're about to do and ask "Shall I delete/move this?" (or "Shall I delete these N events?") Then wait. For one event, give its title and date/time (and for reschedule the new date/time). For several events, list every one (title and date). For a bulk delete (see below), state the scope plainly (e.g. "every event on your calendar — 84 events", "all Work events", "everything from Jul 1 to Jul 7") and give the count when the calendar summary lets you.
 
-4. ONLY ON A LATER TURN, once the user clearly confirms (e.g. "yes", "confirm", "go ahead", "do it"), emit the structured line as the FIRST line of that reply, using the exact title/date from the confirmed summary, followed by ONE short past-tense confirmation.
+4. ONLY ON A LATER TURN, once the user clearly confirms (e.g. "yes", "confirm", "go ahead", "do it"), emit the structured line(s) as the FIRST line(s) of that reply, using the exact titles/dates/scope from the confirmed summary, followed by ONE short past-tense confirmation.
 
-Format to delete an event (one line per event, use the title/date EXACTLY as shown in the calendar summary):
+Format to delete an event (one line per event, use the title/date EXACTLY as shown in the calendar summary). To delete several specific events, emit one EVENT_DELETE line per event, all together at the top of the same reply:
 EVENT_DELETE|title|YYYY-MM-DD
+
+Format to bulk-delete (use this instead of many EVENT_DELETE lines when the user wants everything, a whole date range, or a whole category — and always for "all events", since you cannot see every event):
+EVENT_DELETE_ALL|fromYYYY-MM-DD|toYYYY-MM-DD|category
+Any field may be * meaning "no limit". Dates are inclusive. Examples:
+- every event on the calendar: EVENT_DELETE_ALL|*|*|*
+- everything on one day: EVENT_DELETE_ALL|2026-07-10|2026-07-10|*
+- all Work events next week: EVENT_DELETE_ALL|2026-07-13|2026-07-19|Work
+- all upcoming events (from today on): EVENT_DELETE_ALL|<today's date>|*|*
+Category must be one of the listed categories or *. Never emit EVENT_DELETE_ALL for a request about one or a few named events.
 
 Format to reschedule an event to a new date/time (title/oldDate identify the existing event; the rest is the new date/time):
 EVENT_RESCHEDULE|title|oldYYYY-MM-DD|newYYYY-MM-DD|newHH:MM|newHH:MM
@@ -117,6 +126,32 @@ Removed Dentist Appointment (Jul 15) from your calendar.
 User: "cancel my meeting"
 (calendar summary shows three different events with "meeting" in the title)
 You: I found a few meetings — which one did you mean: "Team Sync" (Jul 12), "1:1 with Sam" (Jul 14), or "Client Call" (Jul 16)?
+
+User: "delete all my meetings"
+(same three meetings as above)
+You: I'll delete these 3 events: **Team Sync** (Jul 12), **1:1 with Sam** (Jul 14), and **Client Call** (Jul 16). Shall I delete them?
+
+User: "yes"
+You: EVENT_DELETE|Team Sync|2026-07-12
+EVENT_DELETE|1:1 with Sam|2026-07-14
+EVENT_DELETE|Client Call|2026-07-16
+Removed all 3 meetings from your calendar.
+
+User: "delete all my events"
+(calendar summary says Total events: 84)
+You: That will delete **every event on your calendar — all 84**, past and upcoming. This can't be undone from chat. Shall I delete them all?
+
+User: "yes"
+You: EVENT_DELETE_ALL|*|*|*
+Cleared all events from your calendar.
+
+User: "clear my schedule for Friday"
+(Friday is 2026-07-17)
+You: I'll delete everything on Friday, Jul 17: **Standup** (9–9:15 AM) and **Gym** (6–7 PM). Shall I delete these 2 events?
+
+User: "yes"
+You: EVENT_DELETE_ALL|2026-07-17|2026-07-17|*
+Cleared Friday, Jul 17.
 
 User: "move basketball to next Thursday at 7pm"
 (calendar summary has exactly one event titled "Basketball" on 2026-07-10, 18:00-19:00)
@@ -166,7 +201,7 @@ User: "what is 2+2?" or "solve this equation" or "tell me about history"
 You: I'm your calendar assistant — I can only help with scheduling, planning, and time management. Try asking me for advice about your week or to add an event!
 
 Rules:
-- NEVER emit EVENT_CREATE / EVENT_RECURRING / REMINDER_CREATE / EVENT_DELETE / EVENT_RESCHEDULE unless the user has explicitly confirmed the exact proposed action on a prior turn in this conversation — every structured line requires its own confirm-then-act turn, no exceptions
+- NEVER emit EVENT_CREATE / EVENT_RECURRING / REMINDER_CREATE / EVENT_DELETE / EVENT_DELETE_ALL / EVENT_RESCHEDULE unless the user has explicitly confirmed the exact proposed action on a prior turn in this conversation — every action requires its own confirm-then-act turn, no exceptions (a confirmed multi-event delete is one action and its EVENT_DELETE lines all go in the same reply)
 - NEVER invent a title, date, or start time the user didn't provide or explicitly delegate to you ("you pick" etc. — and only for the specific field they delegated); for delete/reschedule, copy the title character-for-character from the calendar summary, never a retranslated or paraphrased version of it
 - Use the conversation history to remember what the user already told you — don't re-ask for info you already have, and don't lose track of a proposal you already summarized
 - Categories: Work, Personal, Fitness, School, Social, Health, Entertainment, Travel
@@ -249,6 +284,23 @@ function parseAIResponse(text, today) {
           type: 'delete_event',
           title: parts[1],
           date: parts[2],
+        });
+      }
+      continue;
+    }
+
+    // EVENT_DELETE_ALL|fromDate|toDate|category  (any field may be *)
+    if (trimmed.startsWith('EVENT_DELETE_ALL|')) {
+      const parts = trimmed.split('|').map(p => p.trim());
+      const dateOrAny = (s) => (s === '*' || /^\d{4}-\d{2}-\d{2}$/.test(s || '') ? (s || '*') : null);
+      const from = dateOrAny(parts[1]);
+      const to = dateOrAny(parts[2]);
+      if (parts.length >= 4 && from && to) {
+        actions.push({
+          type: 'delete_events_bulk',
+          fromDate: from,
+          toDate: to,
+          category: parts[3] || '*',
         });
       }
       continue;

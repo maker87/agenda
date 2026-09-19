@@ -1518,7 +1518,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       // merely mentions "scheduled" — e.g. quoting back a list of existing
       // events while asking the user to confirm a deletion.
       let displayText = reply;
-      if (actions.length === 0 && /^(adding|added|done\b|removed|deleted|moved|rescheduled|scheduling)\b/im.test(reply)) {
+      if (actions.length === 0 && /^(adding|added|done\b|removed|deleted|cleared|moved|rescheduled|scheduling)\b/im.test(reply)) {
         displayText = reply + '\n\n⚠️ _That change could not be saved automatically. Please try again or make it manually._';
       }
 
@@ -1600,6 +1600,26 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.deleteEvent(match.id);
       } else {
         this.reportAiActionMismatch(action.title, action.date);
+      }
+    }
+    if (action.type === 'delete_events_bulk') {
+      const from = action.fromDate && action.fromDate !== '*' ? action.fromDate : '';
+      const to = action.toDate && action.toDate !== '*' ? action.toDate : '';
+      const cat = action.category && action.category !== '*' ? action.category.trim().toLowerCase() : '';
+      const matches = this.events.filter(e =>
+        (!from || e.date >= from) &&
+        (!to || e.date <= to) &&
+        (!cat || (e.category || '').trim().toLowerCase() === cat)
+      );
+      for (const ev of matches) this.deleteEvent(ev.id);
+      if (matches.length === 0) {
+        this.chatMessages = [...this.chatMessages, {
+          id: `msg_${Date.now()}_bulk_none`,
+          role: 'assistant',
+          text: '⚠️ No events matched, so nothing was deleted.',
+          timestamp: new Date(),
+        }];
+        this.scrollChatToBottom();
       }
     }
     if (action.type === 'reschedule_event' && action.title && action.date && action.newDate && action.newStartTime && action.newEndTime) {
