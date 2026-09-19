@@ -639,7 +639,8 @@
       </div>
 
       <!-- ── YEAR VIEW — scrollable all months ── -->
-      <div *ngIf="calendarView === 'year'" class="all-months-scroll" (click)="closeEventPopup()">
+      <!-- No click-to-dismiss: the popup closes only through its own ✕. -->
+      <div *ngIf="calendarView === 'year'" class="all-months-scroll">
         <div
           class="month-block"
           *ngFor="let month of calendarMonths"
@@ -2383,7 +2384,6 @@
   *ngIf="popupEvent"
   [style.left.px]="popupX"
   [style.top.px]="popupY"
-  (click)="$event.stopPropagation()"
 >
   <div class="event-popup-header">
     <span class="event-popup-dot" [style.background]="popupEvent.color"></span>
