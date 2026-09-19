@@ -2148,8 +2148,10 @@
 </div>
 
 <!-- ── CHANGE EVENT MODAL ── -->
-<div class="modal-overlay" *ngIf="showChangeModal" (click)="closeChangeModal()">
-  <div class="modal modal-browse" [class.picker-open]="showChangeCategoryPicker" (click)="$event.stopPropagation()">
+<!-- Like the schedule modal: edits in progress are not thrown away by a stray
+     click on the overlay, so the ✕ in the header is the way out. -->
+<div class="modal-overlay" *ngIf="showChangeModal">
+  <div class="modal modal-browse" [class.picker-open]="showChangeCategoryPicker">
     <div class="modal-header">
       <h3>{{ changeStep === 'search' ? i18n.t('changeEventTitle') : i18n.t('updateEvent') }}</h3>
       <button class="modal-close" (click)="closeChangeModal()">✕</button>
@@ -2436,8 +2438,10 @@
 </div>
 
 <!-- ── OVERLAP DETECTION MODAL ── -->
-<div class="modal-overlay" *ngIf="showOverlapModal" (click)="closeOverlapModal()">
-  <div class="modal overlap-modal" (click)="$event.stopPropagation()">
+<!-- Closing this discards pendingNewEvent — the whole event just filled in — so
+     the overlay is inert and every step's ✕ is the deliberate way out. -->
+<div class="modal-overlay" *ngIf="showOverlapModal">
+  <div class="modal overlap-modal">
 
     <!-- Step: ask -->
     <ng-container *ngIf="overlapStep === 'ask'">
