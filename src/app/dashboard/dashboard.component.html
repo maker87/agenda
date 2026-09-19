@@ -2673,7 +2673,10 @@
 </div>
 
 <!-- ── SCHEDULE EVENT MODAL ── -->
-<div class="modal-overlay" *ngIf="showScheduleModal" (click)="closeModal()">  <div class="modal" [class.picker-open]="showCategoryPicker" (click)="$event.stopPropagation()">
+<!-- Clicking the overlay deliberately does nothing here: a part-filled event is
+     too easy to lose to a stray click, so the ✕ in the header is the way out. -->
+<div class="modal-overlay" *ngIf="showScheduleModal">
+  <div class="modal" [class.picker-open]="showCategoryPicker">
 
     <div class="modal-header">
       <h3>{{ i18n.t('newEventTitle') }}</h3>
