@@ -1637,6 +1637,115 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.reportAiActionMismatch(action.title, action.date);
       }
     }
+    if (action.type === 'update_event' && action.title && action.date) {
+      const before = this.findEventForAiAction(action.title, action.date);
+      if (before) {
+        const after: CalendarEvent = { ...before };
+        if (action.newTitle?.trim()) after.title = action.newTitle.trim();
+        if (action.newCategory !== undefined) after.category = action.newCategory.trim();
+        if (action.newDescription !== undefined) after.description = action.newDescription.trim();
+        if (action.newLocation !== undefined) after.location = action.newLocation.trim();
+        // Category drives an event's colour everywhere else, so keep the two in step.
+        if (after.category !== before.category) {
+          after.color = after.category ? this.getCategoryColor(after.category) : before.color;
+          this.rememberCategory(after.category);
+        }
+        this.commitAiEventEdits([{ before, after }]);
+      } else {
+        this.reportAiActionMismatch(action.title, action.date);
+      }
+    }
+    if (action.type === 'rename_category' && action.path && action.newPath) {
+      const from = action.path.trim();
+      const to = action.newPath.trim();
+      const moved = this.applyCategoryMapping(c => this.isUnderCategory(c, from) ? to + c.slice(from.length) : null);
+      this.savedCategories = this.savedCategories
+        .map(p => this.isUnderCategory(p, from) ? to + p.slice(from.length) : p)
+        .sort();
+      this.persistCategories();
+      if (this.isUnderCategory(this.activeCategoryFilter, from)) {
+        this.activeCategoryFilter = to + this.activeCategoryFilter.slice(from.length);
+      }
+      this.addAssistantMsg(`✅ Renamed **${from}** to **${to}** — ${this.eventsLabel(moved)} moved with it.`);
+    }
+    if (action.type === 'delete_category' && action.path) {
+      const path = action.path.trim();
+      const to = (action.reassignTo ?? '').trim();
+      const moved = this.applyCategoryMapping(c => this.isUnderCategory(c, path) ? to : null);
+      this.savedCategories = this.savedCategories.filter(p => !this.isUnderCategory(p, path));
+      this.persistCategories();
+      if (to) this.rememberCategory(to);
+      if (this.isUnderCategory(this.activeCategoryFilter, path)) this.activeCategoryFilter = to;
+      const landed = to ? `moved to **${to}**` : 'now uncategorized';
+      this.addAssistantMsg(`✅ Deleted the **${path}** category — its ${this.eventsLabel(moved)} ${landed}.`);
+    }
+    if (action.type === 'delete_categories_bulk') {
+      const cleared = this.allCategoryPaths.length;
+      const moved = this.applyCategoryMapping(c => c ? '' : null);
+      this.savedCategories = [];
+      this.persistCategories();
+      this.activeCategoryFilter = '';
+      this.addAssistantMsg(
+        cleared === 0
+          ? '⚠️ There were no categories to clear.'
+          : `✅ Cleared all ${cleared} categories — your ${this.eventsLabel(moved)} still there, just uncategorized.`
+      );
+    }
+  }
+
+  /** True when `category` is `path` itself or something filed underneath it. */
+  private isUnderCategory(category: string, path: string): boolean {
+    return !!category && !!path && (category === path || category.startsWith(path + CATEGORY_SEP));
+  }
+
+  private eventsLabel(n: number): string {
+    return `${n} event${n === 1 ? '' : 's'}`;
+  }
+
+  /** Keep a category the assistant introduced, so it survives with no events on it. */
+  private rememberCategory(category: string) {
+    const cat = category.trim();
+    if (!cat || this.savedCategories.includes(cat)) return;
+    this.savedCategories = [...this.savedCategories, cat].sort();
+    this.persistCategories();
+  }
+
+  /**
+   * Re-file every event whose category the mapper rewrites; returning null
+   * leaves an event alone. Answers with how many actually moved, so the
+   * assistant can report something true rather than a guess.
+   */
+  private applyCategoryMapping(map: (category: string) => string | null): number {
+    const edits: { before: CalendarEvent; after: CalendarEvent }[] = [];
+    for (const before of this.events) {
+      const next = map(before.category || '');
+      if (next === null || next === before.category) continue;
+      const after: CalendarEvent = { ...before, category: next };
+      after.color = next ? this.getCategoryColor(next) : before.color;
+      edits.push({ before, after });
+    }
+    this.commitAiEventEdits(edits);
+    return edits.length;
+  }
+
+  /**
+   * Commit assistant-made event edits: swap them into the list, record one
+   * history entry each so the History tab can undo them, and persist. The
+   * category screens still edit events in place without any of this, so an
+   * edit made there is lost on reload — assistant edits go through here.
+   */
+  private commitAiEventEdits(edits: { before: CalendarEvent; after: CalendarEvent }[]) {
+    if (edits.length === 0) return;
+    const byId = new Map(edits.map(e => [e.before.id, e.after]));
+    this.events = this.events
+      .map(e => byId.get(e.id) ?? e)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+    for (const { before, after } of edits) {
+      this.recordHistory('changed', after, before);
+      this.eventsService.updateEvent(after).catch(err =>
+        console.error('[Dashboard] Failed to persist AI event edit:', err)
+      );
+    }
   }
 
   /**

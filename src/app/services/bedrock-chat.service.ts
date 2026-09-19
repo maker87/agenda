@@ -5,13 +5,44 @@ import { CalendarEvent } from './events.service';
 import { ChatMessage } from './ai-chat.service';
 import { I18nService } from './i18n.service';
 
+/**
+ * Every action the assistant can take. These mirror what the user can do by
+ * hand, so anything added to the UI belongs here too — the list is the
+ * assistant's whole vocabulary, and it can do nothing the list omits.
+ */
+export const CHAT_ACTION_TYPES = [
+  'create_event',
+  'create_recurring',
+  'create_reminder',
+  'navigate',
+  'delete_event',
+  'delete_events_bulk',
+  'reschedule_event',
+  'update_event',
+  'rename_category',
+  'delete_category',
+  'delete_categories_bulk',
+] as const;
+
+export type ChatActionType = typeof CHAT_ACTION_TYPES[number];
+
 export interface ChatAction {
-  type: 'create_event' | 'create_recurring' | 'create_reminder' | 'navigate' | 'delete_event' | 'delete_events_bulk' | 'reschedule_event';
+  type: ChatActionType;
   title?: string;
   date?: string;
   startTime?: string;
   endTime?: string;
   category?: string;
+  /** update_event: the fields to change. Anything left out stays as it is. */
+  newTitle?: string;
+  newCategory?: string;
+  newDescription?: string;
+  newLocation?: string;
+  /** Category actions: the path acted on, and what it becomes. */
+  path?: string;
+  newPath?: string;
+  /** Where a deleted category's events land. Empty means uncategorized. */
+  reassignTo?: string;
   /** Single recurring day. Superseded by daysOfWeek, kept for older replies. */
   dayOfWeek?: number;
   /** Days a recurring event lands on, e.g. [1,2,3,4,5] for Monday to Friday. */
@@ -133,7 +164,7 @@ export class BedrockChatService {
       try {
         const parsed = JSON.parse(match[1].trim());
         // Only treat it as an action if it has a valid type field
-        if (parsed.type && ['create_event', 'create_recurring', 'create_reminder', 'navigate', 'delete_event', 'delete_events_bulk', 'reschedule_event'].includes(parsed.type)) {
+        if (parsed.type && (CHAT_ACTION_TYPES as readonly string[]).includes(parsed.type)) {
           actions.push(parsed);
         }
       } catch {
@@ -143,7 +174,12 @@ export class BedrockChatService {
 
     // Also try to find inline JSON objects with action types (no code block wrapper)
     if (actions.length === 0) {
-      const inlineRegex = /\{[^{}]*"type"\s*:\s*"(create_event|create_recurring|create_reminder|delete_event|delete_events_bulk|reschedule_event)"[^{}]*\}/g;
+      // Built from the same list, so a new action type can never be accepted
+      // in a fenced block but silently dropped when it arrives inline.
+      const inlineRegex = new RegExp(
+        `\\{[^{}]*"type"\\s*:\\s*"(${CHAT_ACTION_TYPES.filter(t => t !== 'navigate').join('|')})"[^{}]*\\}`,
+        'g',
+      );
       let inlineMatch;
       while ((inlineMatch = inlineRegex.exec(text)) !== null) {
         try {

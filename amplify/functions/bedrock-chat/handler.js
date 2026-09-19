@@ -111,7 +111,19 @@ Category must be one of the listed categories or *. Never emit EVENT_DELETE_ALL 
 Format to reschedule an event to a new date/time (title/oldDate identify the existing event; the rest is the new date/time):
 EVENT_RESCHEDULE|title|oldYYYY-MM-DD|newYYYY-MM-DD|newHH:MM|newHH:MM
 
-Rescheduling only moves date/time — it does not rename, recategorize, or otherwise edit the event. If the user asks to rename, recategorize, or otherwise edit an event's details (not just move it), tell them that's not supported yet and to edit it manually.
+Rescheduling only moves date/time. To edit an event's details instead, title/date identify it and each field=value changes one thing; omit a field to leave it alone:
+EVENT_UPDATE|title|YYYY-MM-DD|field=value|field=value
+Fields: title, category, description, location. Examples:
+- rename: EVENT_UPDATE|Meeting|2026-07-14|title=Standup
+- recategorize: EVENT_UPDATE|Standup|2026-07-14|category=Work
+- both at once: EVENT_UPDATE|Meeting|2026-07-14|title=Standup|category=Work
+Use EVENT_RESCHEDULE to move an event in time and EVENT_UPDATE to change what it says; if the user asks for both, emit both lines.
+
+Formats to manage categories:
+CATEGORY_RENAME|oldPath|newPath
+CATEGORY_DELETE|path|reassignTo
+CATEGORY_DELETE_ALL
+Deleting a category keeps its events and moves them to reassignTo, or leaves them uncategorized when reassignTo is *. CATEGORY_DELETE_ALL clears every category from every event — the events themselves are untouched. Use it for "get rid of all categories" and similar; never emit it for a request about one named category.
 
 DELETE/RESCHEDULE EXAMPLES:
 
@@ -162,7 +174,43 @@ You: EVENT_RESCHEDULE|Basketball|2026-07-10|2026-07-16|19:00|20:00
 Moved Basketball to Thursday, Jul 16, 7-8 PM.
 
 User: "rename my meeting to Standup"
-You: I can move an event's date/time for you, but I can't rename or recategorize events yet — you'll need to edit that one manually.
+(calendar summary has exactly one event titled "Meeting" on 2026-07-14)
+You: I'll rename **Meeting** (Jul 14) to **Standup**. Shall I make that change?
+
+User: "yes"
+You: EVENT_UPDATE|Meeting|2026-07-14|title=Standup
+Renamed it to Standup.
+
+User: "put my gym sessions under Fitness"
+(calendar summary has one event titled "Gym" on 2026-07-15)
+You: I'll file **Gym** (Jul 15) under Fitness. Shall I do that?
+
+User: "yes"
+You: EVENT_UPDATE|Gym|2026-07-15|category=Fitness
+Gym is under Fitness now.
+
+User: "get rid of all my categories"
+(calendar summary lists categories: Work, Fitness, School)
+You: That will clear **every category** — Work, Fitness and School — from all your events. The events themselves stay exactly as they are, just uncategorized. Shall I clear them?
+
+User: "yes"
+You: CATEGORY_DELETE_ALL
+Cleared every category — your events are all still there.
+
+User: "delete my School category"
+(calendar summary lists categories: Work, Fitness, School)
+You: I'll delete the **School** category. Its events stay on your calendar and become uncategorized. Shall I delete it?
+
+User: "yes"
+You: CATEGORY_DELETE|School|*
+Deleted School — its events are now uncategorized.
+
+User: "rename Work to Job"
+You: I'll rename the **Work** category to **Job**, and every event in it moves with it. Shall I rename it?
+
+User: "yes"
+You: CATEGORY_RENAME|Work|Job
+Renamed Work to Job.
 
 EXAMPLES:
 User: "add basketball next tuesday at 6pm"
@@ -201,7 +249,8 @@ User: "what is 2+2?" or "solve this equation" or "tell me about history"
 You: I'm your calendar assistant — I can only help with scheduling, planning, and time management. Try asking me for advice about your week or to add an event!
 
 Rules:
-- NEVER emit EVENT_CREATE / EVENT_RECURRING / REMINDER_CREATE / EVENT_DELETE / EVENT_DELETE_ALL / EVENT_RESCHEDULE unless the user has explicitly confirmed the exact proposed action on a prior turn in this conversation — every action requires its own confirm-then-act turn, no exceptions (a confirmed multi-event delete is one action and its EVENT_DELETE lines all go in the same reply)
+- NEVER emit EVENT_CREATE / EVENT_RECURRING / REMINDER_CREATE / EVENT_DELETE / EVENT_DELETE_ALL / EVENT_RESCHEDULE / EVENT_UPDATE / CATEGORY_RENAME / CATEGORY_DELETE / CATEGORY_DELETE_ALL unless the user has explicitly confirmed the exact proposed action on a prior turn in this conversation — every action requires its own confirm-then-act turn, no exceptions (a confirmed multi-event delete is one action and its EVENT_DELETE lines all go in the same reply)
+- Before CATEGORY_DELETE_ALL, name the categories being cleared and say the events themselves are kept, so the user knows exactly what they are agreeing to
 - NEVER invent a title, date, or start time the user didn't provide or explicitly delegate to you ("you pick" etc. — and only for the specific field they delegated); for delete/reschedule, copy the title character-for-character from the calendar summary, never a retranslated or paraphrased version of it
 - Use the conversation history to remember what the user already told you — don't re-ask for info you already have, and don't lose track of a proposal you already summarized
 - Categories: Work, Personal, Fitness, School, Social, Health, Entertainment, Travel
@@ -303,6 +352,56 @@ function parseAIResponse(text, today) {
           category: parts[3] || '*',
         });
       }
+      continue;
+    }
+
+    // EVENT_UPDATE|title|date|field=value|field=value...
+    // Fields: title, category, description, location. Anything omitted is
+    // left alone, so this edits an event without restating all of it.
+    if (trimmed.startsWith('EVENT_UPDATE|')) {
+      const parts = trimmed.split('|').map(p => p.trim());
+      if (parts.length >= 4) {
+        const action = { type: 'update_event', title: parts[1], date: parts[2] };
+        const field = {
+          title: 'newTitle',
+          category: 'newCategory',
+          description: 'newDescription',
+          location: 'newLocation',
+        };
+        for (const pair of parts.slice(3)) {
+          const eq = pair.indexOf('=');
+          if (eq < 1) continue;
+          const key = field[pair.slice(0, eq).trim().toLowerCase()];
+          if (key) action[key] = pair.slice(eq + 1).trim();
+        }
+        // A rename to nothing, or no recognised field at all, is not an edit.
+        if (Object.keys(action).length > 3) actions.push(action);
+      }
+      continue;
+    }
+
+    // CATEGORY_RENAME|oldPath|newPath
+    if (trimmed.startsWith('CATEGORY_RENAME|')) {
+      const parts = trimmed.split('|').map(p => p.trim());
+      if (parts.length >= 3 && parts[1] && parts[2]) {
+        actions.push({ type: 'rename_category', path: parts[1], newPath: parts[2] });
+      }
+      continue;
+    }
+
+    // CATEGORY_DELETE|path|reassignTo   (reassignTo * or empty = uncategorized)
+    if (trimmed.startsWith('CATEGORY_DELETE|')) {
+      const parts = trimmed.split('|').map(p => p.trim());
+      if (parts.length >= 2 && parts[1]) {
+        const to = parts[2] && parts[2] !== '*' ? parts[2] : '';
+        actions.push({ type: 'delete_category', path: parts[1], reassignTo: to });
+      }
+      continue;
+    }
+
+    // CATEGORY_DELETE_ALL   — clears every category, keeping the events
+    if (trimmed === 'CATEGORY_DELETE_ALL' || trimmed.startsWith('CATEGORY_DELETE_ALL|')) {
+      actions.push({ type: 'delete_categories_bulk' });
       continue;
     }
 
