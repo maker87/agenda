@@ -6,7 +6,7 @@ import { ChatMessage } from './ai-chat.service';
 import { I18nService } from './i18n.service';
 
 export interface ChatAction {
-  type: 'create_event' | 'create_recurring' | 'create_reminder' | 'navigate' | 'delete_event' | 'reschedule_event';
+  type: 'create_event' | 'create_recurring' | 'create_reminder' | 'navigate' | 'delete_event' | 'delete_events_bulk' | 'reschedule_event';
   title?: string;
   date?: string;
   startTime?: string;
@@ -20,6 +20,8 @@ export interface ChatAction {
   newDate?: string;
   newStartTime?: string;
   newEndTime?: string;
+  fromDate?: string;
+  toDate?: string;
 }
 
 let _client: ReturnType<typeof generateClient<Schema>> | null = null;
@@ -128,7 +130,7 @@ export class BedrockChatService {
       try {
         const parsed = JSON.parse(match[1].trim());
         // Only treat it as an action if it has a valid type field
-        if (parsed.type && ['create_event', 'create_recurring', 'create_reminder', 'navigate', 'delete_event', 'reschedule_event'].includes(parsed.type)) {
+        if (parsed.type && ['create_event', 'create_recurring', 'create_reminder', 'navigate', 'delete_event', 'delete_events_bulk', 'reschedule_event'].includes(parsed.type)) {
           actions.push(parsed);
         }
       } catch {
@@ -138,7 +140,7 @@ export class BedrockChatService {
 
     // Also try to find inline JSON objects with action types (no code block wrapper)
     if (actions.length === 0) {
-      const inlineRegex = /\{[^{}]*"type"\s*:\s*"(create_event|create_recurring|create_reminder|delete_event|reschedule_event)"[^{}]*\}/g;
+      const inlineRegex = /\{[^{}]*"type"\s*:\s*"(create_event|create_recurring|create_reminder|delete_event|delete_events_bulk|reschedule_event)"[^{}]*\}/g;
       let inlineMatch;
       while ((inlineMatch = inlineRegex.exec(text)) !== null) {
         try {
