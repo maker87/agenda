@@ -63,9 +63,24 @@ CRITICAL EVENT/REMINDER CREATION RULES — follow this process, do not skip step
 Format for single events:
 EVENT_CREATE|title|YYYY-MM-DD|HH:MM|HH:MM|category
 
-Format for recurring events:
-EVENT_RECURRING|title|HH:MM|HH:MM|category|dayOfWeek|12
-dayOfWeek: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+Format for recurring / multi-day events:
+EVENT_RECURRING|title|HH:MM|HH:MM|category|days|weeks
+days: one or more day numbers separated by commas, where 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+weeks: how many weeks the pattern repeats for
+
+A day RANGE means one event on EVERY day in the range — never a single event
+spanning several days. "Monday to Friday" is days 1,2,3,4,5 — five events per
+week, not one event from Monday until Friday. The same applies to "weekdays"
+(1,2,3,4,5), "weekends" (6,0) and lists like "Mon, Wed and Fri" (1,3,5).
+
+Choosing weeks:
+- A plain range or list with no stated span covers ONE week: weeks=1.
+  "gym Monday to Friday" -> EVENT_RECURRING|Gym|07:00|08:00|Health|1,2,3,4,5|1
+- "every <day>" with no stated span repeats for 12 weeks.
+  "yoga every Wednesday" -> EVENT_RECURRING|Yoga|07:00|08:00|Health|3|12
+- If the user states how long, use exactly that, converting months to 4 weeks
+  each. "standup Mon-Fri for 3 weeks" -> ...|1,2,3,4,5|3
+Always tell the user how many events this will create when you confirm.
 
 Format for reminders:
 REMINDER_CREATE|title|body
@@ -185,19 +200,30 @@ function parseAIResponse(text, today) {
       continue;
     }
 
-    // EVENT_RECURRING|title|startTime|endTime|category|dayOfWeek|weeks
+    // EVENT_RECURRING|title|startTime|endTime|category|days|weeks
+    // days is a comma-separated list ("1,2,3,4,5" for Monday to Friday); a
+    // single number still works, so replies in the older shape keep parsing.
     if (trimmed.startsWith('EVENT_RECURRING|')) {
       const parts = trimmed.split('|');
       if (parts.length >= 7) {
-        actions.push({
-          type: 'create_recurring',
-          title: parts[1],
-          startTime: parts[2],
-          endTime: parts[3],
-          category: parts[4] || 'Personal',
-          dayOfWeek: parseInt(parts[5]),
-          weeks: parseInt(parts[6]) || 12,
-        });
+        const daysOfWeek = String(parts[5])
+          .split(',')
+          .map((d) => parseInt(d.trim(), 10))
+          .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+
+        if (daysOfWeek.length) {
+          actions.push({
+            type: 'create_recurring',
+            title: parts[1],
+            startTime: parts[2],
+            endTime: parts[3],
+            category: parts[4] || 'Personal',
+            daysOfWeek,
+            // Kept so an older frontend still finds a day to work with.
+            dayOfWeek: daysOfWeek[0],
+            weeks: parseInt(parts[6]) || 12,
+          });
+        }
       }
       continue;
     }

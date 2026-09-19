@@ -10,6 +10,7 @@ import { NotificationsService, AppNotification } from '../services/notifications
 import { FriendsService, Friend, FriendMessage } from '../services/friends.service';
 import { CategoryTreeService, CategoryNode, CATEGORY_SEP } from '../services/category-tree.service';
 import { GoogleCalendarService, GCalEvent, GCalCalendar } from '../services/google-calendar.service';
+import { expandRecurrence, describeDays, MAX_WEEKS } from '../services/recurrence.util';
 import { HolidaysService } from '../services/holidays.service';
 import { AiSchedulerService, AiSuggestion } from '../services/ai-scheduler.service';
 import { AiChatService, ChatMessage, EventDraft, getProactiveReminders } from '../services/ai-chat.service';
@@ -1567,7 +1568,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         sharedWith: [],
       });
     }
-    if (action.type === 'create_recurring' && action.title && action.startTime && action.endTime && action.dayOfWeek !== undefined) {
+    // Either shape is accepted: daysOfWeek for a multi-day pattern
+    // ("Monday to Friday"), dayOfWeek for the original single-day one.
+    const recurringDays: number[] | undefined =
+      Array.isArray(action.daysOfWeek) && action.daysOfWeek.length
+        ? action.daysOfWeek
+        : (action.dayOfWeek !== undefined ? [action.dayOfWeek] : undefined);
+
+    if (action.type === 'create_recurring' && action.title && action.startTime && action.endTime && recurringDays) {
       await this.createEventFromChat({
         title: action.title,
         date: '',
@@ -1577,7 +1585,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         color: '#6c63ff',
         description: '',
         sharedWith: [],
-        _recurring: { dayOfWeek: action.dayOfWeek, weeks: action.weeks || 12 },
+        _recurring: { daysOfWeek: recurringDays, weeks: action.weeks || 12 },
       } as any);
     }
     if (action.type === 'create_reminder' && action.title) {
@@ -1709,22 +1717,26 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     try {
       // Check if this is a recurring event
       if (payload._recurring) {
-        const { dayOfWeek, weeks: requestedWeeks } = payload._recurring;
-        const weeks = Math.min(requestedWeeks || 12, 12); // Cap at 12 weeks
-        const todayStr = new Date().toISOString().split('T')[0];
+        const { dayOfWeek, daysOfWeek, weeks: requestedWeeks } = payload._recurring;
+        // daysOfWeek is the current shape; dayOfWeek is still accepted so a
+        // reply produced before the multi-day protocol landed keeps working.
+        const days: number[] = Array.isArray(daysOfWeek) && daysOfWeek.length
+          ? daysOfWeek
+          : (dayOfWeek !== undefined ? [dayOfWeek] : []);
+        const weeks = Math.min(requestedWeeks || 12, MAX_WEEKS);
 
-        // Find the next occurrence of the target day
-        const startDate = new Date(todayStr + 'T00:00:00');
-        while (startDate.getDay() !== dayOfWeek) {
-          startDate.setDate(startDate.getDate() + 1);
-        }
-
-        // Build all dates first
-        const dates: string[] = [];
-        for (let w = 0; w < weeks; w++) {
-          const date = new Date(startDate);
-          date.setDate(date.getDate() + w * 7);
-          dates.push(date.toISOString().split('T')[0]);
+        // One date per selected day, per week — "Monday to Friday" is five
+        // events a week, not one event spanning five days.
+        const dates = expandRecurrence(days, weeks, new Date());
+        if (!dates.length) {
+          this.chatEventDraft = null;
+          this.chatMessages = [...this.chatMessages, {
+            id: `msg_${Date.now()}_norecur`,
+            role: 'assistant',
+            text: `I couldn't work out which days you meant. Try something like "every Monday" or "Monday to Friday".`,
+            timestamp: new Date(),
+          }];
+          return;
         }
 
         // Create events in parallel batches of 5
@@ -1755,11 +1767,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         }
 
         this.chatEventDraft = null;
-        const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dayOfWeek];
+        // Report what was actually created — the count of events and the days
+        // they land on — rather than a week count and a single day name.
+        const dayLabel = describeDays(days);
+        const spanNote = weeks > 1 ? ` over ${weeks} weeks` : '';
         this.chatMessages = [...this.chatMessages, {
           id: `msg_${Date.now()}_created`,
           role: 'assistant',
-          text: `✅ Added **${weeks}** occurrences of **"${payload.title}"** every ${dayName} at ${this.formatTime(payload.startTime)}!`,
+          text: `✅ Added **${dates.length}** ${dates.length === 1 ? 'event' : 'events'} — **"${payload.title}"** on ${dayLabel}${spanNote} at ${this.formatTime(payload.startTime)}!`,
           timestamp: new Date(),
           actions: [{ label: 'View in Agenda', type: 'navigate', tab: 'agenda' }],
         }];

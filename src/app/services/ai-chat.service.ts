@@ -3,6 +3,7 @@ import { CalendarEvent } from './events.service';
 import { AiRemindersService, Reminder, ReminderSuggestion } from './ai-reminders.service';
 import { AiSchedulerService } from './ai-scheduler.service';
 import { I18nService, LangCode } from './i18n.service';
+import { parseRecurrence, expandRecurrence } from './recurrence.util';
 
 export interface ChatMessage {
   id: string;
@@ -1782,7 +1783,7 @@ export class AiChatService {
     endTime: string | null;
     durationMin: number | null;
     category: string | null;
-    recurring: { dayOfWeek: number; weeks: number } | null;
+    recurring: { daysOfWeek: number[]; weeks: number } | null;
   } | null {
     const lower = text.toLowerCase();
 
@@ -1818,27 +1819,24 @@ export class AiChatService {
       endTime = this.addMinutesToTime(startTime, durationMin);
     }
 
-    // Recurring: "every Monday", "every Wednesday", "every Tue and Thu"
-    let recurring: { dayOfWeek: number; weeks: number } | null = null;
-    const dayNames: Record<string, number> = {
-      'sunday': 0, 'sun': 0, 'monday': 1, 'mon': 1, 'tuesday': 2, 'tue': 2, 'tues': 2,
-      'wednesday': 3, 'wed': 3, 'thursday': 4, 'thu': 4, 'thur': 4, 'thurs': 4,
-      'friday': 5, 'fri': 5, 'saturday': 6, 'sat': 6,
-    };
-    const everyMatch = lower.match(/every\s+(\w+)/i);
-    if (everyMatch) {
-      const dayStr = everyMatch[1].toLowerCase();
-      if (dayNames[dayStr] !== undefined) {
-        // Check for "for X weeks"
-        const weeksMatch = lower.match(/for\s+(\d+)\s*weeks?/i);
-        const weeks = weeksMatch ? parseInt(weeksMatch[1]) : 12;
-        recurring = { dayOfWeek: dayNames[dayStr], weeks };
-      }
+    // Multi-day patterns: "every Monday", "Monday to Friday", "weekdays",
+    // "Mon, Wed and Fri" — plus however long the user asked it to run for.
+    // A bare range covers the week it names; "every" keeps repeating.
+    let recurring: { daysOfWeek: number[]; weeks: number } | null = null;
+    const pattern = parseRecurrence(lower);
+    // A single day that isn't "every" is just a one-off date ("lunch on
+    // Monday") — leave those to parseDate below so they don't become patterns.
+    if (pattern && (pattern.ongoing || pattern.daysOfWeek.length > 1)) {
+      recurring = { daysOfWeek: pattern.daysOfWeek, weeks: pattern.weeks };
     }
 
-    // Parse a specific date if not recurring
+    // Always resolve a date. For a pattern it's the first occurrence, so a
+    // caller that only understands single events still gets a usable date
+    // instead of being left with nothing and re-asking the user for one.
     let date: string | null = null;
-    if (!recurring) {
+    if (recurring) {
+      date = expandRecurrence(recurring.daysOfWeek, 1, new Date())[0] ?? null;
+    } else {
       date = this.parseDate(lower, todayStr);
     }
 
@@ -1849,10 +1847,16 @@ export class AiChatService {
       .replace(/\s+(to|on|in|for)\s+(my\s+)?(calendar|agenda|schedule)\s*$/i, '')
       .replace(/\s*(?:at|from)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?(?:\s*(?:to|until|-)\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?/i, '')
       .replace(/\s*every\s+\w+(?:\s+and\s+\w+)?/i, '')
+      // Day ranges and lists, before the single-day rule so the whole phrase
+      // goes at once and doesn't leave "to friday" stranded in the title.
+      .replace(/\s*(?:from\s+)?(?:mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*(?:to|through|thru|till|until|-|–|—)\s*(?:mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i, '')
+      .replace(/\s*(?:on\s+)?(?:week ?days?|working days|business days|week ?ends?)\b/i, '')
+      .replace(/\s*(?:on\s+)?(?:mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)(?:\s*,\s*(?:mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday))+(?:\s+and\s+(?:mon|tue|tues|wed|weds|thu|thur|thurs|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday))?\b/i, '')
       .replace(/\s*(?:on|this|next)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today)/i, '')
       .replace(/\s*(?:on\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}/i, '')
       .replace(/\s*for\s+\d+(?:\.\d+)?\s*(?:hour|hr|h|minute|min|m)s?/i, '')
-      .replace(/\s*for\s+\d+\s*weeks?/i, '')
+      .replace(/\s*for\s+(?:\d+|a|an|one|two|three|four|five|six)\s*(?:week|month)s?/i, '')
+      .replace(/\s*for\s+\d+\s*days?/i, '')
       .replace(/\s+(event|called|named)$/i, '')
       .trim();
 

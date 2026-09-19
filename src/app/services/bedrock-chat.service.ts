@@ -12,7 +12,10 @@ export interface ChatAction {
   startTime?: string;
   endTime?: string;
   category?: string;
+  /** Single recurring day. Superseded by daysOfWeek, kept for older replies. */
   dayOfWeek?: number;
+  /** Days a recurring event lands on, e.g. [1,2,3,4,5] for Monday to Friday. */
+  daysOfWeek?: number[];
   weeks?: number;
   body?: string;
   tab?: string;
