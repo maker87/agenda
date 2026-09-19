@@ -1442,7 +1442,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       // merely mentions "scheduled" — e.g. quoting back a list of existing
       // events while asking the user to confirm a deletion.
       let displayText = reply;
-      if (actions.length === 0 && /^(adding|added|done\b|removed|deleted|moved|rescheduled|scheduling)\b/im.test(reply)) {
+      if (actions.length === 0 && /^(adding|added|done\b|removed|deleted|cleared|moved|rescheduled|scheduling)\b/im.test(reply)) {
         displayText = reply + '\n\n⚠️ _That change could not be saved automatically. Please try again or make it manually._';
       }
 
