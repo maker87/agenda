@@ -121,7 +121,11 @@
   </div>
 
   <!-- Click-outside backdrop -->
-  <div class="notif-panel-backdrop" *ngIf="showNotifPanel" (click)="showNotifPanel = false"></div>
+  <!-- Backdrops and modal overlays deliberately carry NO click handler: clicking
+       outside a popup must do nothing at all, so a stray click can never discard
+       a half-filled form or an in-progress choice. Every popup is dismissed only
+       through its own ✕ / Cancel button. Please don't add (click) back here. -->
+  <div class="notif-panel-backdrop" *ngIf="showNotifPanel"></div>
 
   <!-- Sidebar -->
   <aside class="sidebar">
@@ -1493,7 +1497,7 @@
     </div>
 
     <!-- ── Send Event picker (from within a Friends chat) ── -->
-    <div class="modal-overlay" *ngIf="showSendEventModal" (click)="closeSendEventModal()">
+    <div class="modal-overlay" *ngIf="showSendEventModal">
       <div class="modal" (click)="$event.stopPropagation()">
         <div class="modal-header">
           <h3>{{ i18n.t('sendEventModalTitle') }}</h3>
@@ -2051,7 +2055,7 @@
 </div>
 
 <!-- ── DELETE EVENT MODAL ── -->
-<div class="modal-overlay" *ngIf="showDeleteModal" (click)="closeDeleteModal()">
+<div class="modal-overlay" *ngIf="showDeleteModal">
   <div class="modal modal-browse" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>{{ i18n.t('deleteEventTitle') }}</h3>
@@ -2401,7 +2405,7 @@
 </div>
 
 <!-- ── DAY DETAIL PANEL ── -->
-<div class="modal-overlay" *ngIf="showDayPanel" (click)="closeDayPanel()">
+<div class="modal-overlay" *ngIf="showDayPanel">
   <div class="modal day-panel-modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <div>
@@ -3037,7 +3041,7 @@
 </div>
 
 <!-- ── GOOGLE CALENDAR PICKER MODAL ── -->
-<div class="modal-overlay" *ngIf="showGcalPicker" (click)="closeGcalPicker()">
+<div class="modal-overlay" *ngIf="showGcalPicker">
   <div class="modal gcal-picker-modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>{{ i18n.t('chooseCalendarsToImport') }}</h3>
@@ -3091,7 +3095,7 @@
 </div>
 
 <!-- ── SHARE EVENT MODAL ── -->
-<div class="modal-overlay" *ngIf="showShareModal" (click)="closeShareModal()">
+<div class="modal-overlay" *ngIf="showShareModal">
   <div class="modal share-modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>{{ i18n.t('shareEventTitle') }}</h3>
@@ -3183,7 +3187,7 @@
 </div>
 
 <!-- ── AI ORGANIZE MODAL ── -->
-<div class="modal-overlay" *ngIf="showOrganizeModal" (click)="closeOrganizeModal()">
+<div class="modal-overlay" *ngIf="showOrganizeModal">
   <div class="modal organize-modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>🤖 {{ i18n.t('organizeModalTitle') }}</h3>
@@ -3288,7 +3292,7 @@
 </div>
 
 <!-- ── SET REMINDER MODAL ── -->
-<div class="modal-overlay" *ngIf="showReminderModal" (click)="closeReminderModal()">
+<div class="modal-overlay" *ngIf="showReminderModal">
   <div class="modal reminder-modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>{{ i18n.t('setReminder') }}</h3>
@@ -3329,7 +3333,7 @@
 </div>
 
 <!-- ── CREATE STREAK MODAL ── -->
-<div class="modal-overlay" *ngIf="showStreakModal" (click)="closeStreakModal()">
+<div class="modal-overlay" *ngIf="showStreakModal">
   <div class="modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>🔥 {{ i18n.t('newStreakModalTitle') }}</h3>
@@ -3433,7 +3437,7 @@
 </div>
 
 <!-- ── AI CATEGORY SUGGESTION MODAL (for accepted invites) ── -->
-<div class="modal-overlay" *ngIf="showInviteCategoryModal" (click)="skipInviteCategory()">
+<div class="modal-overlay" *ngIf="showInviteCategoryModal">
   <div class="modal invite-category-modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
       <h3>{{ i18n.t('categorizeEvent') }}</h3>
@@ -3510,7 +3514,7 @@
 <!-- ── FLOATING AI CHAT ── -->
 
 <!-- Backdrop (closes panel on outside click) -->
-<div class="float-chat-backdrop" *ngIf="showFloatingChat" (click)="showFloatingChat = false"></div>
+<div class="float-chat-backdrop" *ngIf="showFloatingChat"></div>
 
 <!-- Floating panel -->
 <div class="float-chat-panel" [class.float-chat-open]="showFloatingChat">
