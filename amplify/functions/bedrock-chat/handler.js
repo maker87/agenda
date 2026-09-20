@@ -119,6 +119,23 @@ Fields: title, category, description, location. Examples:
 - both at once: EVENT_UPDATE|Meeting|2026-07-14|title=Standup|category=Work
 Use EVENT_RESCHEDULE to move an event in time and EVENT_UPDATE to change what it says; if the user asks for both, emit both lines.
 
+Formats to manage habits (the "streaks" the user tracks daily):
+STREAK_CREATE|name|target|unit
+STREAK_DELETE|name
+STREAK_LOG|name|value|YYYY-MM-DD
+target is the daily goal as a number and unit is what it counts ("pages",
+"minutes", "times"). STREAK_LOG records progress for a day — use today's date
+unless the user names another, and never a future date. Logging a value at or
+above the target checks that day off; below it un-checks it. Identify a habit
+by the exact name shown in the habits list; if none matches, say so instead of
+inventing one.
+
+Formats to manage reminders:
+REMINDER_DELETE|text
+REMINDER_TOGGLE|text|on
+REMINDER_TOGGLE pauses or resumes a reminder without deleting it (on/off).
+Match `text` exactly against the reminders list.
+
 Formats to manage categories:
 CATEGORY_RENAME|oldPath|newPath
 CATEGORY_DELETE|path|reassignTo
@@ -405,6 +422,69 @@ function parseAIResponse(text, today) {
       continue;
     }
 
+    // STREAK_CREATE|name|target|unit
+    if (trimmed.startsWith('STREAK_CREATE|')) {
+      const parts = trimmed.split('|');
+      if (parts.length >= 4 && parts[1].trim()) {
+        const target = parseFloat(parts[2]);
+        actions.push({
+          type: 'create_streak',
+          name: parts[1].trim(),
+          // A habit with no positive daily target can never be checked off,
+          // so fall back to 1 rather than storing a goal of zero.
+          target: Number.isFinite(target) && target > 0 ? target : 1,
+          unit: parts[3].trim() || 'times',
+        });
+      }
+      continue;
+    }
+
+    // STREAK_DELETE|name
+    if (trimmed.startsWith('STREAK_DELETE|')) {
+      const parts = trimmed.split('|');
+      if (parts.length >= 2 && parts[1].trim()) {
+        actions.push({ type: 'delete_streak', name: parts[1].trim() });
+      }
+      continue;
+    }
+
+    // STREAK_LOG|name|value|YYYY-MM-DD
+    if (trimmed.startsWith('STREAK_LOG|')) {
+      const parts = trimmed.split('|');
+      const value = parseFloat(parts[2]);
+      if (parts.length >= 3 && parts[1].trim() && Number.isFinite(value) && value >= 0) {
+        const date = (parts[3] || '').trim();
+        actions.push({
+          type: 'log_streak',
+          name: parts[1].trim(),
+          value,
+          date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : today,
+        });
+      }
+      continue;
+    }
+
+    // REMINDER_DELETE|text
+    if (trimmed.startsWith('REMINDER_DELETE|')) {
+      const parts = trimmed.split('|');
+      if (parts.length >= 2 && parts[1].trim()) {
+        actions.push({ type: 'delete_reminder', reminderTitle: parts[1].trim() });
+      }
+      continue;
+    }
+
+    // REMINDER_TOGGLE|text|on|off
+    if (trimmed.startsWith('REMINDER_TOGGLE|')) {
+      const parts = trimmed.split('|');
+      if (parts.length >= 3 && parts[1].trim()) {
+        const state = parts[2].trim().toLowerCase();
+        if (state === 'on' || state === 'off') {
+          actions.push({ type: 'toggle_reminder', reminderTitle: parts[1].trim(), active: state === 'on' });
+        }
+      }
+      continue;
+    }
+
     // EVENT_RESCHEDULE|title|oldDate|newDate|newStartTime|newEndTime
     if (trimmed.startsWith('EVENT_RESCHEDULE|')) {
       const parts = trimmed.split('|');
@@ -498,7 +578,7 @@ export const handler = async (event) => {
     return translateTexts(event);
   }
 
-  const { message, events, today, conversationHistory } = event.arguments;
+  const { message, events, today, conversationHistory, streaks, reminders } = event.arguments;
 
   // ── Input validation ──────────────────────────────────────────────────────
   if (!message || typeof message !== 'string') {
@@ -574,6 +654,36 @@ Upcoming events (next 50):\n` +
     } catch (err) { /* ignore */ }
   }
 
+  // Habits and reminders, listed by name so the assistant can act on them the
+  // same way it acts on events. Both are capped for the same cost reasons as
+  // the event list above.
+  let habitsContext = '';
+  if (streaks) {
+    try {
+      const parsed = JSON.parse(streaks);
+      if (Array.isArray(parsed) && parsed.length) {
+        habitsContext = `\n\nUser's habits (${parsed.length}):\n` +
+          parsed.slice(0, 30).map((s) => {
+            const goal = s.goalTotal ? `, goal ${s.goalTotal} by ${s.goalDeadline || 'no deadline'}` : '';
+            return `- ${s.name} | target ${s.target} ${s.unit} per day | ${s.count || 0} day streak${goal}`;
+          }).join('\n');
+      }
+    } catch (err) { /* ignore */ }
+  }
+
+  let remindersContext = '';
+  if (reminders) {
+    try {
+      const parsed = JSON.parse(reminders);
+      if (Array.isArray(parsed) && parsed.length) {
+        remindersContext = `\n\nUser's reminders (${parsed.length}):\n` +
+          parsed.slice(0, 30).map((r) =>
+            `- ${r.text} | ${r.frequency} at ${r.time} | ${r.active === false ? 'paused' : 'active'}`
+          ).join('\n');
+      }
+    } catch (err) { /* ignore */ }
+  }
+
   // Build conversation messages, including prior turns so the model can
   // track a multi-turn "ask required info → offer optional info → confirm"
   // flow (e.g. remembering a title/date it already asked about). History
@@ -613,7 +723,7 @@ Upcoming events (next 50):\n` +
   try {
     const command = new ConverseCommand({
       modelId: MODEL_ID,
-      system: [{ text: SYSTEM_PROMPT + eventsContext + `\n\nToday's date: ${todaySafe}` }],
+      system: [{ text: SYSTEM_PROMPT + eventsContext + habitsContext + remindersContext + `\n\nToday's date: ${todaySafe}` }],
       messages: cleanMessages,
       inferenceConfig: {
         maxTokens: 1024,

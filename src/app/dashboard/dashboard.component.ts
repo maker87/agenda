@@ -819,6 +819,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // streaks into the signed-in account, then never written to again.
   private readonly LEGACY_STREAKS_KEY = 'agenda_streaks';
   private readonly LEGACY_STREAK_HISTORY_KEY = 'agenda_streak_history';
+  // Set once the legacy streaks above have been imported into an account, so
+  // they are never handed to a second one.
+  private readonly LEGACY_STREAKS_CLAIMED_KEY = 'agenda_streaks_legacy_claimed';
 
   streaks: Streak[] = [];
 
@@ -914,6 +917,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.userEmail) return;
     const migratedFlag = `agenda_streaks_migrated_${this.userEmail}`;
     if (localStorage.getItem(migratedFlag)) return;
+
+    // The legacy keys are account-independent, so they belong to whoever used
+    // this browser before sync existed — one account, not every account that
+    // ever signs in on this machine. Claiming them once, globally, is what
+    // keeps a fresh signup empty: the per-account guard alone would hand the
+    // same streaks to each new account in turn, so someone signing up here
+    // would start with a stranger's habits already on their dashboard.
+    if (localStorage.getItem(this.LEGACY_STREAKS_CLAIMED_KEY)) {
+      localStorage.setItem(migratedFlag, '1');
+      return;
+    }
+
     try {
       const rawActive = localStorage.getItem(this.LEGACY_STREAKS_KEY);
       const rawHistory = localStorage.getItem(this.LEGACY_STREAK_HISTORY_KEY);
@@ -923,6 +938,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       if (combined.length) {
         await this.streaksService.migrateLegacyStreaks(combined, this.userEmail);
       }
+      // Claimed only once the import actually succeeded, so a failure here
+      // leaves the data for the next attempt rather than dropping it.
+      localStorage.setItem(this.LEGACY_STREAKS_CLAIMED_KEY, '1');
+      localStorage.removeItem(this.LEGACY_STREAKS_KEY);
+      localStorage.removeItem(this.LEGACY_STREAK_HISTORY_KEY);
     } catch (err) {
       console.error('[Dashboard] Failed to migrate legacy streaks:', err);
     }
