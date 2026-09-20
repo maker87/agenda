@@ -1528,7 +1528,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.chatTyping = true;
     this.scrollChatToBottom();
 
-    this.bedrockChat.sendMessage(text, this.events, this.chatMessages).then(({ text: reply, actions }) => {
+    // Habits travel with the message so the assistant can act on them by name,
+    // the same way it already acts on events.
+    this.bedrockChat.sendMessage(text, this.events, this.chatMessages, {
+      streaks: this.streaks.map(s => ({
+        name: s.name,
+        target: s.target,
+        unit: s.unit,
+        count: this.getStreakCount(s),
+        goalTotal: s.goalTotal,
+        goalDeadline: s.goalDeadline,
+      })),
+    }).then(({ text: reply, actions }) => {
       console.log('[AI Chat] Actions found:', actions.length, actions);
       
       // If no actions were parsed but the AI's reply opens with completion
@@ -1699,6 +1710,53 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       const landed = to ? `moved to **${to}**` : 'now uncategorized';
       this.addAssistantMsg(`✅ Deleted the **${path}** category — its ${this.eventsLabel(moved)} ${landed}.`);
     }
+    // ── Habits ──
+    // These drive the same methods the habit UI does, so a habit the assistant
+    // creates is indistinguishable from one added by hand.
+    if (action.type === 'create_streak' && action.name) {
+      const saved = await this.streaksService.createStreak({
+        name: action.name,
+        target: action.target && action.target > 0 ? action.target : 1,
+        unit: action.unit || 'times',
+        checkedDays: [],
+        loggedValues: {},
+        aiPlan: '',
+        createdAt: new Date().toISOString().split('T')[0],
+      }, this.userEmail);
+      this.recomputeStreakDerived(saved);
+      this.streaks = [...this.streaks, saved];
+      this.addAssistantMsg(
+        `✅ Started tracking **${saved.name}** — ${saved.target} ${saved.unit} a day.`
+      );
+    }
+
+    if (action.type === 'delete_streak' && action.name) {
+      const streak = this.findStreakByName(action.name);
+      if (!streak) {
+        this.addAssistantMsg(`⚠️ I couldn't find a habit called "${action.name}".`);
+      } else {
+        await this.deleteStreak(streak.id);
+        this.addAssistantMsg(
+          `✅ Deleted the habit **${streak.name}** — it's in your history if you want it back.`
+        );
+      }
+    }
+
+    if (action.type === 'log_streak' && action.name && action.value !== undefined) {
+      const streak = this.findStreakByName(action.name);
+      if (!streak) {
+        this.addAssistantMsg(`⚠️ I couldn't find a habit called "${action.name}".`);
+      } else {
+        const date = action.date || new Date().toISOString().split('T')[0];
+        this.logStreakValue(streak, date, action.value);
+        const done = action.value >= streak.target;
+        this.addAssistantMsg(
+          `✅ Logged ${action.value} ${streak.unit} for **${streak.name}**` +
+          `${done ? ` — that's the day done, ${this.getStreakCount(streak)} in a row.` : `, ${streak.target - action.value} short of the ${streak.target} target.`}`
+        );
+      }
+    }
+
     if (action.type === 'delete_categories_bulk') {
       const cleared = this.allCategoryPaths.length;
       const moved = this.applyCategoryMapping(c => c ? '' : null);
@@ -1711,6 +1769,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           : `✅ Cleared all ${cleared} categories — your ${this.eventsLabel(moved)} still there, just uncategorized.`
       );
     }
+  }
+
+  /**
+   * Find a habit the assistant named. Exact match first, then case-insensitive,
+   * so "gym" still finds "Gym" without matching something only loosely similar.
+   */
+  private findStreakByName(name: string): Streak | undefined {
+    const wanted = name.trim().toLowerCase();
+    return this.streaks.find(s => s.name === name)
+      ?? this.streaks.find(s => s.name.trim().toLowerCase() === wanted);
   }
 
   /** True when `category` is `path` itself or something filed underneath it. */

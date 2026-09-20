@@ -5,6 +5,17 @@ import { CalendarEvent } from './events.service';
 import { ChatMessage } from './ai-chat.service';
 import { I18nService } from './i18n.service';
 
+/** The habit fields the assistant needs to name one and describe its state. */
+export interface AssistantStreak {
+  name: string;
+  target: number;
+  unit: string;
+  /** Current consecutive-day count, if the caller has computed one. */
+  count?: number;
+  goalTotal?: number;
+  goalDeadline?: string;
+}
+
 /**
  * Every action the assistant can take. These mirror what the user can do by
  * hand, so anything added to the UI belongs here too — the list is the
@@ -22,6 +33,9 @@ export const CHAT_ACTION_TYPES = [
   'rename_category',
   'delete_category',
   'delete_categories_bulk',
+  'create_streak',
+  'delete_streak',
+  'log_streak',
 ] as const;
 
 export type ChatActionType = typeof CHAT_ACTION_TYPES[number];
@@ -56,6 +70,12 @@ export interface ChatAction {
   newEndTime?: string;
   fromDate?: string;
   toDate?: string;
+  /** Habit actions: which habit, and its daily goal. */
+  name?: string;
+  target?: number;
+  unit?: string;
+  /** log_streak: how much was done on `date`. */
+  value?: number;
 }
 
 let _client: ReturnType<typeof generateClient<Schema>> | null = null;
@@ -77,6 +97,8 @@ export class BedrockChatService {
     message: string,
     events: CalendarEvent[],
     conversationHistory: ChatMessage[],
+    /** The user's habits, so the assistant can act on them by name. */
+    context: { streaks?: AssistantStreak[] } = {},
   ): Promise<{ text: string; actions: ChatAction[] }> {
     const today = new Date().toISOString().split('T')[0];
     const lang = this.i18n.getLanguage();
@@ -114,11 +136,21 @@ export class BedrockChatService {
       : '';
 
     try {
+      // Trimmed the same way events are — only the fields the assistant needs
+      // to name one and describe its state.
+      const trimmedStreaks = (context.streaks ?? []).slice(0, 30).map(s => ({
+        name: s.name,
+        target: s.target,
+        unit: s.unit,
+        count: s.count ?? 0,
+        ...(s.goalTotal ? { goalTotal: s.goalTotal, goalDeadline: s.goalDeadline } : {}),
+      }));
       const { data, errors } = await getClient().queries.chat({
         message: langInstruction + message,
         events: JSON.stringify(trimmedEvents),
         today,
         conversationHistory: JSON.stringify(history),
+        streaks: JSON.stringify(trimmedStreaks),
       });
 
       if (errors?.length) {

@@ -122,11 +122,10 @@ const schema = a.schema({
       events: a.string(),
       today: a.string(),
       conversationHistory: a.string(),
-      // The user's habits and reminders, so the assistant can act on them by
+      // The user's habits, so the assistant can act on them by
       // name the same way it already acts on events. Optional: an older client
       // that doesn't send it still works, it just can't manage those.
       streaks: a.string(),
-      reminders: a.string(),
     })
     .returns(a.string())
     .handler(a.handler.function(bedrockChatHandler))

@@ -130,12 +130,6 @@ above the target checks that day off; below it un-checks it. Identify a habit
 by the exact name shown in the habits list; if none matches, say so instead of
 inventing one.
 
-Formats to manage reminders:
-REMINDER_DELETE|text
-REMINDER_TOGGLE|text|on
-REMINDER_TOGGLE pauses or resumes a reminder without deleting it (on/off).
-Match `text` exactly against the reminders list.
-
 Formats to manage categories:
 CATEGORY_RENAME|oldPath|newPath
 CATEGORY_DELETE|path|reassignTo
@@ -266,7 +260,7 @@ User: "what is 2+2?" or "solve this equation" or "tell me about history"
 You: I'm your calendar assistant — I can only help with scheduling, planning, and time management. Try asking me for advice about your week or to add an event!
 
 Rules:
-- NEVER emit EVENT_CREATE / EVENT_RECURRING / REMINDER_CREATE / EVENT_DELETE / EVENT_DELETE_ALL / EVENT_RESCHEDULE / EVENT_UPDATE / CATEGORY_RENAME / CATEGORY_DELETE / CATEGORY_DELETE_ALL unless the user has explicitly confirmed the exact proposed action on a prior turn in this conversation — every action requires its own confirm-then-act turn, no exceptions (a confirmed multi-event delete is one action and its EVENT_DELETE lines all go in the same reply)
+- NEVER emit EVENT_CREATE / EVENT_RECURRING / REMINDER_CREATE / EVENT_DELETE / EVENT_DELETE_ALL / EVENT_RESCHEDULE / EVENT_UPDATE / CATEGORY_RENAME / CATEGORY_DELETE / CATEGORY_DELETE_ALL / STREAK_CREATE / STREAK_DELETE / STREAK_LOG unless the user has explicitly confirmed the exact proposed action on a prior turn in this conversation — every action requires its own confirm-then-act turn, no exceptions (a confirmed multi-event delete is one action and its EVENT_DELETE lines all go in the same reply)
 - Before CATEGORY_DELETE_ALL, name the categories being cleared and say the events themselves are kept, so the user knows exactly what they are agreeing to
 - NEVER invent a title, date, or start time the user didn't provide or explicitly delegate to you ("you pick" etc. — and only for the specific field they delegated); for delete/reschedule, copy the title character-for-character from the calendar summary, never a retranslated or paraphrased version of it
 - Use the conversation history to remember what the user already told you — don't re-ask for info you already have, and don't lose track of a proposal you already summarized
@@ -464,26 +458,6 @@ function parseAIResponse(text, today) {
       continue;
     }
 
-    // REMINDER_DELETE|text
-    if (trimmed.startsWith('REMINDER_DELETE|')) {
-      const parts = trimmed.split('|');
-      if (parts.length >= 2 && parts[1].trim()) {
-        actions.push({ type: 'delete_reminder', reminderTitle: parts[1].trim() });
-      }
-      continue;
-    }
-
-    // REMINDER_TOGGLE|text|on|off
-    if (trimmed.startsWith('REMINDER_TOGGLE|')) {
-      const parts = trimmed.split('|');
-      if (parts.length >= 3 && parts[1].trim()) {
-        const state = parts[2].trim().toLowerCase();
-        if (state === 'on' || state === 'off') {
-          actions.push({ type: 'toggle_reminder', reminderTitle: parts[1].trim(), active: state === 'on' });
-        }
-      }
-      continue;
-    }
 
     // EVENT_RESCHEDULE|title|oldDate|newDate|newStartTime|newEndTime
     if (trimmed.startsWith('EVENT_RESCHEDULE|')) {
@@ -578,7 +552,7 @@ export const handler = async (event) => {
     return translateTexts(event);
   }
 
-  const { message, events, today, conversationHistory, streaks, reminders } = event.arguments;
+  const { message, events, today, conversationHistory, streaks } = event.arguments;
 
   // ── Input validation ──────────────────────────────────────────────────────
   if (!message || typeof message !== 'string') {
@@ -671,19 +645,6 @@ Upcoming events (next 50):\n` +
     } catch (err) { /* ignore */ }
   }
 
-  let remindersContext = '';
-  if (reminders) {
-    try {
-      const parsed = JSON.parse(reminders);
-      if (Array.isArray(parsed) && parsed.length) {
-        remindersContext = `\n\nUser's reminders (${parsed.length}):\n` +
-          parsed.slice(0, 30).map((r) =>
-            `- ${r.text} | ${r.frequency} at ${r.time} | ${r.active === false ? 'paused' : 'active'}`
-          ).join('\n');
-      }
-    } catch (err) { /* ignore */ }
-  }
-
   // Build conversation messages, including prior turns so the model can
   // track a multi-turn "ask required info → offer optional info → confirm"
   // flow (e.g. remembering a title/date it already asked about). History
@@ -723,7 +684,7 @@ Upcoming events (next 50):\n` +
   try {
     const command = new ConverseCommand({
       modelId: MODEL_ID,
-      system: [{ text: SYSTEM_PROMPT + eventsContext + habitsContext + remindersContext + `\n\nToday's date: ${todaySafe}` }],
+      system: [{ text: SYSTEM_PROMPT + eventsContext + habitsContext + `\n\nToday's date: ${todaySafe}` }],
       messages: cleanMessages,
       inferenceConfig: {
         maxTokens: 1024,
