@@ -237,6 +237,7 @@ const TRANSLATIONS: Record<LangCode, Translations> = {
     timePlaceholder12: '9:30 or 930',
     timePlaceholder24: '09:30 or 0930',
     toggleMeridiem: 'Switch between AM and PM',
+    pickATime: 'Pick a time from the list',
     description: 'Description',
     descriptionPlaceholder: 'Optional notes about this event...',
     location: 'Location',

@@ -1,0 +1,53 @@
+<div class="time-input">
+  <input
+    #input
+    [id]="inputId || null"
+    type="text"
+    inputmode="numeric"
+    autocomplete="off"
+    maxlength="5"
+    role="combobox"
+    aria-haspopup="listbox"
+    [attr.aria-expanded]="open"
+    [attr.name]="name"
+    [required]="required"
+    [value]="field.text"
+    [placeholder]="placeholder"
+    (input)="onInput($event)"
+    (focus)="openList()"
+    (click)="openList()"
+    (keydown)="onKeydown($event)"
+    (blur)="normalize()"
+  />
+
+  <button
+    *ngIf="usesTwelveHourClock"
+    type="button"
+    class="meridiem-toggle"
+    (click)="toggleMeridiem()"
+    [title]="toggleLabel"
+    [attr.aria-label]="toggleLabel"
+  >{{ meridiemLabel(field.meridiem) }}</button>
+
+  <button
+    type="button"
+    class="time-open-btn"
+    (click)="open ? closeList() : openList()"
+    [title]="pickLabel"
+    [attr.aria-label]="pickLabel"
+    tabindex="-1"
+  >🕐</button>
+
+  <ul class="time-options" *ngIf="open" role="listbox">
+    <li
+      *ngFor="let option of options; let i = index; trackBy: trackByValue"
+      class="time-option"
+      role="option"
+      [class.active]="i === activeIndex"
+      [class.current]="isCurrent(option)"
+      [attr.aria-selected]="isCurrent(option)"
+      (mousedown)="$event.preventDefault()"
+      (click)="choose(option)"
+    >{{ option.label }}</li>
+  </ul>
+</div>

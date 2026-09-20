@@ -1,0 +1,133 @@
+/* ── Time picker ──
+   The dashboard's theme variables are :host-scoped to that component and don't
+   reach here, so the few that are needed are re-declared with the same values
+   and the same light/dark switch. */
+
+:host {
+  --tp-surface: #ffffff;
+  --tp-surface-hover: #f4f5f9;
+  --tp-text: #1a1a2e;
+  --tp-text-soft: #6b7280;
+  --tp-border: #e3e5ec;
+  --tp-accent: #6c63ff;
+  --tp-shadow: 0 12px 32px rgba(26, 26, 46, 0.16);
+
+  display: block;
+}
+
+:host-context([data-theme='dark']) {
+  --tp-surface: #1a1a2e;
+  --tp-surface-hover: #24243d;
+  --tp-text: #e8e8f0;
+  --tp-text-soft: #9ca3af;
+  --tp-border: #2f2f4a;
+  --tp-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.time-input {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.time-input input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Buttons ── */
+
+.meridiem-toggle,
+.time-open-btn {
+  flex: 0 0 auto;
+  border: 1.5px solid var(--tp-border);
+  border-radius: 9px;
+  background: var(--tp-surface);
+  color: var(--tp-text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.meridiem-toggle {
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.time-open-btn {
+  width: 34px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.meridiem-toggle:hover,
+.time-open-btn:hover {
+  border-color: var(--tp-accent);
+  color: var(--tp-accent);
+}
+
+.meridiem-toggle:focus-visible,
+.time-open-btn:focus-visible {
+  outline: none;
+  border-color: var(--tp-accent);
+  box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.1);
+}
+
+/* ── Dropdown ── */
+
+.time-options {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  /* Tall enough to show the shape of the day, short enough to leave the field
+     and the rest of the form visible while it's open. */
+  max-height: 208px;
+  overflow-y: auto;
+  background: var(--tp-surface);
+  border: 1px solid var(--tp-border);
+  border-radius: 11px;
+  box-shadow: var(--tp-shadow);
+}
+
+.time-option {
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13.5px;
+  color: var(--tp-text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.time-option:hover,
+.time-option.active {
+  background: var(--tp-surface-hover);
+}
+
+.time-option.current {
+  color: var(--tp-accent);
+  font-weight: 600;
+}
+
+/* Keyboard highlight has to stay visible over the hover shade. */
+.time-option.active {
+  box-shadow: inset 0 0 0 1.5px var(--tp-accent);
+}
+
+@media (max-width: 640px) {
+  .time-options {
+    max-height: 168px;
+  }
+
+  /* Matches the rest of the mobile form: 16px stops iOS zooming on focus. */
+  .time-input input {
+    font-size: 16px;
+  }
+}

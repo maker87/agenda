@@ -2288,17 +2288,11 @@
         <div class="field-row">
           <div class="field">
             <label>{{ i18n.t('startTime') }}</label>
-            <div class="time-input">
-              <input type="text" inputmode="numeric" [ngModel]="changeStartTime.text" name="changeStart" (input)="onTimeInput(changeStartTime, $event)" maxlength="5" (blur)="normalizeTimeField(changeStartTime)" [placeholder]="timePlaceholder" autocomplete="off" />
-              <button *ngIf="usesTwelveHourClock" type="button" class="meridiem-toggle" (click)="toggleMeridiem(changeStartTime)" [title]="i18n.t('toggleMeridiem')" [attr.aria-label]="i18n.t('toggleMeridiem')">{{ meridiemLabel(changeStartTime.meridiem) }}</button>
-            </div>
+            <app-time-picker [field]="changeStartTime" name="changeStart" />
           </div>
           <div class="field">
             <label>{{ i18n.t('endTime') }}</label>
-            <div class="time-input">
-              <input type="text" inputmode="numeric" [ngModel]="changeEndTime.text" name="changeEnd" (input)="onTimeInput(changeEndTime, $event)" maxlength="5" (blur)="normalizeTimeField(changeEndTime)" [placeholder]="timePlaceholder" autocomplete="off" />
-              <button *ngIf="usesTwelveHourClock" type="button" class="meridiem-toggle" (click)="toggleMeridiem(changeEndTime)" [title]="i18n.t('toggleMeridiem')" [attr.aria-label]="i18n.t('toggleMeridiem')">{{ meridiemLabel(changeEndTime.meridiem) }}</button>
-            </div>
+            <app-time-picker [field]="changeEndTime" name="changeEnd" />
           </div>
         </div>
 
@@ -2677,17 +2671,11 @@
         <div class="field-row" style="margin-top:14px">
           <div class="field">
             <label>{{ i18n.t('startTime') }}</label>
-            <div class="time-input">
-              <input type="text" inputmode="numeric" [ngModel]="overlapStartTime.text" name="overlapTimeStart" (input)="onTimeInput(overlapStartTime, $event)" maxlength="5" (blur)="normalizeTimeField(overlapStartTime)" [placeholder]="timePlaceholder" autocomplete="off" />
-              <button *ngIf="usesTwelveHourClock" type="button" class="meridiem-toggle" (click)="toggleMeridiem(overlapStartTime)" [title]="i18n.t('toggleMeridiem')" [attr.aria-label]="i18n.t('toggleMeridiem')">{{ meridiemLabel(overlapStartTime.meridiem) }}</button>
-            </div>
+            <app-time-picker [field]="overlapStartTime" name="overlapTimeStart" />
           </div>
           <div class="field">
             <label>{{ i18n.t('endTime') }}</label>
-            <div class="time-input">
-              <input type="text" inputmode="numeric" [ngModel]="overlapEndTime.text" name="overlapTimeEnd" (input)="onTimeInput(overlapEndTime, $event)" maxlength="5" (blur)="normalizeTimeField(overlapEndTime)" [placeholder]="timePlaceholder" autocomplete="off" />
-              <button *ngIf="usesTwelveHourClock" type="button" class="meridiem-toggle" (click)="toggleMeridiem(overlapEndTime)" [title]="i18n.t('toggleMeridiem')" [attr.aria-label]="i18n.t('toggleMeridiem')">{{ meridiemLabel(overlapEndTime.meridiem) }}</button>
-            </div>
+            <app-time-picker [field]="overlapEndTime" name="overlapTimeEnd" />
           </div>
         </div>
 
@@ -2824,55 +2812,11 @@
       <div class="field-row">
         <div class="field">
           <label for="start-time">{{ isMultiDay ? i18n.t('startTimeFirstDay') : i18n.t('startTime') }}</label>
-          <div class="time-input">
-            <input
-              id="start-time"
-              type="text"
-              inputmode="numeric"
-              [ngModel]="formStartTime.text"
-              name="startTime"
-              (input)="onTimeInput(formStartTime, $event)"
-              maxlength="5"
-              (blur)="normalizeTimeField(formStartTime)"
-              [placeholder]="timePlaceholder"
-              autocomplete="off"
-              required
-            />
-            <button
-              *ngIf="usesTwelveHourClock"
-              type="button"
-              class="meridiem-toggle"
-              (click)="toggleMeridiem(formStartTime)"
-              [title]="i18n.t('toggleMeridiem')"
-              [attr.aria-label]="i18n.t('toggleMeridiem')"
-            >{{ meridiemLabel(formStartTime.meridiem) }}</button>
-          </div>
+          <app-time-picker [field]="formStartTime" name="startTime" inputId="start-time" [required]="true" />
         </div>
         <div class="field">
           <label for="end-time">{{ isMultiDay ? i18n.t('endTimeLastDay') : i18n.t('endTime') }}</label>
-          <div class="time-input">
-            <input
-              id="end-time"
-              type="text"
-              inputmode="numeric"
-              [ngModel]="formEndTime.text"
-              name="endTime"
-              (input)="onTimeInput(formEndTime, $event)"
-              maxlength="5"
-              (blur)="normalizeTimeField(formEndTime)"
-              [placeholder]="timePlaceholder"
-              autocomplete="off"
-              required
-            />
-            <button
-              *ngIf="usesTwelveHourClock"
-              type="button"
-              class="meridiem-toggle"
-              (click)="toggleMeridiem(formEndTime)"
-              [title]="i18n.t('toggleMeridiem')"
-              [attr.aria-label]="i18n.t('toggleMeridiem')"
-            >{{ meridiemLabel(formEndTime.meridiem) }}</button>
-          </div>
+          <app-time-picker [field]="formEndTime" name="endTime" inputId="end-time" [required]="true" />
         </div>
       </div>
 
