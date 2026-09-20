@@ -163,9 +163,13 @@ export class EventsService {
         endTime:     event.endTime,
         description: event.description,
         color:       event.color,
-        category:    event.category || undefined,
-        location:    event.location || undefined,
-        sharedWith:  event.sharedWith?.length ? event.sharedWith : undefined,
+        // null clears the field; undefined would mean "leave it as it is", so
+        // an emptied category/location silently kept its old value in the
+        // database and came back on the next load even though the local copy
+        // looked cleared.
+        category:    event.category || null,
+        location:    event.location || null,
+        sharedWith:  event.sharedWith?.length ? event.sharedWith : null,
       });
       if (errors?.length) throw new Error(errors[0].message);
       const saved = this.toLocal(data!);
@@ -317,9 +321,11 @@ export class EventsService {
             id: entry.event.id, title: entry.event.title, date: entry.event.date,
             startTime: entry.event.startTime, endTime: entry.event.endTime,
             description: entry.event.description, color: entry.event.color,
-            category: entry.event.category || undefined,
-            location: entry.event.location || undefined,
-            sharedWith: entry.event.sharedWith?.length ? entry.event.sharedWith : undefined,
+            // null clears, undefined leaves unchanged — same reason as in
+            // updateEvent(), so a queued clear survives the replay too.
+            category: entry.event.category || null,
+            location: entry.event.location || null,
+            sharedWith: entry.event.sharedWith?.length ? entry.event.sharedWith : null,
           });
           if (errors?.length) throw new Error(errors[0].message);
         } else if (entry.op === 'delete' && !entry.event.id.startsWith('local_')) {

@@ -1454,6 +1454,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       const moved = this.applyCategoryMapping(c => c ? '' : null);
       this.savedCategories = [];
       this.persistCategories();
+      // Drop the saved colours too — otherwise a category recreated later
+      // silently comes back wearing its old colour.
+      this.categoryColors = {};
+      this.saveCategoryColors();
       this.activeCategoryFilter = '';
       this.addAssistantMsg(
         cleared === 0
@@ -1501,7 +1505,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       const next = map(before.category || '');
       if (next === null || next === before.category) continue;
       const after: CalendarEvent = { ...before, category: next };
-      after.color = next ? this.getCategoryColor(next) : before.color;
+      // An event losing its category loses that category's colour with it —
+      // keeping the old one would leave it looking filed when it isn't.
+      after.color = next ? this.getCategoryColor(next) : UNCATEGORIZED_COLOR;
       edits.push({ before, after });
     }
     this.commitAiEventEdits(edits);
@@ -3108,21 +3114,32 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /** Save category colors to localStorage for persistence. */
+  // Colours used to live under one flat key shared by every account on the
+  // browser, so signing in as someone else overwrote the previous account's
+  // choices with their own. They are per-account now; LEGACY_COLORS_KEY is
+  // read once so nobody's existing colours are lost to the move.
+  private get CATEGORY_COLORS_KEY() { return `agenda_category_colors_${this.userEmail}`; }
+  private readonly LEGACY_CATEGORY_COLORS_KEY = 'agenda_category_colors';
+
   private saveCategoryColors() {
     try {
-      localStorage.setItem('agenda_category_colors', JSON.stringify(this.categoryColors));
+      localStorage.setItem(this.CATEGORY_COLORS_KEY, JSON.stringify(this.categoryColors));
     } catch { /* ignore */ }
   }
 
   /** Load category colors from localStorage. */
   private loadCategoryColors() {
     try {
-      const stored = localStorage.getItem('agenda_category_colors');
+      // Fall back to the shared key only until this account has its own, and
+      // claim it by writing the colours back out under the per-account one.
+      const own = localStorage.getItem(this.CATEGORY_COLORS_KEY);
+      const stored = own ?? localStorage.getItem(this.LEGACY_CATEGORY_COLORS_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         Object.assign(this.categoryColors, parsed);
         this.dropAutoAssignedSubcategoryColors();
       }
+      if (!own) this.saveCategoryColors();
     } catch { /* ignore */ }
   }
 
@@ -3465,23 +3482,25 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     });
     this.persistCategories();
 
-    // Reassign events that used this category (or a descendant)
-    for (const event of this.events) {
-      if (event.category === oldPath) {
-        event.category = newPath;
-      } else if (event.category.startsWith(oldPath + CATEGORY_SEP)) {
-        event.category = newPath + event.category.slice(oldPath.length);
-      }
-    }
+    // Re-file the events through the shared mapper, which writes each one
+    // back and records it in History. Editing event.category in place here
+    // saved nothing: neither the cache nor the backend heard about it, so
+    // every renamed event reverted on the next reload.
+    const moved = this.applyCategoryMapping(
+      c => this.categoryTreeService.isUnderPath(c, oldPath) ? newPath + c.slice(oldPath.length) : null
+    );
 
     // Update expanded-node tracking
     if (this.expandedCatNodes.has(oldPath)) {
       this.expandedCatNodes.delete(oldPath);
       this.expandedCatNodes.add(newPath);
     }
+    if (this.categoryTreeService.isUnderPath(this.activeCategoryFilter, oldPath)) {
+      this.activeCategoryFilter = newPath + this.activeCategoryFilter.slice(oldPath.length);
+    }
 
     this.cancelRenameCategory();
-    this.catFormSuccess = `Renamed to "${newPath}".`;
+    this.catFormSuccess = `Renamed to "${newPath}" — ${this.eventsLabel(moved)} moved with it.`;
     setTimeout(() => { this.catFormSuccess = ''; }, 3000);
   }
 
@@ -5501,7 +5520,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Persist reminder setting on the event
     const updated = { ...ev, reminderMinutes: this.reminderMinutes } as CalendarEvent & { reminderMinutes: number };
-    this.events = this.events.map(e => e.id === ev.id ? { ...e } : e);
+    // The event that goes back into the list has to be `updated`; putting a
+    // copy of the old one there sent the reminder to the backend but dropped
+    // it in memory, so reopening the dialog showed the previous setting.
+    this.events = this.events.map(e => e.id === ev.id ? updated : e);
     this.eventsService.updateEvent(updated).catch(err =>
       console.error('[Dashboard] Failed to save reminder:', err)
     );
