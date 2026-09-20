@@ -134,7 +134,11 @@ Formats to manage categories:
 CATEGORY_RENAME|oldPath|newPath
 CATEGORY_DELETE|path|reassignTo
 CATEGORY_DELETE_ALL
-Deleting a category keeps its events and moves them to reassignTo, or leaves them uncategorized when reassignTo is *. CATEGORY_DELETE_ALL clears every category from every event — the events themselves are untouched. Use it for "get rid of all categories" and similar; never emit it for a request about one named category.
+Deleting a category keeps its events by default and moves them to reassignTo, or leaves them unorganized when reassignTo is *. To delete the events along with the category, put the literal DELETE_EVENTS there instead:
+- keep the events, unorganized: CATEGORY_DELETE|School|*
+- move them to another category: CATEGORY_DELETE|School|Personal
+- delete them too: CATEGORY_DELETE|School|DELETE_EVENTS
+Deleting a category and deleting its events are different things, so when the category has events and the user hasn't said which they want, ask before proposing either — don't assume. CATEGORY_DELETE_ALL clears every category from every event — the events themselves are untouched. Use it for "get rid of all categories" and similar; never emit it for a request about one named category.
 
 DELETE/RESCHEDULE EXAMPLES:
 
@@ -209,12 +213,22 @@ You: CATEGORY_DELETE_ALL
 Cleared every category — your events are all still there.
 
 User: "delete my School category"
-(calendar summary lists categories: Work, Fitness, School)
-You: I'll delete the **School** category. Its events stay on your calendar and become uncategorized. Shall I delete it?
+(calendar summary lists categories: Work, Fitness, School, with events under School)
+You: Before I do — should I keep those events and just leave them unorganized, or delete them along with the category?
+
+User: "keep them"
+You: I'll delete the **School** category and leave its events on your calendar, unorganized. Shall I do that?
 
 User: "yes"
 You: CATEGORY_DELETE|School|*
-Deleted School — its events are now uncategorized.
+Deleted School — its events are still there, just unorganized.
+
+User: "delete my School category and everything in it"
+You: That will delete the **School** category and all 12 events filed under it. The events cannot be recovered from chat. Shall I delete them?
+
+User: "yes"
+You: CATEGORY_DELETE|School|DELETE_EVENTS
+Deleted School and its 12 events.
 
 User: "rename Work to Job"
 You: I'll rename the **Work** category to **Job**, and every event in it moves with it. Shall I rename it?
@@ -400,12 +414,15 @@ function parseAIResponse(text, today) {
       continue;
     }
 
-    // CATEGORY_DELETE|path|reassignTo   (reassignTo * or empty = uncategorized)
+    // CATEGORY_DELETE|path|reassignTo   (reassignTo * or empty = uncategorized,
+    // or the literal DELETE_EVENTS to remove the events along with the label)
     if (trimmed.startsWith('CATEGORY_DELETE|')) {
       const parts = trimmed.split('|').map(p => p.trim());
       if (parts.length >= 2 && parts[1]) {
-        const to = parts[2] && parts[2] !== '*' ? parts[2] : '';
-        actions.push({ type: 'delete_category', path: parts[1], reassignTo: to });
+        const target = parts[2] || '';
+        const deleteEvents = target.toUpperCase() === 'DELETE_EVENTS';
+        const to = !deleteEvents && target && target !== '*' ? target : '';
+        actions.push({ type: 'delete_category', path: parts[1], reassignTo: to, deleteEvents });
       }
       continue;
     }

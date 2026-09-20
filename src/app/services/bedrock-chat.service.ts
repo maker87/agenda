@@ -57,6 +57,8 @@ export interface ChatAction {
   newPath?: string;
   /** Where a deleted category's events land. Empty means uncategorized. */
   reassignTo?: string;
+  /** delete_category: delete the events along with the label, not just re-file them. */
+  deleteEvents?: boolean;
   /** Single recurring day. Superseded by daysOfWeek, kept for older replies. */
   dayOfWeek?: number;
   /** Days a recurring event lands on, e.g. [1,2,3,4,5] for Monday to Friday. */

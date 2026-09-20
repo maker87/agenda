@@ -146,6 +146,10 @@ const TRANSLATIONS: Record<LangCode, Translations> = {
     deleteCat: 'Delete',
     categoryHasEvents: 'This category has',
     eventsWillBeUnassigned: 'event(s). They will be unassigned.',
+    // Deleting a category with events asks which of the two it means.
+    eventsWhatToDo: 'event(s). What should happen to them?',
+    keepEventsUnorganized: 'Keep events, unorganized',
+    deleteEventsToo: 'Delete events too',
     deleteConfirm: 'Delete',
     pickColorFor: 'Pick a color for',
     appliesToAllEvents: '(applies to all its events):',

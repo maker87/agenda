@@ -1702,13 +1702,17 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (action.type === 'delete_category' && action.path) {
       const path = action.path.trim();
       const to = (action.reassignTo ?? '').trim();
-      const moved = this.applyCategoryMapping(c => this.isUnderCategory(c, path) ? to : null);
-      this.savedCategories = this.savedCategories.filter(p => !this.isUnderCategory(p, path));
-      this.persistCategories();
+      const affected = this.countEventsUnder(path);
+      // Drives the same method the category screen does, so deleting by chat
+      // and deleting by hand can never drift apart.
+      this.confirmDeleteCategory(path, to, !!action.deleteEvents);
       if (to) this.rememberCategory(to);
-      if (this.isUnderCategory(this.activeCategoryFilter, path)) this.activeCategoryFilter = to;
-      const landed = to ? `moved to **${to}**` : 'now uncategorized';
-      this.addAssistantMsg(`✅ Deleted the **${path}** category — its ${this.eventsLabel(moved)} ${landed}.`);
+      const outcome = action.deleteEvents
+        ? `and its ${this.eventsLabel(affected)}`
+        : to
+          ? `— its ${this.eventsLabel(affected)} moved to **${to}**`
+          : `— its ${this.eventsLabel(affected)} kept, just unorganized`;
+      this.addAssistantMsg(`✅ Deleted the **${path}** category ${outcome}.`);
     }
     // ── Habits ──
     // These drive the same methods the habit UI does, so a habit the assistant
@@ -3769,12 +3773,27 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /** Delete category and optionally reassign its events to another category. */
-  confirmDeleteCategory(path: string, reassignTo: string) {
-    // Reassign events that used this category (or a descendant)
-    for (const event of this.events) {
-      if (event.category === path || event.category.startsWith(path + CATEGORY_SEP)) {
-        event.category = reassignTo;
-      }
+  /**
+   * Delete a category. Its events either outlive it — re-filed under
+   * `reassignTo`, or left unorganized when that is empty — or are deleted
+   * along with it when `deleteEvents` is set. Keeping them is the default:
+   * a category is a label, so removing one should not quietly take a month
+   * of events with it.
+   */
+  confirmDeleteCategory(path: string, reassignTo: string, deleteEvents = false) {
+    let affected: number;
+    if (deleteEvents) {
+      // Snapshot first — deleteEvent() reassigns this.events as it goes.
+      const doomed = this.events.filter(e => this.categoryTreeService.isUnderPath(e.category, path));
+      affected = doomed.length;
+      for (const ev of doomed) this.deleteEvent(ev.id);
+    } else {
+      // Goes through the shared mapper so the events are persisted and land
+      // in the History tab; the old in-place edit did neither, and the
+      // category came back on the next reload.
+      affected = this.applyCategoryMapping(
+        c => this.categoryTreeService.isUnderPath(c, path) ? reassignTo : null
+      );
     }
 
     // Remove from saved categories
@@ -3783,8 +3802,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     );
     this.persistCategories();
     this.expandedCatNodes.delete(path);
+    if (this.categoryTreeService.isUnderPath(this.activeCategoryFilter, path)) {
+      this.activeCategoryFilter = reassignTo;
+    }
     this.deletingCatPath = null;
-    this.catFormSuccess = `"${path}" deleted.`;
+    this.catFormSuccess = deleteEvents
+      ? `"${path}" and its ${this.eventsLabel(affected)} deleted.`
+      : `"${path}" deleted — ${this.eventsLabel(affected)} kept.`;
     setTimeout(() => { this.catFormSuccess = ''; }, 3000);
   }
 
