@@ -2004,6 +2004,25 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+/* Opens the month on its own, so it has to look like it does something. */
+.month-header-clickable {
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+  transition: background 0.15s, color 0.15s;
+}
+.month-header-clickable:hover,
+.month-header-clickable:focus-visible {
+  background: var(--bg-hover);
+}
+.month-header-clickable:hover .month-name,
+.month-header-clickable:focus-visible .month-name {
+  color: var(--accent);
+}
+.month-header-clickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .month-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
 
 .month-year-badge {

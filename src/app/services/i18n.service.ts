@@ -61,6 +61,7 @@ const TRANSLATIONS: Record<LangCode, Translations> = {
     anyDateInWeek: 'Any date in week',
     date: 'Date',
     thisMonth: 'This month',
+    openMonthView: 'Open this month',
     weekOf: 'Week of',
     noEventsDay: 'No events on this day.',
     categoriesLabel: 'Categories:',

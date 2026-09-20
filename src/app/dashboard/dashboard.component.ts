@@ -2786,6 +2786,18 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // ── Year view slideshow ──
   slideMonthIndex = new Date().getMonth();
+
+  /**
+   * Year view: clicking a month's header opens that month on its own. Set
+   * directly rather than through goToSlideMonth(), which animates between
+   * months and bails when the target is the one already selected — neither
+   * makes sense when the month is arriving from a different view.
+   */
+  openMonthView(monthIdx: number) {
+    this.slideMonthIndex = monthIdx;
+    this.slideAnimating = false;
+    this.calendarView = 'month';
+  }
   slideAnimating = false;
   slideDirection: 'left' | 'right' = 'left';
 
@@ -3086,9 +3098,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
    * with no category at all.
    */
   eventColor(ev: { category?: string; color?: string } | null | undefined): string {
-    if (!ev) return UNCATEGORIZED_COLOR;
-    if (ev.category) return this.getCategoryColor(ev.category);
-    return ev.color || UNCATEGORIZED_COLOR;
+    // The stored `color` is deliberately ignored. It's a leftover from when
+    // each event carried its own colour, and reading it is what let old
+    // colour codes keep showing through after a category was recoloured.
+    // Colour comes from the category, or grey when there isn't one.
+    if (!ev?.category) return UNCATEGORIZED_COLOR;
+    return this.getCategoryColor(ev.category);
   }
 
   /** Exposed for the template's "no category yet" swatch. */
@@ -3120,6 +3135,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // read once so nobody's existing colours are lost to the move.
   private get CATEGORY_COLORS_KEY() { return `agenda_category_colors_${this.userEmail}`; }
   private readonly LEGACY_CATEGORY_COLORS_KEY = 'agenda_category_colors';
+  /** Marks that the pre-category colour codes have been cleared out. */
+  private readonly COLOR_RESET_KEY = 'agenda_color_codes_reset';
 
   private saveCategoryColors() {
     try {
@@ -3130,6 +3147,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Load category colors from localStorage. */
   private loadCategoryColors() {
     try {
+      if (this.purgeLegacyColorCodes()) return;
       // Fall back to the shared key only until this account has its own, and
       // claim it by writing the colours back out under the per-account one.
       const own = localStorage.getItem(this.CATEGORY_COLORS_KEY);
@@ -3137,10 +3155,36 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       if (stored) {
         const parsed = JSON.parse(stored);
         Object.assign(this.categoryColors, parsed);
-        this.dropAutoAssignedSubcategoryColors();
       }
       if (!own) this.saveCategoryColors();
     } catch { /* ignore */ }
+  }
+
+  /**
+   * Throw away every colour code saved before colours became a property of the
+   * category.
+   *
+   * What was stored was a mix of three things that can no longer be told
+   * apart: colours the user picked, colours the old code auto-assigned by
+   * hashing a path, and colours copied onto a category when an event was
+   * filed under it. Keeping any of them meant an old colour outranking the
+   * category it was supposed to follow. Everything now derives from the
+   * category, so the map starts empty and fills only with deliberate choices.
+   *
+   * Runs once per browser — a colour picked after the reset is kept.
+   * Returns true when it ran, so the caller skips loading the old values.
+   */
+  private purgeLegacyColorCodes(): boolean {
+    if (localStorage.getItem(this.COLOR_RESET_KEY)) return false;
+
+    for (const key of Object.keys(localStorage)) {
+      if (key === this.LEGACY_CATEGORY_COLORS_KEY || key.startsWith(`${this.LEGACY_CATEGORY_COLORS_KEY}_`)) {
+        localStorage.removeItem(key);
+      }
+    }
+    this.categoryColors = {};
+    localStorage.setItem(this.COLOR_RESET_KEY, new Date().toISOString());
+    return true;
   }
 
   /**

@@ -651,7 +651,18 @@
           [class.current-month]="month.isCurrent"
           [attr.id]="'year-month-' + month.monthIdx"
         >
-          <div class="month-header">
+          <!-- The header opens the month on its own; the day cells below keep
+               their own click, so this does not swallow them. -->
+          <div
+            class="month-header month-header-clickable"
+            role="button"
+            tabindex="0"
+            [attr.aria-label]="i18n.t('openMonthView') + ' ' + month.name"
+            [title]="i18n.t('openMonthView')"
+            (click)="openMonthView(month.monthIdx)"
+            (keydown.enter)="openMonthView(month.monthIdx)"
+            (keydown.space)="openMonthView(month.monthIdx); $event.preventDefault()"
+          >
             <span class="month-name">{{ month.name }} {{ currentYear }}</span>
             <span class="month-year-badge" *ngIf="month.isCurrent">{{ i18n.t('thisMonth') }}</span>
           </div>
