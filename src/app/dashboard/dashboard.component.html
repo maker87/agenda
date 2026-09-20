@@ -2274,14 +2274,14 @@
           <div class="field">
             <label>{{ i18n.t('startTime') }}</label>
             <div class="time-input">
-              <input type="text" inputmode="numeric" [(ngModel)]="changeStartTime.text" name="changeStart" (blur)="normalizeTimeField(changeStartTime)" [placeholder]="timePlaceholder" autocomplete="off" />
+              <input type="text" inputmode="numeric" [ngModel]="changeStartTime.text" name="changeStart" (input)="onTimeInput(changeStartTime, $event)" maxlength="5" (blur)="normalizeTimeField(changeStartTime)" [placeholder]="timePlaceholder" autocomplete="off" />
               <button *ngIf="usesTwelveHourClock" type="button" class="meridiem-toggle" (click)="toggleMeridiem(changeStartTime)" [title]="i18n.t('toggleMeridiem')" [attr.aria-label]="i18n.t('toggleMeridiem')">{{ meridiemLabel(changeStartTime.meridiem) }}</button>
             </div>
           </div>
           <div class="field">
             <label>{{ i18n.t('endTime') }}</label>
             <div class="time-input">
-              <input type="text" inputmode="numeric" [(ngModel)]="changeEndTime.text" name="changeEnd" (blur)="normalizeTimeField(changeEndTime)" [placeholder]="timePlaceholder" autocomplete="off" />
+              <input type="text" inputmode="numeric" [ngModel]="changeEndTime.text" name="changeEnd" (input)="onTimeInput(changeEndTime, $event)" maxlength="5" (blur)="normalizeTimeField(changeEndTime)" [placeholder]="timePlaceholder" autocomplete="off" />
               <button *ngIf="usesTwelveHourClock" type="button" class="meridiem-toggle" (click)="toggleMeridiem(changeEndTime)" [title]="i18n.t('toggleMeridiem')" [attr.aria-label]="i18n.t('toggleMeridiem')">{{ meridiemLabel(changeEndTime.meridiem) }}</button>
             </div>
           </div>
@@ -2663,14 +2663,14 @@
           <div class="field">
             <label>{{ i18n.t('startTime') }}</label>
             <div class="time-input">
-              <input type="text" inputmode="numeric" [(ngModel)]="overlapStartTime.text" name="overlapTimeStart" (blur)="normalizeTimeField(overlapStartTime)" [placeholder]="timePlaceholder" autocomplete="off" />
+              <input type="text" inputmode="numeric" [ngModel]="overlapStartTime.text" name="overlapTimeStart" (input)="onTimeInput(overlapStartTime, $event)" maxlength="5" (blur)="normalizeTimeField(overlapStartTime)" [placeholder]="timePlaceholder" autocomplete="off" />
               <button *ngIf="usesTwelveHourClock" type="button" class="meridiem-toggle" (click)="toggleMeridiem(overlapStartTime)" [title]="i18n.t('toggleMeridiem')" [attr.aria-label]="i18n.t('toggleMeridiem')">{{ meridiemLabel(overlapStartTime.meridiem) }}</button>
             </div>
           </div>
           <div class="field">
             <label>{{ i18n.t('endTime') }}</label>
             <div class="time-input">
-              <input type="text" inputmode="numeric" [(ngModel)]="overlapEndTime.text" name="overlapTimeEnd" (blur)="normalizeTimeField(overlapEndTime)" [placeholder]="timePlaceholder" autocomplete="off" />
+              <input type="text" inputmode="numeric" [ngModel]="overlapEndTime.text" name="overlapTimeEnd" (input)="onTimeInput(overlapEndTime, $event)" maxlength="5" (blur)="normalizeTimeField(overlapEndTime)" [placeholder]="timePlaceholder" autocomplete="off" />
               <button *ngIf="usesTwelveHourClock" type="button" class="meridiem-toggle" (click)="toggleMeridiem(overlapEndTime)" [title]="i18n.t('toggleMeridiem')" [attr.aria-label]="i18n.t('toggleMeridiem')">{{ meridiemLabel(overlapEndTime.meridiem) }}</button>
             </div>
           </div>
@@ -2814,8 +2814,10 @@
               id="start-time"
               type="text"
               inputmode="numeric"
-              [(ngModel)]="formStartTime.text"
+              [ngModel]="formStartTime.text"
               name="startTime"
+              (input)="onTimeInput(formStartTime, $event)"
+              maxlength="5"
               (blur)="normalizeTimeField(formStartTime)"
               [placeholder]="timePlaceholder"
               autocomplete="off"
@@ -2838,8 +2840,10 @@
               id="end-time"
               type="text"
               inputmode="numeric"
-              [(ngModel)]="formEndTime.text"
+              [ngModel]="formEndTime.text"
               name="endTime"
+              (input)="onTimeInput(formEndTime, $event)"
+              maxlength="5"
               (blur)="normalizeTimeField(formEndTime)"
               [placeholder]="timePlaceholder"
               autocomplete="off"

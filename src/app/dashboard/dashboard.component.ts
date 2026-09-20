@@ -11,6 +11,7 @@ import { FriendsService, Friend, FriendMessage } from '../services/friends.servi
 import { CategoryTreeService, CategoryNode, CATEGORY_SEP } from '../services/category-tree.service';
 import { GoogleCalendarService, GCalEvent, GCalCalendar } from '../services/google-calendar.service';
 import { expandRecurrence, describeDays, MAX_WEEKS } from '../services/recurrence.util';
+import { resolveCategoryColor, UNCATEGORIZED_COLOR } from '../services/category-color.util';
 import { HolidaysService } from '../services/holidays.service';
 import { AiSchedulerService, AiSuggestion } from '../services/ai-scheduler.service';
 import { AiChatService, ChatMessage, EventDraft, getProactiveReminders } from '../services/ai-chat.service';
@@ -117,6 +118,31 @@ function toTimeField(hhmm: string, twelveHour: boolean): TimeField {
   const meridiem: Meridiem = hour < 12 ? 'AM' : 'PM';
   if (!twelveHour) return { text: `${String(hour).padStart(2, '0')}:${parts[2]}`, meridiem };
   return { text: `${hour % 12 === 0 ? 12 : hour % 12}:${parts[2]}`, meridiem };
+}
+
+/**
+ * Reshape a time as it is being typed, so the colon appears on its own and
+ * digits are all anyone has to enter: "930" becomes "9:30", "0930" becomes
+ * "09:30". Text that is not a bare clock time — a typed "pm", say — is handed
+ * back untouched, for parseTimeField to make sense of on the way out.
+ */
+function formatTypedTime(raw: string): string {
+  const text = raw ?? '';
+  if (/[^\d:.\s]/.test(text)) return text;
+
+  const separator = text.search(/[:.]/);
+  if (separator >= 0) {
+    // The user placed the split themselves; leave it exactly where they put it.
+    const hh = text.slice(0, separator).replace(/\D/g, '').slice(0, 2);
+    const mm = text.slice(separator + 1).replace(/\D/g, '').slice(0, 2);
+    return `${hh}:${mm}`;
+  }
+
+  const digits = text.replace(/\D/g, '').slice(0, 4);
+  // Under three digits there is no telling the hour from the minutes yet, so
+  // leave the keystrokes alone rather than have the colon jump around.
+  if (digits.length < 3) return digits;
+  return `${digits.slice(0, digits.length - 2)}:${digits.slice(-2)}`;
 }
 
 /**
@@ -3227,13 +3253,22 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get timePlaceholder(): string {
-    // The HH:MM hint is already translated everywhere, so reuse it for the
-    // 24-hour clock rather than carrying a second copy of the same string.
-    return this.usesTwelveHourClock ? this.i18n.t('timePlaceholder12') : this.i18n.t('startTimePlaceholder');
+    return this.usesTwelveHourClock ? this.i18n.t('timePlaceholder12') : this.i18n.t('timePlaceholder24');
   }
 
   toggleMeridiem(field: TimeField) {
     field.meridiem = field.meridiem === 'AM' ? 'PM' : 'AM';
+  }
+
+  /** Put the colon in as the user types, so they only ever enter digits. */
+  onTimeInput(field: TimeField, event: Event) {
+    const input = event.target as HTMLInputElement;
+    const formatted = formatTypedTime(input.value);
+    field.text = formatted;
+    // Written straight back to the element as well: where the formatted value
+    // matches what the field already held ("9:30" typed one digit further),
+    // Angular sees no change and would leave the raw keystrokes on screen.
+    if (input.value !== formatted) input.value = formatted;
   }
 
   /** Re-render a typed time in its canonical shape once the field loses focus. */
@@ -3369,34 +3404,38 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Returns a consistent color for a given category. Auto-assigns one if not yet mapped. */
   getCategoryColor(category: string): string {
-    if (!category) return '#64748b'; // default gray for uncategorized
-    if (this.categoryColors[category]) return this.categoryColors[category];
-    // Auto-assign based on hash of category name for consistency
-    let hash = 0;
-    for (let i = 0; i < category.length; i++) {
-      hash = category.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const idx = Math.abs(hash) % this.categoryColorPalette.length;
-    this.categoryColors[category] = this.categoryColorPalette[idx];
-    return this.categoryColors[category];
+    // Resolved fresh each time rather than cached: a sub-category with no
+    // colour of its own follows whatever its parent is set to, so recolouring
+    // a parent updates everything under it immediately. Caching the derived
+    // value here is what used to freeze sub-categories to a random colour.
+    return resolveCategoryColor(category, this.categoryColors, this.categoryColorPalette);
+  }
+
+  /**
+   * The colour an event is drawn in.
+   *
+   * Taken from its category so that recolouring a category is reflected
+   * everywhere at once. `color` on the event is only a fallback for events
+   * with no category at all.
+   */
+  eventColor(ev: { category?: string; color?: string } | null | undefined): string {
+    if (!ev) return UNCATEGORIZED_COLOR;
+    if (ev.category) return this.getCategoryColor(ev.category);
+    return ev.color || UNCATEGORIZED_COLOR;
   }
 
   /** Change a category's color and update all events using that category. */
+  /**
+   * Recolour the category the event is being filed under.
+   *
+   * There is no per-event colour to set any more — an event takes its
+   * category's colour — so with no category chosen there is nothing to do.
+   */
   pickCategoryColor(color: string) {
-    if (this.form.category) {
-      // Update the category color map
-      this.categoryColors[this.form.category] = color;
-      // Update all existing events in this category to use the new color
-      this.events = this.events.map(e =>
-        e.category === this.form.category ? { ...e, color } : e
-      );
-      this.showCategoryColorPicker = false;
-      // Persist color mapping
-      this.saveCategoryColors();
-    } else {
-      // No category selected — just update the standalone color
-      this.selectedColor = color;
-    }
+    if (!this.form.category) return;
+    this.categoryColors[this.form.category] = color;
+    this.showCategoryColorPicker = false;
+    this.saveCategoryColors();
   }
 
   /** Save category colors to localStorage for persistence. */
@@ -3413,8 +3452,36 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       if (stored) {
         const parsed = JSON.parse(stored);
         Object.assign(this.categoryColors, parsed);
+        this.dropAutoAssignedSubcategoryColors();
       }
     } catch { /* ignore */ }
+  }
+
+  /**
+   * Forget sub-category colours that the old auto-assigner picked.
+   *
+   * Colours used to be hashed from the full path and then written back into the
+   * saved map, so a sub-category ended up with a stored colour unrelated to its
+   * parent and indistinguishable from a deliberate choice. Those entries would
+   * now outrank inheritance forever, so any whose value is exactly what the old
+   * hash would have produced is dropped and left to follow its parent. A colour
+   * the user picked by hand only matches by coincidence, and can be re-picked.
+   */
+  private dropAutoAssignedSubcategoryColors() {
+    let changed = false;
+    for (const path of Object.keys(this.categoryColors)) {
+      if (!path.includes(CATEGORY_SEP)) continue; // top-level colours are kept
+      let hash = 0;
+      for (let i = 0; i < path.length; i++) {
+        hash = path.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const legacy = this.categoryColorPalette[Math.abs(hash) % this.categoryColorPalette.length];
+      if (this.categoryColors[path] === legacy) {
+        delete this.categoryColors[path];
+        changed = true;
+      }
+    }
+    if (changed) this.saveCategoryColors();
   }
 
   // ── Category & sharing state ──
@@ -3612,18 +3679,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   setCategoryColorFromTree(path: string, color: string) {
+    // Only the category's colour is stored. Events read their colour from
+    // their category, so everything filed here — including sub-categories
+    // that have no colour of their own — re-renders with no per-event writes.
     this.categoryColors[path] = color;
-    // Update all events in this category to use the new color
-    this.events = this.events.map(e => {
-      if (e.category === path) {
-        const updated = { ...e, color };
-        this.eventsService.updateEvent(updated).catch(err =>
-          console.error('[Dashboard] Failed to update event color:', err)
-        );
-        return updated;
-      }
-      return e;
-    });
     this.catColorPickerPath = '';
     this.saveCategoryColors();
   }

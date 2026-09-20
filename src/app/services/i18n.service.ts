@@ -230,9 +230,11 @@ const TRANSLATIONS: Record<LangCode, Translations> = {
     endTime: 'End Time *',
     startTimePlaceholder: 'HH:MM (e.g. 09:00)',
     endTimePlaceholder: 'HH:MM (e.g. 10:00)',
-    // Shown instead of the HH:MM placeholders where the language uses a
-    // 12-hour clock; the AM/PM half of the day is picked with a toggle.
-    timePlaceholder12: 'h:mm (e.g. 9:30)',
+    // Time placeholders are digits only, so they read the same in every
+    // language and advertise that the colon is optional — typing "930" is
+    // enough. The 12-hour one has no AM/PM in it; that is a toggle.
+    timePlaceholder12: '9:30 or 930',
+    timePlaceholder24: '09:30 or 0930',
     toggleMeridiem: 'Switch between AM and PM',
     description: 'Description',
     descriptionPlaceholder: 'Optional notes about this event...',
