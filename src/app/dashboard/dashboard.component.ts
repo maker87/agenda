@@ -3187,32 +3187,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return true;
   }
 
-  /**
-   * Forget sub-category colours that the old auto-assigner picked.
-   *
-   * Colours used to be hashed from the full path and then written back into the
-   * saved map, so a sub-category ended up with a stored colour unrelated to its
-   * parent and indistinguishable from a deliberate choice. Those entries would
-   * now outrank inheritance forever, so any whose value is exactly what the old
-   * hash would have produced is dropped and left to follow its parent. A colour
-   * the user picked by hand only matches by coincidence, and can be re-picked.
-   */
-  private dropAutoAssignedSubcategoryColors() {
-    let changed = false;
-    for (const path of Object.keys(this.categoryColors)) {
-      if (!path.includes(CATEGORY_SEP)) continue; // top-level colours are kept
-      let hash = 0;
-      for (let i = 0; i < path.length; i++) {
-        hash = path.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      const legacy = this.categoryColorPalette[Math.abs(hash) % this.categoryColorPalette.length];
-      if (this.categoryColors[path] === legacy) {
-        delete this.categoryColors[path];
-        changed = true;
-      }
-    }
-    if (changed) this.saveCategoryColors();
-  }
 
   // ── Category & sharing state ──
   activeCategoryFilter = ''; // '' = show all

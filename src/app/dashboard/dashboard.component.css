@@ -7920,7 +7920,10 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--accent);
+  flex: 0 0 auto;
+  /* Colour is set per dot from the event's category; this is only the
+     fallback for an event with no category. */
+  background: var(--text-tertiary, #64748b);
 }
 
 .browse-day-events {
@@ -9139,4 +9142,14 @@
 .cat-breadcrumb-leaf {
   font-weight: 600;
   color: var(--text-primary);
+}
+
+/* Day markers in the compact browse calendars. One dot per event (up to
+   three), each in its category's colour, matching the main calendar — they
+   used to be a single dot in the accent colour regardless of category. */
+.browse-cal-dots {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  align-items: center;
 }

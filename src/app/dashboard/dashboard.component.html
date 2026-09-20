@@ -2132,7 +2132,9 @@
                   (click)="cell && cell.events.length > 0 && browseSelectDay(cell.dateStr)"
                 >
                   <span class="browse-cal-day-num" *ngIf="cell">{{ cell.day }}</span>
-                  <span class="browse-cal-dot" *ngIf="cell && cell.events.length > 0"></span>
+                  <div class="browse-cal-dots" *ngIf="cell && cell.events.length > 0">
+                    <span class="browse-cal-dot" *ngFor="let ev of cell.events.slice(0, 3)" [style.background]="eventColor(ev)" [title]="ev.title"></span>
+                  </div>
                 </div>
               </ng-container>
             </ng-container>
@@ -2235,7 +2237,9 @@
                     (click)="cell && cell.events.length > 0 && browseSelectDay(cell.dateStr)"
                   >
                     <span class="browse-cal-day-num" *ngIf="cell">{{ cell.day }}</span>
-                    <span class="browse-cal-dot" *ngIf="cell && cell.events.length > 0"></span>
+                    <div class="browse-cal-dots" *ngIf="cell && cell.events.length > 0">
+                      <span class="browse-cal-dot" *ngFor="let ev of cell.events.slice(0, 3)" [style.background]="eventColor(ev)" [title]="ev.title"></span>
+                    </div>
                   </div>
                 </ng-container>
               </ng-container>
