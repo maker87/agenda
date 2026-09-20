@@ -3370,7 +3370,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     // Neutrals & Misc
     '#8b5cf6', '#d946ef', '#14b8a6', '#64748b', '#1a1a2e',
   ];
-  selectedColor = '#6c63ff';
 
   // ── Category color map: assigns a unique color to each category ──
   categoryColors: { [category: string]: string } = {
@@ -3422,6 +3421,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!ev) return UNCATEGORIZED_COLOR;
     if (ev.category) return this.getCategoryColor(ev.category);
     return ev.color || UNCATEGORIZED_COLOR;
+  }
+
+  /** Exposed for the template's "no category yet" swatch. */
+  readonly UNCATEGORIZED_COLOR = UNCATEGORIZED_COLOR;
+
+  /** True when the path is nested under another category. */
+  isSubcategory(path: string): boolean {
+    return !!path && path.includes(CATEGORY_SEP);
   }
 
   /** Change a category's color and update all events using that category. */
@@ -4412,7 +4419,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isMultiDay = false;
     this.formShareInput = '';
     this.formShareSuggestions = [];
-    this.selectedColor = '#6c63ff';
     this.scheduleError = '';
     this.scheduleSuccess = false;
     this.showCategoryColorPicker = false;
@@ -4533,7 +4539,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
             startTime: this.form.startTime,
             endTime: this.form.endTime,
             description: this.form.description.trim(),
-            color: this.form.category ? this.getCategoryColor(this.form.category.trim()) : this.selectedColor,
+            color: this.form.category ? this.getCategoryColor(this.form.category.trim()) : UNCATEGORIZED_COLOR,
             category: this.form.category.trim(),
             location: this.form.location.trim(),
             sharedWith: [...this.form.sharedWith],
@@ -4565,7 +4571,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         startTime: this.form.startTime,
         endTime: this.form.endTime,
         description: this.form.description.trim(),
-        color: this.form.category ? this.getCategoryColor(this.form.category.trim()) : this.selectedColor,
+        color: this.form.category ? this.getCategoryColor(this.form.category.trim()) : UNCATEGORIZED_COLOR,
         category: this.form.category.trim(),
         location: this.form.location.trim(),
         sharedWith: [...this.form.sharedWith],
@@ -4595,7 +4601,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       startTime: this.form.startTime,
       endTime: this.form.endTime,
       description: this.form.description.trim(),
-      color: this.form.category ? this.getCategoryColor(this.form.category.trim()) : this.selectedColor,
+      color: this.form.category ? this.getCategoryColor(this.form.category.trim()) : UNCATEGORIZED_COLOR,
       category: this.form.category.trim(),
       location: this.form.location.trim(),
       sharedWith: [...this.form.sharedWith],
@@ -5084,7 +5090,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isMultiDay = false;
     this.formShareInput = '';
     this.formShareSuggestions = [];
-    this.selectedColor = '#6c63ff';
     this.scheduleError = '';
     this.scheduleSuccess = false;
     // Reset AI panel state

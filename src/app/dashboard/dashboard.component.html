@@ -477,7 +477,7 @@
         <h3 class="section-label muted">{{ i18n.t('past') }}</h3>
         <div class="events-list">
           <div class="event-card past" *ngFor="let event of pastEvents">
-            <div class="event-color-bar" [style.background]="event.color"></div>
+            <div class="event-color-bar" [style.background]="eventColor(event)"></div>
             <div class="event-body">
               <div class="event-header">
                 <div class="event-title-group">
@@ -509,7 +509,7 @@
         <h3 class="section-label">{{ i18n.t('today') }} · {{ formatDate(today) }}</h3>
         <div class="events-list">
           <div class="event-card" *ngFor="let event of todayEvents">
-            <div class="event-color-bar" [style.background]="event.color"></div>
+            <div class="event-color-bar" [style.background]="eventColor(event)"></div>
             <div class="event-body">
               <div class="event-header">
                 <div class="event-title-group">
@@ -545,7 +545,7 @@
         <h3 class="section-label">{{ i18n.t('upcoming') }}</h3>
         <div class="events-list">
           <div class="event-card" *ngFor="let event of upcomingEvents">
-            <div class="event-color-bar" [style.background]="event.color"></div>
+            <div class="event-color-bar" [style.background]="eventColor(event)"></div>
             <div class="event-body">
               <div class="event-header">
                 <div class="event-title-group">
@@ -674,7 +674,7 @@
                     <span
                       class="cal-dot"
                       *ngFor="let ev of cell.events.slice(0, 3)"
-                      [style.background]="ev.color"
+                      [style.background]="eventColor(ev)"
                       [title]="ev.title"
                       (click)="openEventPopup(ev, $event)"
                     ></span>
@@ -737,7 +737,7 @@
                     <div
                       class="slide-event-pill"
                       *ngFor="let ev of cell.events.slice(0, 3)"
-                      [style.background]="ev.color"
+                      [style.background]="eventColor(ev)"
                       [title]="ev.title"
                     >{{ ev.title | translateTitle }}</div>
                     <div class="slide-event-more" *ngIf="cell.events.length > 3">+{{ cell.events.length - 3 }} {{ i18n.t('more') }}</div>
@@ -783,7 +783,7 @@
               <div
                 class="week-event-pill"
                 *ngFor="let ev of day.events"
-                [style.border-left-color]="ev.color"
+                [style.border-left-color]="eventColor(ev)"
               >
                 <span class="week-event-title">{{ ev.title | translateTitle }}</span>
                 <span class="week-event-time">{{ formatTime(ev.startTime) }}</span>
@@ -809,7 +809,7 @@
               <span>{{ formatTime(ev.startTime) }}</span>
               <span class="day-event-end">{{ formatTime(ev.endTime) }}</span>
             </div>
-            <div class="day-event-card" [style.border-left-color]="ev.color">
+            <div class="day-event-card" [style.border-left-color]="eventColor(ev)">
               <div class="day-event-title">{{ ev.title | translateTitle }}</div>
               <div class="day-event-desc" *ngIf="ev.description">{{ ev.description }}</div>
             </div>
@@ -1375,7 +1375,7 @@
 
         <div class="events-list">
           <div class="event-card" *ngFor="let event of unassignedEvents">
-            <div class="event-color-bar" [style.background]="event.color"></div>
+            <div class="event-color-bar" [style.background]="eventColor(event)"></div>
             <div class="event-body">
               <div class="event-header">
                 <div class="event-title-group">
@@ -1452,7 +1452,7 @@
               </ng-container>
               <div class="shared-event-card" *ngIf="m.sharedEvent as ev">
                 <div class="shared-event-card-header">
-                  <span class="shared-event-card-dot" [style.background]="ev.color || '#6c63ff'"></span>
+                  <span class="shared-event-card-dot" [style.background]="eventColor(ev)"></span>
                   <span class="shared-event-card-title">{{ ev.title | translateTitle }}</span>
                 </div>
                 <div class="shared-event-card-meta">{{ formatDate(ev.date) }} · {{ ev.startTime }}–{{ ev.endTime }}</div>
@@ -1523,7 +1523,7 @@
               *ngFor="let ev of sendEventCandidates"
               (click)="sendEventToFriend(ev)"
             >
-              <span class="send-event-item-dot" [style.background]="ev.color"></span>
+              <span class="send-event-item-dot" [style.background]="eventColor(ev)"></span>
               <div class="friend-info">
                 <span class="friend-display-name">{{ ev.title | translateTitle }}</span>
                 <span class="friend-username">{{ formatDate(ev.date) }} · {{ ev.startTime }}–{{ ev.endTime }}</span>
@@ -1840,7 +1840,7 @@
           </div>
           <div class="weekly-day-events" *ngIf="day.events.length > 0">
             <div class="weekly-event" *ngFor="let ev of day.events">
-              <span class="weekly-event-dot" [style.background]="ev.color"></span>
+              <span class="weekly-event-dot" [style.background]="eventColor(ev)"></span>
               <span class="weekly-event-time">{{ formatTime(ev.startTime) }}</span>
               <span class="weekly-event-title">{{ ev.title | translateTitle }}</span>
               <span class="weekly-event-cat" *ngIf="ev.category">{{ ev.category | translateTitle }}</span>
@@ -2089,7 +2089,7 @@
             [class.selected]="selectedEventId === ev.id"
             (click)="selectEvent(ev.id)"
           >
-            <span class="result-dot" [style.background]="ev.color"></span>
+            <span class="result-dot" [style.background]="eventColor(ev)"></span>
             <div class="result-info">
               <span class="result-title">{{ ev.title | translateTitle }}</span>
               <span class="result-meta">{{ formatDate(ev.date) }} · {{ formatTime(ev.startTime) }}</span>
@@ -2138,7 +2138,7 @@
               [class.selected]="selectedEventId === ev.id"
               (click)="browseSelectEvent(ev.id)"
             >
-              <span class="result-dot" [style.background]="ev.color"></span>
+              <span class="result-dot" [style.background]="eventColor(ev)"></span>
               <div class="result-info">
                 <span class="result-title">{{ ev.title | translateTitle }}</span>
                 <span class="result-meta">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
@@ -2192,7 +2192,7 @@
               [class.selected]="selectedEventId === ev.id"
               (click)="selectEvent(ev.id)"
             >
-              <span class="result-dot" [style.background]="ev.color"></span>
+              <span class="result-dot" [style.background]="eventColor(ev)"></span>
               <div class="result-info">
                 <span class="result-title">{{ ev.title | translateTitle }}</span>
                 <span class="result-meta">{{ formatDate(ev.date) }} · {{ formatTime(ev.startTime) }}</span>
@@ -2241,7 +2241,7 @@
                 [class.selected]="selectedEventId === ev.id"
                 (click)="browseSelectEvent(ev.id)"
               >
-                <span class="result-dot" [style.background]="ev.color"></span>
+                <span class="result-dot" [style.background]="eventColor(ev)"></span>
                 <div class="result-info">
                   <span class="result-title">{{ ev.title | translateTitle }}</span>
                   <span class="result-meta">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
@@ -2433,7 +2433,7 @@
       </div>
       <div class="day-panel-list" *ngIf="dayPanelEvents.length > 0">
         <div class="day-panel-event" *ngFor="let ev of dayPanelEvents">
-          <div class="day-panel-color-bar" [style.background]="ev.color"></div>
+          <div class="day-panel-color-bar" [style.background]="eventColor(ev)"></div>
           <div class="day-panel-body">
             <div class="day-panel-title">{{ ev.title | translateTitle }}</div>
             <div class="day-panel-time">🕐 {{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</div>
@@ -2474,7 +2474,7 @@
             </div>
           </div>
           <div class="overlap-event-item" *ngFor="let ev of overlapConflicts">
-            <span class="result-dot" [style.background]="ev.color"></span>
+            <span class="result-dot" [style.background]="eventColor(ev)"></span>
             <div class="result-info">
               <span class="result-title">{{ ev.title | translateTitle }}</span>
               <span class="result-meta">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
@@ -2517,7 +2517,7 @@
             [class.selected]="overlapSelectedEventId === ev.id"
             (click)="overlapPickEvent(ev.id)"
           >
-            <span class="result-dot" [style.background]="ev.color"></span>
+            <span class="result-dot" [style.background]="eventColor(ev)"></span>
             <div class="result-info">
               <span class="result-title">{{ ev.title | translateTitle }}</span>
               <span class="result-meta">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
@@ -2646,7 +2646,7 @@
           </p>
           <div class="timepick-booked-list">
             <div class="timepick-booked-item" *ngFor="let ev of eventsOnDate(overlapFinalDate)">
-              <span class="timepick-booked-bar" [style.background]="ev.color"></span>
+              <span class="timepick-booked-bar" [style.background]="eventColor(ev)"></span>
               <span class="timepick-booked-title">{{ ev.title | translateTitle }}</span>
               <span class="timepick-booked-time">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
             </div>
@@ -2902,8 +2902,11 @@
             <span class="category-picker-icon">📂</span>
             <span *ngIf="!form.category" class="category-picker-placeholder">{{ i18n.t('selectOrCreate') }}</span>
             <span *ngIf="form.category" class="category-picker-value">
+              <!-- The colour the event will take, shown while choosing rather
+                   than only afterwards, so the link between the two is plain. -->
+              <span class="cat-breadcrumb-dot" [style.background]="getCategoryColor(form.category)"></span>
               <span *ngFor="let seg of form.category.split(' > '); let last = last">
-                <span class="cat-breadcrumb-seg">{{ seg | translateTitle }}</span>
+                <span class="cat-breadcrumb-seg" [class.cat-breadcrumb-leaf]="last">{{ seg | translateTitle }}</span>
                 <span *ngIf="!last" class="cat-breadcrumb-sep"> › </span>
               </span>
             </span>
@@ -3014,29 +3017,34 @@
         </div>
       </div>
 
+      <!-- Colour belongs to the category, not the event: an event is drawn in
+           its category's colour, so the only thing to set here is that
+           category's colour. With no category chosen there is nothing to pick. -->
       <div class="field">
         <label>{{ i18n.t('eventColor') }}</label>
         <div class="category-color-info" *ngIf="form.category">
           <span class="category-color-dot" [style.background]="getCategoryColor(form.category)"></span>
-          <span class="category-color-text">{{ i18n.t('usingCategoryColor') }} <strong>{{ form.category | translateTitle }}</strong> {{ i18n.t('categoryColorSuffix') }}</span>
+          <span class="category-color-text">
+            {{ i18n.t('usingCategoryColor') }} <strong>{{ form.category | translateTitle }}</strong> {{ i18n.t('categoryColorSuffix') }}
+          </span>
           <button type="button" class="category-color-change-btn" (click)="showCategoryColorPicker = !showCategoryColorPicker">{{ i18n.t('change') }}</button>
         </div>
         <div class="category-color-info" *ngIf="!form.category">
-          <span class="category-color-dot" [style.background]="selectedColor"></span>
+          <span class="category-color-dot" [style.background]="UNCATEGORIZED_COLOR"></span>
           <span class="category-color-text muted">{{ i18n.t('selectCategoryForColor') }}</span>
         </div>
-        <div class="color-picker" *ngIf="showCategoryColorPicker || !form.category">
+        <div class="color-picker" *ngIf="showCategoryColorPicker && form.category">
           <button
             type="button"
             class="color-swatch"
             *ngFor="let c of eventColors"
             [style.background]="c"
-            [class.selected]="(form.category ? getCategoryColor(form.category) : selectedColor) === c"
+            [class.selected]="getCategoryColor(form.category) === c"
             (click)="pickCategoryColor(c)"
           ></button>
         </div>
         <p class="category-color-hint" *ngIf="showCategoryColorPicker && form.category">
-          {{ i18n.t('changingColorWarning') }} "{{ form.category | translateTitle }}".
+          {{ i18n.t('changingColorWarning') }} "{{ form.category | translateTitle }}"{{ isSubcategory(form.category) ? i18n.t('subcategoryColorNote') : '' }}
         </p>
       </div>
 
@@ -3271,7 +3279,7 @@
             *ngFor="let ev of organizePreview; let i = index"
             [class.removed]="organizeRemovedIndexes.has(i)"
           >
-            <span class="organize-event-dot" [style.background]="ev.color"></span>
+            <span class="organize-event-dot" [style.background]="eventColor(ev)"></span>
             <div class="organize-event-info">
               <span class="organize-event-title">{{ ev.title | translateTitle }}</span>
               <span class="organize-event-meta">{{ ev.date }} · {{ ev.startTime }}–{{ ev.endTime }}</span>

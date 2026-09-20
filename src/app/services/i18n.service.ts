@@ -241,12 +241,16 @@ const TRANSLATIONS: Record<LangCode, Translations> = {
     location: 'Location',
     locationPlaceholder: 'Add a location…',
     openInGoogleMaps: 'Open in Google Maps ↗',
-    eventColor: 'Event Color',
-    usingCategoryColor: 'Using',
-    categoryColorSuffix: 'category color',
+    // Colour comes from the category, so this field describes the category's
+    // colour rather than offering a separate one for the event.
+    eventColor: 'Colour',
+    usingCategoryColor: 'Takes the',
+    categoryColorSuffix: 'colour',
     change: 'Change',
-    selectCategoryForColor: 'Select a category to assign a color, or pick one:',
-    changingColorWarning: 'Changing this color will update all events in',
+    selectCategoryForColor: 'Pick a category above — events take their colour from it.',
+    changingColorWarning: 'This recolours every event in',
+    // Appended when the chosen category is nested under another one.
+    subcategoryColorNote: ', and any sub-categories that follow it.',
     scheduleEventBtn: 'Schedule Event',
     eventScheduled: 'Event scheduled successfully!',
     // Delete Modal

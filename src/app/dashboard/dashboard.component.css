@@ -9101,3 +9101,23 @@
     backdrop-filter: blur(2px);
   }
 }
+
+/* ── Category breadcrumb in the event form ──
+   The dot shows the colour the event will take, so picking a category and
+   getting a colour read as one action rather than two. The leaf segment is
+   emphasised because that's the category the event is actually filed under —
+   the segments before it are the path to it. */
+.cat-breadcrumb-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 7px;
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
+
+.cat-breadcrumb-leaf {
+  font-weight: 600;
+  color: var(--text-primary);
+}
