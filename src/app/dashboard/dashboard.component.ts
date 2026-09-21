@@ -11,7 +11,7 @@ import { FriendsService, Friend, FriendMessage } from '../services/friends.servi
 import { CategoryTreeService, CategoryNode, CATEGORY_SEP } from '../services/category-tree.service';
 import { GoogleCalendarService, GCalEvent, GCalCalendar } from '../services/google-calendar.service';
 import { expandRecurrence, describeDays, MAX_WEEKS } from '../services/recurrence.util';
-import { resolveCategoryColor, UNCATEGORIZED_COLOR } from '../services/category-color.util';
+import { claimRootColor, resolveCategoryColor, seedRootColors, UNCATEGORIZED_COLOR } from '../services/category-color.util';
 import { TimePickerComponent } from '../shared/time-picker/time-picker.component';
 import { emptyTimeField, parseTimeField, toTimeField, isTwelveHourLocale, meridiemLabelFor, type TimeField } from '../services/time-field.util';
 import { HolidaysService } from '../services/holidays.service';
@@ -1193,6 +1193,24 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   ];
 
   /**
+   * How many events one recurring action may add without being shown first.
+   *
+   * Comfortably above what a normal pattern asks for — five weekdays, or a
+   * weekly slot for a term — and well below what a vague request turns into
+   * when the model picks the span itself (a daily habit for a year is 366).
+   */
+  private static readonly REVIEW_EVENT_THRESHOLD = 20;
+
+  /** How many events a recurring action would actually create. */
+  private recurringOccurrenceCount(action: BedrockAction): number {
+    const days = Array.isArray(action.daysOfWeek) && action.daysOfWeek.length
+      ? action.daysOfWeek
+      : (action.dayOfWeek !== undefined ? [action.dayOfWeek] : []);
+    if (!days.length) return 0;
+    return expandRecurrence(days, Math.min(action.weeks || 12, MAX_WEEKS), new Date()).length;
+  }
+
+  /**
    * Whether an action should be shown before it happens.
    *
    * Two cases: it is one of several things being created at once, or it would
@@ -1208,6 +1226,13 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     // A category the user already uses is theirs; a new one is an invention.
     const category = (action.category ?? '').trim();
     if (category && !this.allCategoryPaths.includes(category)) return true;
+
+    // One recurring action is still one action, but it can fill a year. Past a
+    // point the count matters more than the number of actions it arrived as.
+    if (action.type === 'create_recurring'
+      && this.recurringOccurrenceCount(action) > DashboardComponent.REVIEW_EVENT_THRESHOLD) {
+      return true;
+    }
 
     return false;
   }
@@ -1247,7 +1272,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         const days = Array.isArray(action.daysOfWeek) && action.daysOfWeek.length
           ? describeDays(action.daysOfWeek)
           : 'a weekly pattern';
-        return `**${action.title}** — ${days}, ${this.formatTime(action.startTime ?? '')}–${this.formatTime(action.endTime ?? '')}${category}`;
+        // The count is the part worth seeing — "Mon–Fri" reads small until you
+        // notice it means 60 events.
+        const count = this.recurringOccurrenceCount(action);
+        const total = count ? ` — **${count} ${count === 1 ? 'event' : 'events'}**` : '';
+        return `**${action.title}** — ${days}, ${this.formatTime(action.startTime ?? '')}–${this.formatTime(action.endTime ?? '')}${category}${total}`;
       }
       case 'create_streak':
         return `habit **${action.name}** — ${action.target} ${action.unit} a day`;
@@ -3041,10 +3070,36 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // through to everything beneath it.
   private categoryColorCache = new Map<string, string>();
 
+  // One palette colour per root category, so no two roots share one while the
+  // palette holds out. Seeded in sorted order from the categories that exist
+  // at the time, which makes it the same after every reload; a root that turns
+  // up later claims the next free slot and keeps it, so adding a category
+  // never re-colours the ones already on screen.
+  private rootColors = new Map<string, string>();
+  private rootColorsSeeded = false;
+
   getCategoryColor(category: string): string {
     const hit = this.categoryColorCache.get(category);
     if (hit !== undefined) return hit;
-    const resolved = resolveCategoryColor(category, this.categoryColors, this.categoryColorPalette);
+
+    if (!this.rootColorsSeeded) {
+      this.rootColors = seedRootColors(
+        this.allCategoryPaths.map(p => this.categoryTreeService.splitPath(p)[0]),
+        this.categoryColors,
+        this.categoryColorPalette,
+      );
+      this.rootColorsSeeded = true;
+    }
+
+    const root = this.categoryTreeService.splitPath(category)[0];
+    if (root && !this.rootColors.has(root)) {
+      this.rootColors.set(root, this.categoryColors[root]
+        ?? claimRootColor(root, this.rootColors, this.categoryColorPalette));
+    }
+
+    const resolved = resolveCategoryColor(
+      category, this.categoryColors, this.categoryColorPalette, this.rootColors,
+    );
     this.categoryColorCache.set(category, resolved);
     return resolved;
   }
@@ -3052,6 +3107,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Drop memoised colours; every write to categoryColors goes through here. */
   private invalidateCategoryColors() {
     this.categoryColorCache.clear();
+    this.rootColors.clear();
+    this.rootColorsSeeded = false;
   }
 
   /**

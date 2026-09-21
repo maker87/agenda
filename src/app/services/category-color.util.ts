@@ -116,10 +116,67 @@ export function deriveChildColor(base: string, childName: string, depth: number)
  *
  * `explicit` is not mutated — callers decide whether to cache the result.
  */
+/**
+ * Give `root` a palette colour nothing else is already using.
+ *
+ * Hashing alone picked a slot per name and lived with the clashes: across 20
+ * ordinary category names four pairs came out the same colour, even though the
+ * palette had a free slot for every one of them. Widening the palette doesn't
+ * help — the hash clusters differently against each modulus — and once there
+ * are more names than slots some sharing is unavoidable anyway. So the hash
+ * still chooses where to *start*, which keeps a name's colour predictable, and
+ * a slot that is taken probes forward to the next free one instead of doubling
+ * up. Distinct colours are then guaranteed until the palette genuinely runs out.
+ */
+export function claimRootColor(
+  root: string,
+  assigned: ReadonlyMap<string, string>,
+  palette: readonly string[],
+): string {
+  if (!palette.length) return UNCATEGORIZED_COLOR;
+
+  const taken = new Set<number>();
+  for (const color of assigned.values()) {
+    const slot = palette.indexOf(color);
+    if (slot >= 0) taken.add(slot);
+  }
+
+  let slot = hashString(root) % palette.length;
+  for (let step = 0; step < palette.length && taken.has(slot); step++) {
+    slot = (slot + 1) % palette.length;
+  }
+  return palette[slot];
+}
+
+/**
+ * Colour every root category, in sorted order so the result depends on the set
+ * of names rather than the order they happened to be discovered in — the same
+ * categories always come out the same way, including after a reload.
+ * Hand-picked colours are placed first, so probing never displaces one.
+ */
+export function seedRootColors(
+  roots: readonly string[],
+  explicit: Readonly<Record<string, string>>,
+  palette: readonly string[],
+): Map<string, string> {
+  const assigned = new Map<string, string>();
+  const unique = [...new Set(roots.filter(Boolean))].sort();
+
+  for (const root of unique) {
+    if (explicit[root]) assigned.set(root, explicit[root]);
+  }
+  for (const root of unique) {
+    if (!assigned.has(root)) assigned.set(root, claimRootColor(root, assigned, palette));
+  }
+  return assigned;
+}
+
 export function resolveCategoryColor(
   path: string,
   explicit: Readonly<Record<string, string>>,
   palette: readonly string[],
+  /** Pre-assigned root colours; without it, roots fall back to a plain hash. */
+  rootColors?: ReadonlyMap<string, string>,
 ): string {
   if (!path) return UNCATEGORIZED_COLOR;
 
@@ -140,7 +197,8 @@ export function resolveCategoryColor(
 
   // Nothing above it is coloured — seed from the root so the family matches.
   const root = segments[0];
-  const seeded = palette.length ? palette[hashString(root) % palette.length] : UNCATEGORIZED_COLOR;
+  const seeded = rootColors?.get(root)
+    ?? (palette.length ? palette[hashString(root) % palette.length] : UNCATEGORIZED_COLOR);
   if (segments.length === 1) return seeded;
   return deriveChildColor(seeded, segments[segments.length - 1], segments.length - 1);
 }
