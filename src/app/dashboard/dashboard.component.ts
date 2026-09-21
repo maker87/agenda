@@ -11,7 +11,7 @@ import { FriendsService, Friend, FriendMessage } from '../services/friends.servi
 import { CategoryTreeService, CategoryNode, CATEGORY_SEP } from '../services/category-tree.service';
 import { GoogleCalendarService, GCalEvent, GCalCalendar } from '../services/google-calendar.service';
 import { expandRecurrence, describeDays, MAX_WEEKS } from '../services/recurrence.util';
-import { buildCategoryColorMap, claimRootColor, resolveCategoryColor, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from '../services/category-color.util';
+import { buildCategoryColorMap, claimRootColor, resolveCategoryColor, seedRootColors, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from '../services/category-color.util';
 import { TimePickerComponent } from '../shared/time-picker/time-picker.component';
 import { emptyTimeField, parseTimeField, toTimeField, isTwelveHourLocale, meridiemLabelFor, type TimeField } from '../services/time-field.util';
 import { HolidaysService } from '../services/holidays.service';
@@ -1204,6 +1204,51 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     'delete_streak', 'update_event', 'reschedule_event', 'rename_category', 'log_streak',
   ];
 
+  /**
+   * A short agreement, in any of the languages the app speaks.
+   *
+   * Deliberately narrow: it has to look like agreement and nothing else, so a
+   * sentence that merely contains "yes" ("yes, but move my 3pm first") is not
+   * taken as consent to create. Anything unrecognised is treated as "not a
+   * confirmation", which costs a click rather than an unwanted event.
+   */
+  private static readonly AFFIRMATIONS = new Set([
+    // en
+    'y', 'yes', 'yeah', 'yep', 'yup', 'ok', 'okay', 'k', 'sure', 'please',
+    'confirm', 'confirmed', 'go', 'go ahead', 'do it', 'add it', 'add them',
+    'sounds good', 'looks good', 'perfect', 'great', 'correct', 'right',
+    'that works', 'works for me', 'yes please', 'ok thanks', 'save it',
+    // es / pt
+    'si', 'sí', 'vale', 'claro', 'confirmar', 'hazlo', 'sim', 'confirmo',
+    // fr
+    'oui', 'ouais', "d'accord", 'daccord', 'vas-y', 'confirme',
+    // de / nl / sv
+    'ja', 'jawohl', 'okej', 'bekräfta', 'doe het',
+    // it
+    'certo', 'conferma', 'fallo',
+    // pl / tr / ru
+    'tak', 'evet', 'tamam', 'да', 'ага', 'давай',
+    // zh / ja / ko / hi / ar
+    '是', '是的', '好', '好的', '确认', 'はい', 'うん', '確認',
+    '네', '예', '좋아', 'हाँ', 'हां', 'ठीक', 'نعم', 'حسنا',
+  ]);
+
+  /** Whether the message that prompted this reply was a plain "yes". */
+  private lastUserMessageWasAffirmation(): boolean {
+    for (let i = this.chatMessages.length - 1; i >= 0; i--) {
+      const message = this.chatMessages[i];
+      if (message.role !== 'user') continue;
+      const text = (message.text ?? '')
+        .toLowerCase()
+        .trim()
+        // Strip surrounding punctuation and emoji-ish padding, so "yes!" and
+        // "ok." count, while leaving inner words alone.
+        .replace(/^[\s.,!¡¿?"'`]+|[\s.,!¡¿?"'`]+$/g, '');
+      return DashboardComponent.AFFIRMATIONS.has(text);
+    }
+    return false;
+  }
+
   /** The events a bulk delete would remove. Shared so the count shown and the
    *  set removed can never disagree. */
   private bulkDeleteMatches(action: BedrockAction): CalendarEvent[] {
@@ -1254,6 +1299,20 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     const category = (action.category ?? '').trim();
     if (DashboardComponent.CREATING_TYPES.includes(action.type)
       && category && !this.allCategoryPaths.includes(category)) {
+      return true;
+    }
+
+    // Nothing is created unless the user just said yes.
+    //
+    // The contract is that the assistant proposes in words, waits, and only
+    // acts once the user agrees (bedrock-chat SYSTEM_PROMPT rules 3-4). When
+    // it holds, the message before the action really is "yes" / "go ahead".
+    // When it skips ahead and creates on the first turn — which is how events
+    // nobody asked for appear — the message before it is the original request
+    // instead, and that is the difference this reads. Checking it here means
+    // the contract no longer depends on the model keeping to it.
+    if (DashboardComponent.CREATING_TYPES.includes(action.type)
+      && !this.lastUserMessageWasAffirmation()) {
       return true;
     }
 
@@ -1545,8 +1604,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.savedCategories = [];
       this.persistCategories();
       // Drop the saved colours too — otherwise a category recreated later
-      // silently comes back wearing its old colour.
+      // silently comes back wearing its old colour. That goes for the ones
+      // assigned automatically as much as the ones picked by hand.
       this.categoryColors = {};
+      this.autoRootColors = {};
+      this.saveAutoRootColors();
       this.saveCategoryColors();
       this.activeCategoryFilter = '';
       this.addAssistantMsg(
@@ -3143,14 +3205,51 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     const key = `${this.savedCategories.length}:${this.events.length}`;
     if (key === this.colorPlanKey) return this.colorPlan;
 
-    this.colorPlan = buildCategoryColorMap(
-      this.allCategoryPaths, this.categoryColors, this.categoryColorPalette,
+    const paths = this.allCategoryPaths;
+    const roots = paths.map(p => this.categoryTreeService.splitPath(p)[0]).filter(Boolean);
+    this.colorPlanRoots = seedRootColors(
+      roots, this.categoryColors, this.categoryColorPalette, this.autoRootColors,
     );
-    this.colorPlanRoots = new Map(
-      Object.entries(this.colorPlan).filter(([path]) => !path.includes(CATEGORY_SEP)),
+    this.rememberRootColors(roots);
+
+    this.colorPlan = buildCategoryColorMap(
+      paths, this.categoryColors, this.categoryColorPalette, this.colorPlanRoots,
     );
     this.colorPlanKey = key;
     return this.colorPlan;
+  }
+
+  /**
+   * Write back the colours the roots just came out with.
+   *
+   * This is what keeps them still. Assignment has to probe past slots that are
+   * already spoken for, and probing cascades — without a record of what a root
+   * already had, adding one category re-coloured five others and everything
+   * filed beneath them.
+   *
+   * Only roots, and only ones with no hand-picked colour, are remembered.
+   * Writing derived sub-category shades back is the mistake that froze them to
+   * whatever colour they first got; those stay derived, so recolouring a
+   * parent still flows all the way down. A root that is renamed or deleted
+   * drops out, which frees its colour for the next one.
+   */
+  private rememberRootColors(roots: string[]) {
+    const live = new Set(roots);
+    let changed = false;
+
+    for (const name of Object.keys(this.autoRootColors)) {
+      if (!live.has(name) || this.categoryColors[name]) {
+        delete this.autoRootColors[name];
+        changed = true;
+      }
+    }
+    for (const [name, color] of this.colorPlanRoots) {
+      if (this.categoryColors[name] || this.autoRootColors[name] === color) continue;
+      this.autoRootColors[name] = color;
+      changed = true;
+    }
+
+    if (changed) this.saveAutoRootColors();
   }
 
   /** Returns a consistent colour for a given category. */
@@ -3241,8 +3340,36 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     } catch { /* ignore */ }
   }
 
+  /**
+   * Which palette colour each root category was handed automatically.
+   *
+   * Kept apart from categoryColors on purpose: that map means "the user picked
+   * this", and an entry in it outranks everything. These are the app's own
+   * choices, held only so they are the same tomorrow. Roots only — see
+   * rememberRootColors.
+   */
+  private get AUTO_ROOT_COLORS_KEY() { return `agenda_auto_root_colors_${this.userEmail}`; }
+  autoRootColors: { [root: string]: string } = {};
+
+  private saveAutoRootColors() {
+    try {
+      localStorage.setItem(this.AUTO_ROOT_COLORS_KEY, JSON.stringify(this.autoRootColors));
+    } catch { /* ignore */ }
+  }
+
+  private loadAutoRootColors() {
+    try {
+      const stored = localStorage.getItem(this.AUTO_ROOT_COLORS_KEY);
+      this.autoRootColors = stored ? JSON.parse(stored) : {};
+    } catch {
+      this.autoRootColors = {};
+    }
+    this.invalidateCategoryColors();
+  }
+
   /** Load category colors from localStorage. */
   private loadCategoryColors() {
+    this.loadAutoRootColors();
     try {
       if (this.purgeLegacyColorCodes()) return;
       // Fall back to the shared key only until this account has its own, and
@@ -3281,6 +3408,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
     this.categoryColors = {};
+    this.autoRootColors = {};
+    this.saveAutoRootColors();
     this.invalidateCategoryColors();
     localStorage.setItem(this.COLOR_RESET_KEY, new Date().toISOString());
     return true;
