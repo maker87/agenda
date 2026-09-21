@@ -11,7 +11,7 @@ import { FriendsService, Friend, FriendMessage } from '../services/friends.servi
 import { CategoryTreeService, CategoryNode, CATEGORY_SEP } from '../services/category-tree.service';
 import { GoogleCalendarService, GCalEvent, GCalCalendar } from '../services/google-calendar.service';
 import { expandRecurrence, describeDays, MAX_WEEKS } from '../services/recurrence.util';
-import { claimRootColor, resolveCategoryColor, seedRootColors, UNCATEGORIZED_COLOR } from '../services/category-color.util';
+import { buildCategoryColorMap, claimRootColor, resolveCategoryColor, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from '../services/category-color.util';
 import { TimePickerComponent } from '../shared/time-picker/time-picker.component';
 import { emptyTimeField, parseTimeField, toTimeField, isTwelveHourLocale, meridiemLabelFor, type TimeField } from '../services/time-field.util';
 import { HolidaysService } from '../services/holidays.service';
@@ -1193,6 +1193,34 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   ];
 
   /**
+   * Everything the assistant can do that changes the calendar.
+   *
+   * Reading and navigating are not here — only writes, which are what needs
+   * showing before it happens.
+   */
+  private static readonly MUTATING_TYPES = [
+    'create_event', 'create_recurring', 'create_streak', 'create_reminder',
+    'delete_event', 'delete_events_bulk', 'delete_category', 'delete_categories_bulk',
+    'delete_streak', 'update_event', 'reschedule_event', 'rename_category', 'log_streak',
+  ];
+
+  /** Actions that sweep across the calendar rather than touching one thing. */
+  private static readonly SWEEPING_TYPES = ['delete_events_bulk', 'delete_categories_bulk'];
+
+  /** The events a bulk delete would remove. Shared so the count shown and the
+   *  set removed can never disagree. */
+  private bulkDeleteMatches(action: BedrockAction): CalendarEvent[] {
+    const from = action.fromDate && action.fromDate !== '*' ? action.fromDate : '';
+    const to = action.toDate && action.toDate !== '*' ? action.toDate : '';
+    const cat = action.category && action.category !== '*' ? action.category.trim().toLowerCase() : '';
+    return this.events.filter(e =>
+      (!from || e.date >= from) &&
+      (!to || e.date <= to) &&
+      (!cat || (e.category || '').trim().toLowerCase() === cat)
+    );
+  }
+
+  /**
    * How many events one recurring action may add without being shown first.
    *
    * Comfortably above what a normal pattern asks for — five weekdays, or a
@@ -1218,14 +1246,19 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
    * vague request turns into a calendar full of things nobody asked for.
    */
   private needsReviewBefore(action: BedrockAction, batch: readonly BedrockAction[]): boolean {
-    if (!DashboardComponent.CREATING_TYPES.includes(action.type)) return false;
+    if (!DashboardComponent.MUTATING_TYPES.includes(action.type)) return false;
 
-    const creating = batch.filter(a => DashboardComponent.CREATING_TYPES.includes(a.type));
-    if (creating.length > 1) return true;
+    // Anything touching more than one thing is shown first. That is the whole
+    // rule: one change the user just asked for goes through, a sweep does not.
+    const mutating = batch.filter(a => DashboardComponent.MUTATING_TYPES.includes(a.type));
+    if (mutating.length > 1) return true;
 
     // A category the user already uses is theirs; a new one is an invention.
     const category = (action.category ?? '').trim();
-    if (category && !this.allCategoryPaths.includes(category)) return true;
+    if (DashboardComponent.CREATING_TYPES.includes(action.type)
+      && category && !this.allCategoryPaths.includes(category)) {
+      return true;
+    }
 
     // One recurring action is still one action, but it can fill a year. Past a
     // point the count matters more than the number of actions it arrived as.
@@ -1233,6 +1266,17 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       && this.recurringOccurrenceCount(action) > DashboardComponent.REVIEW_EVENT_THRESHOLD) {
       return true;
     }
+
+    // Clearing every category is never a single edit.
+    if (action.type === 'delete_categories_bulk') return true;
+
+    // A bulk delete matching one event is just that delete; matching more is a
+    // sweep, and "delete everything" is the same shape as a misfire.
+    if (action.type === 'delete_events_bulk') return this.bulkDeleteMatches(action).length > 1;
+
+    // Deleting a category that takes its events with it destroys more than a
+    // label, so it gets the same treatment.
+    if (action.type === 'delete_category' && action.deleteEvents) return true;
 
     return false;
   }
@@ -1351,14 +1395,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
     if (action.type === 'delete_events_bulk') {
-      const from = action.fromDate && action.fromDate !== '*' ? action.fromDate : '';
-      const to = action.toDate && action.toDate !== '*' ? action.toDate : '';
-      const cat = action.category && action.category !== '*' ? action.category.trim().toLowerCase() : '';
-      const matches = this.events.filter(e =>
-        (!from || e.date >= from) &&
-        (!to || e.date <= to) &&
-        (!cat || (e.category || '').trim().toLowerCase() === cat)
-      );
+      const matches = this.bulkDeleteMatches(action);
       for (const ev of matches) this.deleteEvent(ev.id);
       if (matches.length === 0) {
         this.chatMessages = [...this.chatMessages, {
@@ -3029,16 +3066,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   events: CalendarEvent[] = [];
 
-  eventColors = [
-    // Purples & Blues
-    '#6c63ff', '#764ba2', '#3b82f6', '#0ea5e9', '#06b6d4',
-    // Greens
-    '#10b981', '#22c55e', '#84cc16', '#a3e635', '#65a30d',
-    // Warm
-    '#f59e0b', '#f97316', '#ef4444', '#e11d48', '#ec4899',
-    // Neutrals & Misc
-    '#8b5cf6', '#d946ef', '#14b8a6', '#64748b', '#1a1a2e',
-  ];
+  // The swatches offered when picking a category's colour by hand. Same twelve
+  // the app assigns automatically, so a hand-picked colour sits in the scheme
+  // rather than beside it, plus three deeper tones for a category meant to
+  // recede. Grey is deliberately absent — it is what "no category" is drawn in.
+  eventColors = [...CATEGORY_PALETTE, '#334155', '#78350f', '#0f172a'];
 
   // ── Category color map: assigns a unique color to each category ──
   // Colours chosen by hand. Everything else is derived from these, so an entry
@@ -3048,67 +3080,84 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // and which quietly hijacked any category that happened to share a name.
   categoryColors: { [category: string]: string } = {};
 
-  // Palette used to auto-assign colors to new/unknown categories
-  private readonly categoryColorPalette = [
-    '#6c63ff', '#ec4899', '#f59e0b', '#3b82f6', '#10b981',
-    '#ef4444', '#764ba2', '#d946ef', '#14b8a6', '#f97316',
-    '#0ea5e9', '#8b5cf6', '#22c55e', '#e11d48', '#06b6d4',
-    '#84cc16', '#64748b', '#a3e635', '#65a30d', '#1a1a2e',
-  ];
+  // Palette used to auto-assign colours to new/unknown categories. Twelve
+  // well-separated hues rather than the twenty it held before: that list had
+  // three yellow-greens, two near-identical reds, and the exact grey used for
+  // "no category", so a good third of its slots were handed out as distinct
+  // colours that nobody could actually tell apart.
+  private readonly categoryColorPalette = CATEGORY_PALETTE;
 
-  /** Returns a consistent color for a given category. Auto-assigns one if not yet mapped. */
-  // Resolution is a pure function of (path, chosen colours, palette), but it
-  // splits the path, hashes it and converts through HSL — and the template
-  // asks for it once per event, per list, on every change-detection pass. The
-  // answers are memoised per path and the whole map is dropped whenever the
-  // chosen colours change, which is the one thing that can alter them.
+  // ── The colour plan ──
+  // Every known category's colour, worked out in one pass over the whole tree.
   //
-  // This is not the caching that went wrong before: that wrote derived shades
-  // back into categoryColors, turning "inherited from my parent" into "chosen
-  // by hand", which froze sub-categories to whatever colour they first got.
-  // Nothing here is ever written back, so recolouring a parent still flows
-  // through to everything beneath it.
-  private categoryColorCache = new Map<string, string>();
+  // Doing the whole set at once is what makes the scheme readable rather than
+  // merely deterministic. Resolving a path on its own cannot see how many
+  // siblings it shares a parent with, so it has to guess the shade from a hash
+  // of the name — which is how "Work > Meetings" and "Work > Reviews" ended up
+  // a few degrees apart, close enough to be the same colour on a calendar dot.
+  // Seen together they can be spread evenly across the band instead, and no
+  // two roots can be handed the same palette slot.
+  //
+  // It is also what rendering costs. The template asks for a colour once per
+  // event, per list, on every change-detection pass; each of those is now a
+  // property read instead of a path split, a hash and two colour-space
+  // conversions.
+  //
+  // Nothing here is ever written back into categoryColors. That is the caching
+  // that went wrong before: it turned "inherited from my parent" into "chosen
+  // by hand", freezing sub-categories to whatever colour they first got.
+  private colorPlan: Record<string, string> = {};
+  /** Root → colour, for resolving a path the plan has not seen yet. */
+  private colorPlanRoots = new Map<string, string>();
+  /** Cheap stand-in for "have the categories changed"; '' forces a rebuild. */
+  private colorPlanKey = '';
 
-  // One palette colour per root category, so no two roots share one while the
-  // palette holds out. Seeded in sorted order from the categories that exist
-  // at the time, which makes it the same after every reload; a root that turns
-  // up later claims the next free slot and keeps it, so adding a category
-  // never re-colours the ones already on screen.
-  private rootColors = new Map<string, string>();
-  private rootColorsSeeded = false;
+  private ensureColorPlan(): Record<string, string> {
+    // Renames leave both counts alone, so every write to savedCategories also
+    // clears the key; these two only catch categories and events coming and
+    // going without one.
+    const key = `${this.savedCategories.length}:${this.events.length}`;
+    if (key === this.colorPlanKey) return this.colorPlan;
 
+    this.colorPlan = buildCategoryColorMap(
+      this.allCategoryPaths, this.categoryColors, this.categoryColorPalette,
+    );
+    this.colorPlanRoots = new Map(
+      Object.entries(this.colorPlan).filter(([path]) => !path.includes(CATEGORY_SEP)),
+    );
+    this.colorPlanKey = key;
+    return this.colorPlan;
+  }
+
+  /** Returns a consistent colour for a given category. */
   getCategoryColor(category: string): string {
-    const hit = this.categoryColorCache.get(category);
-    if (hit !== undefined) return hit;
+    if (!category) return UNCATEGORIZED_COLOR;
 
-    if (!this.rootColorsSeeded) {
-      this.rootColors = seedRootColors(
-        this.allCategoryPaths.map(p => this.categoryTreeService.splitPath(p)[0]),
-        this.categoryColors,
-        this.categoryColorPalette,
-      );
-      this.rootColorsSeeded = true;
-    }
+    const plan = this.ensureColorPlan();
+    const planned = plan[category];
+    if (planned) return planned;
 
+    // Not saved anywhere yet — a category part-way through being typed into
+    // the event form, say. Resolve it on its own so it still belongs to the
+    // right family, and hold onto the answer so it stops moving while the
+    // rest of the name is typed. The next rebuild replaces it with the
+    // sibling-aware shade.
     const root = this.categoryTreeService.splitPath(category)[0];
-    if (root && !this.rootColors.has(root)) {
-      this.rootColors.set(root, this.categoryColors[root]
-        ?? claimRootColor(root, this.rootColors, this.categoryColorPalette));
+    if (root && !this.colorPlanRoots.has(root)) {
+      this.colorPlanRoots.set(root, this.categoryColors[root]
+        ?? claimRootColor(root, this.colorPlanRoots, this.categoryColorPalette));
     }
 
     const resolved = resolveCategoryColor(
-      category, this.categoryColors, this.categoryColorPalette, this.rootColors,
+      category, this.categoryColors, this.categoryColorPalette, this.colorPlanRoots,
     );
-    this.categoryColorCache.set(category, resolved);
+    plan[category] = resolved;
     return resolved;
   }
 
-  /** Drop memoised colours; every write to categoryColors goes through here. */
+  /** Drop the plan; every write to categoryColors or savedCategories lands here. */
   private invalidateCategoryColors() {
-    this.categoryColorCache.clear();
-    this.rootColors.clear();
-    this.rootColorsSeeded = false;
+    this.colorPlanKey = '';
   }
 
   /**
@@ -3376,9 +3425,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     } catch {
       this.savedCategories = [];
     }
+    // Signing in as someone else brings a different tree with it.
+    this.invalidateCategoryColors();
   }
 
   private persistCategories() {
+    // The colour plan is built from these paths, and a rename changes them
+    // without changing how many there are, so the plan is dropped here rather
+    // than left for the count to notice.
+    this.invalidateCategoryColors();
     localStorage.setItem(this.CATEGORIES_KEY, JSON.stringify(this.savedCategories));
   }
 
