@@ -1204,9 +1204,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     'delete_streak', 'update_event', 'reschedule_event', 'rename_category', 'log_streak',
   ];
 
-  /** Actions that sweep across the calendar rather than touching one thing. */
-  private static readonly SWEEPING_TYPES = ['delete_events_bulk', 'delete_categories_bulk'];
-
   /** The events a bulk delete would remove. Shared so the count shown and the
    *  set removed can never disagree. */
   private bulkDeleteMatches(action: BedrockAction): CalendarEvent[] {
@@ -1296,11 +1293,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.chatMessages = [...this.chatMessages, {
       id: `msg_${Date.now()}_review`,
       role: 'assistant',
-      text: `Before I add anything — here's exactly what I'd create:\n\n${lines}${categoryNote}\n\nAdd these, or drop them?`,
+      text: `Before I change anything — here's exactly what I'd do:\n\n${lines}${categoryNote}\n\nGo ahead, or leave it?`,
       timestamp: new Date(),
       actions: [
-        { label: 'Add them', type: 'apply_pending' },
-        { label: 'Drop them', type: 'discard_pending' },
+        { label: 'Go ahead', type: 'apply_pending' },
+        { label: 'Leave it', type: 'discard_pending' },
       ],
     }];
     this.scrollChatToBottom();
@@ -1326,6 +1323,33 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         return `habit **${action.name}** — ${action.target} ${action.unit} a day`;
       case 'create_reminder':
         return `reminder **${action.title}**`;
+      case 'delete_event':
+        return `delete **${action.title}** on ${action.date}`;
+      case 'delete_events_bulk': {
+        const matches = this.bulkDeleteMatches(action);
+        const scope = action.category && action.category !== '*'
+          ? ` in **${action.category}**`
+          : (action.fromDate && action.fromDate !== '*'
+            ? ` from ${action.fromDate} to ${action.toDate}`
+            : ' — your whole calendar');
+        return `delete **${matches.length} ${matches.length === 1 ? 'event' : 'events'}**${scope}`;
+      }
+      case 'delete_category':
+        return action.deleteEvents
+          ? `delete the category **${action.path}** and every event in it`
+          : `delete the category **${action.path}** (events kept)`;
+      case 'delete_categories_bulk':
+        return `clear **all ${this.allCategoryPaths.length} categories** (events kept)`;
+      case 'delete_streak':
+        return `delete the habit **${action.name}**`;
+      case 'rename_category':
+        return `rename **${action.path}** to **${action.newPath}**`;
+      case 'update_event':
+        return `edit **${action.title}** on ${action.date}`;
+      case 'reschedule_event':
+        return `move **${action.title}** to ${action.newDate} ${this.formatTime(action.newStartTime ?? '')}`;
+      case 'log_streak':
+        return `log ${action.value} for the habit **${action.name}**`;
       default:
         return action.title || action.name || action.type;
     }
@@ -1344,7 +1368,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   discardPendingChatActions() {
     const count = this.pendingChatActions.length;
     this.pendingChatActions = [];
-    this.addAssistantMsg(`Dropped — nothing was added. (${count} ${count === 1 ? 'item' : 'items'} discarded.)`);
+    this.addAssistantMsg(`Left alone — your calendar is unchanged. (${count} ${count === 1 ? 'change' : 'changes'} discarded.)`);
   }
 
   private async executeBedrockAction(action: BedrockAction) {
