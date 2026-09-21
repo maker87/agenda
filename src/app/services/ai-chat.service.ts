@@ -15,7 +15,9 @@ export interface ChatMessage {
 
 export interface ChatAction {
   label: string;
-  type: 'create_event' | 'navigate' | 'create_reminder' | 'copy_text' | 'confirm_create_event' | 'pick_slot' | 'create_recurring';
+  // apply_pending / discard_pending answer the "here's what I'd create"
+  // prompt shown before a batch of assistant-proposed additions is applied.
+  type: 'create_event' | 'navigate' | 'create_reminder' | 'copy_text' | 'confirm_create_event' | 'pick_slot' | 'create_recurring' | 'apply_pending' | 'discard_pending';
   payload?: Partial<CalendarEvent>;
   tab?: string;
   reminderTitle?: string;

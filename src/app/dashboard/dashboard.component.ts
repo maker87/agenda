@@ -1154,15 +1154,23 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.scrollChatToBottom();
       this.syncConversationMessages();
 
-      // The Lambda only ever emits create_event / create_recurring /
-      // create_reminder after the user has already explicitly confirmed the
-      // proposed details on a prior chat turn (see bedrock-chat SYSTEM_PROMPT
-      // rules 3-4), so by the time an action reaches the frontend it's meant
-      // to happen — execute it immediately instead of waiting on a second,
-      // redundant button click the user has no reason to expect.
-      for (const action of actions) {
+      // A single, unremarkable action still applies straight away — the model
+      // is supposed to have confirmed it in text first, and a second click
+      // there is friction the user has no reason to expect.
+      //
+      // A batch is different. "Add school throughout" is the shape of request
+      // that gets answered with a whole invented timetable under categories
+      // nobody asked for, and the prompt alone cannot prevent that: the model
+      // in use is weak at the confirm-then-act contract (see the MODEL_ID note
+      // in bedrock-chat/handler.js). So anything that would create several
+      // things at once, or invent a category, is held and shown first.
+      const held = actions.filter(a => this.needsReviewBefore(a, actions));
+      const immediate = actions.filter(a => !held.includes(a));
+
+      for (const action of immediate) {
         this.executeBedrockAction(action);
       }
+      if (held.length) this.holdForReview(held);
     }).catch((err) => {
       console.error('[AI Chat] Error:', err);
       this.chatMessages = [...this.chatMessages, {
@@ -1174,6 +1182,96 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.chatTyping = false;
       this.scrollChatToBottom();
     });
+  }
+
+  /** Actions waiting on the user to say yes, from the most recent reply. */
+  pendingChatActions: BedrockAction[] = [];
+
+  /** Action types that bring something into existence. */
+  private static readonly CREATING_TYPES = [
+    'create_event', 'create_recurring', 'create_streak', 'create_reminder',
+  ];
+
+  /**
+   * Whether an action should be shown before it happens.
+   *
+   * Two cases: it is one of several things being created at once, or it would
+   * file something under a category that doesn't exist yet. Both are how a
+   * vague request turns into a calendar full of things nobody asked for.
+   */
+  private needsReviewBefore(action: BedrockAction, batch: readonly BedrockAction[]): boolean {
+    if (!DashboardComponent.CREATING_TYPES.includes(action.type)) return false;
+
+    const creating = batch.filter(a => DashboardComponent.CREATING_TYPES.includes(a.type));
+    if (creating.length > 1) return true;
+
+    // A category the user already uses is theirs; a new one is an invention.
+    const category = (action.category ?? '').trim();
+    if (category && !this.allCategoryPaths.includes(category)) return true;
+
+    return false;
+  }
+
+  /** Park a batch and ask, rather than applying it. */
+  private holdForReview(actions: BedrockAction[]) {
+    this.pendingChatActions = actions;
+    const lines = actions.map(a => `• ${this.describeAction(a)}`).join('\n');
+    const newCategories = Array.from(new Set(
+      actions.map(a => (a.category ?? '').trim())
+        .filter(c => c && !this.allCategoryPaths.includes(c)),
+    ));
+    const categoryNote = newCategories.length
+      ? `\n\nThis would also add ${newCategories.length === 1 ? 'a new category' : 'new categories'}: **${newCategories.join('**, **')}**.`
+      : '';
+
+    this.chatMessages = [...this.chatMessages, {
+      id: `msg_${Date.now()}_review`,
+      role: 'assistant',
+      text: `Before I add anything — here's exactly what I'd create:\n\n${lines}${categoryNote}\n\nAdd these, or drop them?`,
+      timestamp: new Date(),
+      actions: [
+        { label: 'Add them', type: 'apply_pending' },
+        { label: 'Drop them', type: 'discard_pending' },
+      ],
+    }];
+    this.scrollChatToBottom();
+  }
+
+  /** One line describing what an action would do, for the review list. */
+  private describeAction(action: BedrockAction): string {
+    const category = action.category ? ` · ${action.category}` : '';
+    switch (action.type) {
+      case 'create_event':
+        return `**${action.title}** — ${action.date} ${this.formatTime(action.startTime ?? '')}–${this.formatTime(action.endTime ?? '')}${category}`;
+      case 'create_recurring': {
+        const days = Array.isArray(action.daysOfWeek) && action.daysOfWeek.length
+          ? describeDays(action.daysOfWeek)
+          : 'a weekly pattern';
+        return `**${action.title}** — ${days}, ${this.formatTime(action.startTime ?? '')}–${this.formatTime(action.endTime ?? '')}${category}`;
+      }
+      case 'create_streak':
+        return `habit **${action.name}** — ${action.target} ${action.unit} a day`;
+      case 'create_reminder':
+        return `reminder **${action.title}**`;
+      default:
+        return action.title || action.name || action.type;
+    }
+  }
+
+  /** Apply everything that was held, after the user agreed to it. */
+  async applyPendingChatActions() {
+    const actions = this.pendingChatActions;
+    this.pendingChatActions = [];
+    for (const action of actions) {
+      await this.executeBedrockAction(action);
+    }
+  }
+
+  /** Throw the held batch away. */
+  discardPendingChatActions() {
+    const count = this.pendingChatActions.length;
+    this.pendingChatActions = [];
+    this.addAssistantMsg(`Dropped — nothing was added. (${count} ${count === 1 ? 'item' : 'items'} discarded.)`);
   }
 
   private async executeBedrockAction(action: BedrockAction) {
@@ -1476,6 +1574,15 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   handleChatAction(action: { label: string; type: string; tab?: string; reminderTitle?: string; reminderBody?: string; copyText?: string; payload?: any; slotIndex?: number }) {
+    // Answers to the "here's what I'd create" prompt.
+    if (action.type === 'apply_pending') {
+      this.applyPendingChatActions();
+      return;
+    }
+    if (action.type === 'discard_pending') {
+      this.discardPendingChatActions();
+      return;
+    }
     if (action.type === 'navigate' && action.tab) {
       this.switchTab(action.tab as any);
       this.showFloatingChat = false;
@@ -2905,26 +3012,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   ];
 
   // ── Category color map: assigns a unique color to each category ──
-  categoryColors: { [category: string]: string } = {
-    'AP Calculus BC': '#6c63ff',
-    'AP English Lit': '#ec4899',
-    'AP US History': '#f59e0b',
-    'AP Chemistry': '#3b82f6',
-    'Spanish III': '#10b981',
-    'PE / Health': '#22c55e',
-    'Robotics Club': '#ef4444',
-    'Debate Team': '#764ba2',
-    'Orchestra': '#d946ef',
-    'Soccer': '#14b8a6',
-    'Track & Field': '#f97316',
-    'NHS': '#0ea5e9',
-    'School': '#64748b',
-    'Clients': '#e11d48',
-    'Gym': '#8b5cf6',
-    'Nutrition': '#22c55e',
-    'Admin': '#f59e0b',
-    'Personal': '#06b6d4',
-  };
+  // Colours chosen by hand. Everything else is derived from these, so an entry
+  // here means "the user picked this", nothing more. It starts empty: it used
+  // to ship with eighteen categories from the demo accounts ("AP Calculus BC",
+  // "Track & Field"…), which every real account then carried around and saved,
+  // and which quietly hijacked any category that happened to share a name.
+  categoryColors: { [category: string]: string } = {};
 
   // Palette used to auto-assign colors to new/unknown categories
   private readonly categoryColorPalette = [
@@ -2935,12 +3028,30 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   ];
 
   /** Returns a consistent color for a given category. Auto-assigns one if not yet mapped. */
+  // Resolution is a pure function of (path, chosen colours, palette), but it
+  // splits the path, hashes it and converts through HSL — and the template
+  // asks for it once per event, per list, on every change-detection pass. The
+  // answers are memoised per path and the whole map is dropped whenever the
+  // chosen colours change, which is the one thing that can alter them.
+  //
+  // This is not the caching that went wrong before: that wrote derived shades
+  // back into categoryColors, turning "inherited from my parent" into "chosen
+  // by hand", which froze sub-categories to whatever colour they first got.
+  // Nothing here is ever written back, so recolouring a parent still flows
+  // through to everything beneath it.
+  private categoryColorCache = new Map<string, string>();
+
   getCategoryColor(category: string): string {
-    // Resolved fresh each time rather than cached: a sub-category with no
-    // colour of its own follows whatever its parent is set to, so recolouring
-    // a parent updates everything under it immediately. Caching the derived
-    // value here is what used to freeze sub-categories to a random colour.
-    return resolveCategoryColor(category, this.categoryColors, this.categoryColorPalette);
+    const hit = this.categoryColorCache.get(category);
+    if (hit !== undefined) return hit;
+    const resolved = resolveCategoryColor(category, this.categoryColors, this.categoryColorPalette);
+    this.categoryColorCache.set(category, resolved);
+    return resolved;
+  }
+
+  /** Drop memoised colours; every write to categoryColors goes through here. */
+  private invalidateCategoryColors() {
+    this.categoryColorCache.clear();
   }
 
   /**
@@ -2992,6 +3103,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly COLOR_RESET_KEY = 'agenda_color_codes_reset';
 
   private saveCategoryColors() {
+    // Every write to categoryColors is followed by a save, which makes this the
+    // one place the memoised colours can go stale.
+    this.invalidateCategoryColors();
     try {
       localStorage.setItem(this.CATEGORY_COLORS_KEY, JSON.stringify(this.categoryColors));
     } catch { /* ignore */ }
@@ -3008,6 +3122,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       if (stored) {
         const parsed = JSON.parse(stored);
         Object.assign(this.categoryColors, parsed);
+        this.invalidateCategoryColors();
       }
       if (!own) this.saveCategoryColors();
     } catch { /* ignore */ }
@@ -3036,6 +3151,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
     this.categoryColors = {};
+    this.invalidateCategoryColors();
     localStorage.setItem(this.COLOR_RESET_KEY, new Date().toISOString());
     return true;
   }
