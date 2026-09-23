@@ -54,10 +54,13 @@
     </div>
 
     <!-- Mock calendar -->
-    <aside class="sandbox-agenda" aria-label="Sample day agenda">
+    <aside class="sandbox-agenda" aria-label="Sample calendar agenda">
       <div class="agenda-head">
-        <span class="agenda-title">Sample day</span>
-        <span class="agenda-date">{{ todayLabel }}</span>
+        <span class="agenda-title">Sample calendar</span>
+        <span class="agenda-date">
+          {{ activeDateLabel }}
+          <button type="button" class="agenda-today" *ngIf="!showingToday" (click)="goToToday()">Back to today</button>
+        </span>
       </div>
 
       <p class="agenda-empty" *ngIf="!sortedEvents.length">Nothing scheduled — the day is yours.</p>
