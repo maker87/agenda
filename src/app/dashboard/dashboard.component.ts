@@ -3618,6 +3618,32 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.expandedCatNodes.has(path);
   }
 
+  // ── Sidebar category list (under the Categories nav item) ──
+
+  /** Paths expanded in the sidebar list. Kept apart from `expandedCatNodes`
+   *  so collapsing a branch here does not fold it up in the Categories tab. */
+  expandedSidebarCats = new Set<string>();
+
+  toggleSidebarCat(path: string) {
+    if (this.expandedSidebarCats.has(path)) {
+      this.expandedSidebarCats.delete(path);
+    } else {
+      this.expandedSidebarCats.add(path);
+    }
+  }
+
+  isSidebarCatExpanded(path: string): boolean {
+    return this.expandedSidebarCats.has(path);
+  }
+
+  /** Clicking a category in the sidebar shows its events: the agenda, filtered
+   *  to that path. Clicking the one already showing clears the filter again. */
+  openCategoryInAgenda(path: string) {
+    const alreadyShowing = this.activeTab === 'agenda' && this.activeCategoryFilter === path;
+    this.switchTab('agenda');
+    this.activeCategoryFilter = alreadyShowing ? '' : path;
+  }
+
   // ── Category color picker (in categories tab) ──
   catColorPickerPath = '';
 
@@ -3756,6 +3782,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.expandedCatNodes.delete(oldPath);
       this.expandedCatNodes.add(newPath);
     }
+    if (this.expandedSidebarCats.has(oldPath)) {
+      this.expandedSidebarCats.delete(oldPath);
+      this.expandedSidebarCats.add(newPath);
+    }
     if (this.categoryTreeService.isUnderPath(this.activeCategoryFilter, oldPath)) {
       this.activeCategoryFilter = newPath + this.activeCategoryFilter.slice(oldPath.length);
     }
@@ -3810,6 +3840,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     );
     this.persistCategories();
     this.expandedCatNodes.delete(path);
+    this.expandedSidebarCats.delete(path);
     if (this.categoryTreeService.isUnderPath(this.activeCategoryFilter, path)) {
       this.activeCategoryFilter = reassignTo;
     }

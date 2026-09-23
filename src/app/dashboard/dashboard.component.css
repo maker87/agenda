@@ -127,6 +127,9 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* the nav can now grow past the viewport, so let it scroll */
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .nav-item {
@@ -158,6 +161,81 @@
 }
 
 .nav-icon { font-size: 16px; }
+
+/* ── Categories listed under the Categories nav item ── */
+.nav-cat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 6px;
+}
+
+.nav-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.nav-cat-toggle,
+.nav-cat-toggle-spacer {
+  flex: 0 0 16px;
+  width: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sidebar-text);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.nav-cat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sidebar-text);
+  font-family: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-cat-item:hover {
+  background: var(--sidebar-hover);
+  color: #fff;
+}
+
+.nav-cat-item.active {
+  background: var(--sidebar-active-bg);
+  color: var(--sidebar-active-text);
+}
+
+.nav-cat-dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.nav-cat-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.nav-cat-count {
+  font-size: 10px;
+  opacity: 0.6;
+}
 
 .notif-nav-item {
   position: relative;
@@ -1666,6 +1744,8 @@
   .sidebar-brand span:last-child,
   .nav-item span:last-child,
   .user-details { display: none; }
+  /* icons-only rail (and the mobile bottom bar below it): no room for names */
+  .nav-cat-list { display: none; }
   .main-content { margin-left: 64px; padding: 20px 16px; }
   .page-header { flex-direction: column; gap: 12px; }
   .field-row { grid-template-columns: 1fr; }

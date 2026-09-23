@@ -184,6 +184,13 @@
         <span class="nav-icon">🏷️</span>
         {{ i18n.t('categories') }}
       </button>
+
+      <!-- Categories, shown under the Categories tab -->
+      <div class="nav-cat-list" *ngIf="categoryTabTree.length > 0">
+        <ng-container *ngFor="let node of categoryTabTree">
+          <ng-container *ngTemplateOutlet="navCatTpl; context: { node: node, depth: 0 }"></ng-container>
+        </ng-container>
+      </div>
       <button
         class="nav-item"
         [class.active]="activeTab === 'friends'"
@@ -208,6 +215,37 @@
         <span class="nav-icon">📊</span>
         {{ i18n.t('weeklySummary') }}
       </button>
+
+      <!-- The categories themselves, listed under the Categories tab. Declared
+           inside <nav> so the recursive template ref stays in this view. -->
+      <ng-template #navCatTpl let-node="node" let-depth="depth">
+        <div class="nav-cat-row" [style.padding-left.px]="depth * 12">
+          <button
+            class="nav-cat-toggle"
+            *ngIf="node.children.length > 0"
+            (click)="toggleSidebarCat(node.fullPath)"
+            [attr.aria-label]="isSidebarCatExpanded(node.fullPath) ? i18n.t('collapseLabel') : i18n.t('expandLabel')"
+          >{{ isSidebarCatExpanded(node.fullPath) ? '▾' : '▸' }}</button>
+          <span class="nav-cat-toggle-spacer" *ngIf="node.children.length === 0"></span>
+
+          <button
+            class="nav-cat-item"
+            [class.active]="activeTab === 'agenda' && activeCategoryFilter === node.fullPath"
+            (click)="openCategoryInAgenda(node.fullPath)"
+            [title]="node.fullPath"
+          >
+            <span class="nav-cat-dot" [style.background]="getCategoryColor(node.fullPath)"></span>
+            <span class="nav-cat-name">{{ node.name | translateTitle }}</span>
+            <span class="nav-cat-count" *ngIf="countEventsUnder(node.fullPath) > 0">{{ countEventsUnder(node.fullPath) }}</span>
+          </button>
+        </div>
+
+        <ng-container *ngIf="isSidebarCatExpanded(node.fullPath) && node.children.length > 0">
+          <ng-container *ngFor="let child of node.children">
+            <ng-container *ngTemplateOutlet="navCatTpl; context: { node: child, depth: depth + 1 }"></ng-container>
+          </ng-container>
+        </ng-container>
+      </ng-template>
     </nav>
 
     <div class="sidebar-footer">
