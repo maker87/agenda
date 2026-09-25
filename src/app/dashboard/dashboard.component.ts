@@ -1850,11 +1850,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       const { message, draft } = this.aiChatService.pickSlot(action.slotIndex ?? -1, this.chatEventDraft, this.events, t);
       this.chatMessages = [...this.chatMessages, message];
       this.chatEventDraft = draft;
+      // Picking a slot only fills in the time. The card it produces carries its
+      // own "Add to Calendar" button, and nothing is created until that is
+      // pressed — firing it here added the event before the user had seen it.
       this.scrollChatToBottom();
-      // If picking a slot produced a confirm_create_event action, auto-fire it
-      if (message.actions?.length === 1 && message.actions[0].type === 'confirm_create_event') {
-        this.createEventFromChat(message.actions[0].payload);
-      }
     }
   }
 
