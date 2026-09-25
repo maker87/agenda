@@ -109,7 +109,23 @@
   align-items: center;
   gap: 10px;
   padding: 0 20px 28px;
+  border: none;
   border-bottom: 1px solid rgba(255,255,255,0.08);
+  /* It's a button now (the logo goes home), so drop the button chrome. */
+  width: 100%;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.sidebar-brand:hover { opacity: 0.85; }
+
+.sidebar-brand:focus-visible {
+  outline: 2px solid rgba(255,255,255,0.5);
+  outline-offset: -2px;
+  border-radius: 8px;
 }
 
 .sidebar-icon { font-size: 24px; }

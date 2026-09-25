@@ -129,10 +129,10 @@
 
   <!-- Sidebar -->
   <aside class="sidebar">
-    <div class="sidebar-brand">
+    <button type="button" class="sidebar-brand" (click)="goHome()" [title]="i18n.t('myAgenda')">
       <span class="sidebar-icon">📅</span>
       <span class="sidebar-title">Agenda</span>
-    </div>
+    </button>
 
     <nav class="sidebar-nav">
       <button
