@@ -1169,7 +1169,10 @@
 
 .field-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, …) lets the columns shrink to fit: plain 1fr stops at the
+     time inputs' built-in minimum width, which pushed End Time past the
+     edge of the edit box and gave it a sideways scrollbar. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
 }
 
