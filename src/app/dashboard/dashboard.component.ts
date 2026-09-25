@@ -3630,10 +3630,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Clicking a category in the sidebar shows its events: the agenda, filtered
    *  to that path. Clicking the one already showing clears the filter again. */
-  /** The logo goes home: the whole agenda, with no category filter left on. */
+  /** The logo goes home: the Schedule page, where the app opens. */
   goHome() {
-    this.switchTab('agenda');
-    this.activeCategoryFilter = '';
+    this.switchTab('schedule');
   }
 
   openCategoryInAgenda(path: string) {
