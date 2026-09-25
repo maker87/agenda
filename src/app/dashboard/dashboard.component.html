@@ -187,6 +187,12 @@
 
       <!-- Categories, shown under the Categories tab -->
       <div class="nav-cat-list" *ngIf="categoryTabTree.length > 0">
+        <button
+          class="nav-cat-showall"
+          *ngIf="expandableSidebarCats.length > 0"
+          (click)="toggleAllSidebarCats()"
+          [attr.aria-expanded]="allSidebarCatsExpanded"
+        >{{ allSidebarCatsExpanded ? '▾ ' + i18n.t('collapseAllCategories') : '▸ ' + i18n.t('showAllCategories') }}</button>
         <ng-container *ngFor="let node of categoryTabTree">
           <ng-container *ngTemplateOutlet="navCatTpl; context: { node: node, depth: 0 }"></ng-container>
         </ng-container>

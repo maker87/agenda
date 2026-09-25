@@ -186,6 +186,25 @@
   margin: 2px 0 6px;
 }
 
+.nav-cat-showall {
+  align-self: flex-start;
+  margin: 0 0 2px 18px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sidebar-text);
+  opacity: 0.75;
+  font-family: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.nav-cat-showall:hover {
+  background: var(--sidebar-hover);
+  opacity: 1;
+}
+
 .nav-cat-row {
   display: flex;
   align-items: center;

@@ -3620,8 +3620,23 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   // ── Sidebar category list (under the Categories nav item) ──
 
   /** Paths expanded in the sidebar list. Kept apart from `expandedCatNodes`
-   *  so collapsing a branch here does not fold it up in the Categories tab. */
-  expandedSidebarCats = new Set<string>();
+   *  so collapsing a branch here does not fold it up in the Categories tab.
+   *  Remembered in this browser, so the list opens the way it was left. */
+  private readonly SIDEBAR_EXPANDED_KEY = 'agenda_sidebar_expanded_cats';
+  expandedSidebarCats = this.readSidebarExpanded();
+
+  private readSidebarExpanded(): Set<string> {
+    try {
+      const raw = localStorage.getItem(this.SIDEBAR_EXPANDED_KEY);
+      const paths = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(paths) ? paths.filter((p: unknown) => typeof p === 'string') : []);
+    } catch { return new Set(); }
+  }
+
+  private persistSidebarExpanded() {
+    try { localStorage.setItem(this.SIDEBAR_EXPANDED_KEY, JSON.stringify([...this.expandedSidebarCats])); }
+    catch { /* storage unavailable: the list still works, it just won't be remembered */ }
+  }
 
   toggleSidebarCat(path: string) {
     if (this.expandedSidebarCats.has(path)) {
@@ -3629,6 +3644,34 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     } else {
       this.expandedSidebarCats.add(path);
     }
+    this.persistSidebarExpanded();
+  }
+
+  /** Every category in the sidebar that has subcategories to unfold. */
+  get expandableSidebarCats(): string[] {
+    const out: string[] = [];
+    const walk = (nodes: CategoryNode[]) => {
+      for (const n of nodes) {
+        if (n.children.length === 0) continue;
+        out.push(n.fullPath);
+        walk(n.children);
+      }
+    };
+    walk(this.categoryTabTree);
+    return out;
+  }
+
+  get allSidebarCatsExpanded(): boolean {
+    return this.expandableSidebarCats.every(p => this.expandedSidebarCats.has(p));
+  }
+
+  /** One click to see every category at once, subcategories included, or to
+   *  fold them all back to the top level. */
+  toggleAllSidebarCats() {
+    this.expandedSidebarCats = this.allSidebarCatsExpanded
+      ? new Set()
+      : new Set(this.expandableSidebarCats);
+    this.persistSidebarExpanded();
   }
 
   isSidebarCatExpanded(path: string): boolean {
