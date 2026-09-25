@@ -378,6 +378,34 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.profileRegionMsg = `Added ${toAdd.length} holidays for ${countryName}${regionLabel}.`;
   }
 
+  // ── Start fresh ──
+  /** Events other people shared into this calendar: readable, but only their
+   *  owner may delete them, so clearing the calendar leaves them be. */
+  private sharedEventIds = new Set<string>();
+  startFreshConfirm = false;
+  startFreshMsg = '';
+
+  /**
+   * Clears the calendar back to empty: every event this user owns and every
+   * category. For accounts left holding events and categories they never made.
+   * Each deletion is recorded in History like any other.
+   */
+  startFresh() {
+    const own = this.events.filter(e => !this.sharedEventIds.has(e.id));
+    for (const ev of own) this.deleteEvent(ev.id);
+    this.savedCategories = [];
+    this.persistCategories();
+    this.categoryColors = {};
+    this.autoRootColors = {};
+    this.saveAutoRootColors();
+    this.saveCategoryColors();
+    this.activeCategoryFilter = '';
+    this.expandedSidebarCats = new Set();
+    this.startFreshConfirm = false;
+    this.startFreshMsg = `Cleared ${this.eventsLabel(own.length)} and all categories.`;
+    setTimeout(() => { this.startFreshMsg = ''; }, 4000);
+  }
+
   confirmDeleteAccount() {
     this.profileDeleteConfirm = true;
     this.profileDeleteError = '';
@@ -1659,6 +1687,40 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
    * leaves an event alone. Answers with how many actually moved, so the
    * assistant can report something true rather than a guess.
    */
+  /**
+   * One-time tidy-up of categories the app made up rather than the user.
+   * Google Calendar imports used to file every event under
+   * "Google Calendar > <calendar> > <guess>". The events stay; only that
+   * invented category comes off them, and each change lands in History so it
+   * can be undone. Other made-up categories ("Personal", "Work"…) can't be
+   * told apart from ones people chose, so they are left alone.
+   *
+   * Runs once per account, and only after a sync that reached the server, so
+   * it never acts on a stale offline copy. `own` is the user's own events:
+   * events others shared are in `this.events` too, but aren't theirs to edit.
+   */
+  private clearInventedCategories(own: CalendarEvent[]) {
+    const doneKey = `agenda_invented_categories_cleared_${this.userEmail}`;
+    try { if (localStorage.getItem(doneKey)) return; } catch { return; }
+    if (this.eventsService.syncWarning) return;
+
+    const invented = 'Google Calendar';
+    const ownIds = new Set(own.map(e => e.id));
+    const edits = this.events
+      .filter(e => ownIds.has(e.id) && this.isUnderCategory(e.category, invented))
+      .map(before => ({ before, after: { ...before, category: '', color: UNCATEGORIZED_COLOR } }));
+    this.commitAiEventEdits(edits);
+
+    const kept = this.savedCategories.filter(p => !this.isUnderCategory(p, invented));
+    if (kept.length !== this.savedCategories.length) {
+      this.savedCategories = kept;
+      this.persistCategories();
+    }
+    if (this.isUnderCategory(this.activeCategoryFilter, invented)) this.activeCategoryFilter = '';
+
+    try { localStorage.setItem(doneKey, new Date().toISOString()); } catch { /* runs again next time; harmless */ }
+  }
+
   private applyCategoryMapping(map: (category: string) => string | null): number {
     const edits: { before: CalendarEvent; after: CalendarEvent }[] = [];
     for (const before of this.events) {
@@ -4066,9 +4128,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       const shared = await this.eventsService.listSharedEvents(email);
       const ownIds = new Set(synced.map(e => e.id));
       const uniqueShared = shared.filter(e => !ownIds.has(e.id));
+      this.sharedEventIds = new Set(uniqueShared.map(e => e.id));
       this.events = [...synced, ...uniqueShared];
       this.dbLoading = false;
       this.dbError = this.eventsService.syncWarning ?? '';
+      this.clearInventedCategories(synced);
       this.showProactiveBanner(await this.runProactiveReminders());
     });
 
@@ -4087,6 +4151,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       if (shared.length > 0) {
         const ownIds = new Set(this.events.map(e => e.id));
         const uniqueShared = shared.filter(e => !ownIds.has(e.id));
+        this.sharedEventIds = new Set(uniqueShared.map(e => e.id));
         this.events = [...this.events, ...uniqueShared];
       }
       // All other users start with a blank calendar (plus any shared events)

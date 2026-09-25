@@ -1924,6 +1924,26 @@
           </div>
         </div>
 
+        <!-- ── Start fresh card ── -->
+        <div class="profile-card profile-card-danger">
+          <div class="profile-card-header">
+            <span class="profile-card-icon">🧹</span>
+            <h3 class="profile-card-title profile-danger-title">{{ i18n.t('startFresh') }}</h3>
+          </div>
+          <div *ngIf="!startFreshConfirm">
+            <p class="profile-field-hint">{{ i18n.t('startFreshHint') }}</p>
+            <button class="btn-danger" (click)="startFreshConfirm = true">{{ i18n.t('startFresh') }}</button>
+            <p class="profile-field-hint" *ngIf="startFreshMsg">✅ {{ startFreshMsg }}</p>
+          </div>
+          <div *ngIf="startFreshConfirm" class="profile-delete-confirm">
+            <p class="profile-delete-warning">{{ i18n.t('startFreshConfirm') }}</p>
+            <div class="profile-delete-actions">
+              <button class="btn-secondary" (click)="startFreshConfirm = false">{{ i18n.t('cancel') }}</button>
+              <button class="btn-danger" (click)="startFresh()">{{ i18n.t('yesDelete') }}</button>
+            </div>
+          </div>
+        </div>
+
         <!-- ── Sign Out card ── -->
         <div class="profile-card profile-card-signout">
           <button class="btn-secondary profile-signout-btn" (click)="logout()">

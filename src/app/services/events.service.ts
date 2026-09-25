@@ -193,7 +193,9 @@ export class EventsService {
     const resolvedOwner = ownerEmail || this.ownerFromCache(id);
     this.writeCache(resolvedOwner, this.readCache(resolvedOwner).filter(e => e.id !== id));
 
-    if (id.startsWith('local_')) {
+    // Never on the server: not yet synced (local_), or holidays, which are
+    // generated in the browser and only ever cached.
+    if (id.startsWith('local_') || id.startsWith('holiday_')) {
       this.writePending(resolvedOwner, this.readPending(resolvedOwner).filter(p => p.event.id !== id));
       return;
     }
