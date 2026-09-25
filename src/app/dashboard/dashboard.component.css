@@ -382,6 +382,39 @@
   color: var(--text-muted);
 }
 
+/* Current time and date, top right of the Schedule page. */
+.schedule-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 10px 16px;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  text-align: right;
+}
+
+.schedule-clock-time {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-clock-date {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .schedule-clock {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
 /* ── Buttons ── */
 .btn-primary {
   padding: 10px 20px;

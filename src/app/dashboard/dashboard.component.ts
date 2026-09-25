@@ -3897,6 +3897,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   ) {}
 
   async ngOnInit() {
+    this.startClock();
     const user = this.mockAuth.getCurrentUser();
     if (!user) {
       this.router.navigate(['/']);
@@ -3927,6 +3928,30 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnDestroy() {
     this.stopMessagePolling();
+    if (this.clockHandle) clearTimeout(this.clockHandle);
+  }
+
+  // ── Schedule page clock ──
+  /** The current moment, advanced on each minute boundary. */
+  clockNow = new Date();
+  private clockHandle: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Tick on the minute rather than every second: the clock shows no seconds,
+   * and each tick re-runs change detection over this whole component.
+   */
+  private startClock() {
+    this.clockNow = new Date();
+    const untilNextMinute = 60_000 - (Date.now() % 60_000);
+    this.clockHandle = setTimeout(() => this.startClock(), untilNextMinute + 50);
+  }
+
+  get clockTime(): string {
+    return this.clockNow.toLocaleTimeString(this.i18n.getLocale(), { hour: 'numeric', minute: '2-digit' });
+  }
+
+  get clockDate(): string {
+    return this.clockNow.toLocaleDateString(this.i18n.getLocale(), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   }
 
   /**
