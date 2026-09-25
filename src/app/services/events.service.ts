@@ -14,6 +14,8 @@ export interface CalendarEvent {
   category: string;
   location?: string;
   sharedWith: string[];
+  /** Minutes before the start to remind; absent when no reminder is set. */
+  reminderMinutes?: number;
 }
 
 interface PendingWrite {
@@ -122,6 +124,7 @@ export class EventsService {
         category:    event.category || undefined,
         location:    event.location || undefined,
         sharedWith:  event.sharedWith?.length ? event.sharedWith : undefined,
+        reminderMinutes: event.reminderMinutes ?? undefined,
         ownerEmail,
         ...(event.endDate ? { endDate: event.endDate } : {}),
       } as any);
@@ -170,6 +173,7 @@ export class EventsService {
         category:    event.category || null,
         location:    event.location || null,
         sharedWith:  event.sharedWith?.length ? event.sharedWith : null,
+        reminderMinutes: event.reminderMinutes ?? null,
       });
       if (errors?.length) throw new Error(errors[0].message);
       const saved = this.toLocal(data!);
@@ -310,6 +314,7 @@ export class EventsService {
             category: entry.event.category || undefined,
             location: entry.event.location || undefined,
             sharedWith: entry.event.sharedWith?.length ? entry.event.sharedWith : undefined,
+            reminderMinutes: entry.event.reminderMinutes ?? undefined,
             ownerEmail: entry.ownerEmail,
           });
           if (errors?.length) throw new Error(errors[0].message);
@@ -326,6 +331,7 @@ export class EventsService {
             category: entry.event.category || null,
             location: entry.event.location || null,
             sharedWith: entry.event.sharedWith?.length ? entry.event.sharedWith : null,
+            reminderMinutes: entry.event.reminderMinutes ?? null,
           });
           if (errors?.length) throw new Error(errors[0].message);
         } else if (entry.op === 'delete' && !entry.event.id.startsWith('local_')) {
@@ -367,6 +373,7 @@ export class EventsService {
       category:    record.category ?? '',
       location:    record.location ?? '',
       sharedWith:  (record.sharedWith ?? []).filter((e): e is string => e !== null),
+      reminderMinutes: record.reminderMinutes ?? undefined,
     };
   }
 }

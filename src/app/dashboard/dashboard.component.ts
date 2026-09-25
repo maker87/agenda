@@ -36,6 +36,7 @@ interface CalendarEvent {
   category: string;
   location?: string;
   sharedWith: string[];
+  reminderMinutes?: number;
 }
 
 /** One line of the agenda list: an event, and every day it recurs in that list. */
@@ -5342,6 +5343,24 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       // Event is fully in the past (end date < today)
       return effectiveEnd < this.today && e.date >= weekAgoStr;
     });
+  }
+
+  /**
+   * Everything on today's date, earliest first, for the panel that heads the
+   * Schedule page. Deliberately ignores the agenda's category filter: this is
+   * "what is on today", and a filter chosen on another tab shouldn't hide it.
+   */
+  get todayAtAGlance(): CalendarEvent[] {
+    return this.events
+      .filter(e => this.eventSpansDate(e, this.today))
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }
+
+  /** "30 minutes before" and the like, or '' when the event has no reminder. */
+  reminderLabel(ev: CalendarEvent): string {
+    if (!ev.reminderMinutes) return '';
+    return this.reminderOptions.find(o => o.value === ev.reminderMinutes)?.label
+      ?? `${ev.reminderMinutes} min before`;
   }
 
   get pastRows(): AgendaRow[] { return this.groupRepeats(this.pastEvents); }

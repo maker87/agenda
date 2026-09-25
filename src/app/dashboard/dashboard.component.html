@@ -289,6 +289,21 @@
         </div>
       </header>
 
+      <!-- Today: always shown, above the action cards. No close button and no
+           timer, unlike the sign-in banner, so it's still there when you look. -->
+      <section class="today-panel" [attr.aria-label]="i18n.t('today')">
+        <h3 class="today-panel-heading">{{ i18n.t('today') }} · {{ formatDate(today) }}</h3>
+        <ul class="today-panel-list" *ngIf="todayAtAGlance.length > 0">
+          <li class="today-panel-item" *ngFor="let ev of todayAtAGlance">
+            <span class="today-panel-dot" [style.background]="eventColor(ev)"></span>
+            <span class="today-panel-time">{{ formatTime(ev.startTime) }} – {{ formatTime(ev.endTime) }}</span>
+            <span class="today-panel-title">{{ ev.title | translateTitle }}</span>
+            <span class="today-panel-reminder" *ngIf="reminderLabel(ev) as label" [title]="i18n.t('setReminder')">🔔 {{ label }}</span>
+          </li>
+        </ul>
+        <p class="today-panel-empty" *ngIf="todayAtAGlance.length === 0">{{ i18n.t('nothingScheduledToday') }}</p>
+      </section>
+
       <!-- 4 Action Cards -->
       <div class="action-grid">
 

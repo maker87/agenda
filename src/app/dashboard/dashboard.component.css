@@ -448,6 +448,64 @@
 .btn-secondary:hover { background: var(--border); }
 
 /* ── Schedule Action Cards ── */
+/* ── Today panel (Schedule page) ── */
+.today-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-input);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.today-panel-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 0 0 8px;
+}
+
+.today-panel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.today-panel-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 14px;
+}
+
+.today-panel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.today-panel-time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.today-panel-title { font-weight: 500; }
+
+.today-panel-reminder {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.today-panel-empty {
+  font-size: 13px;
+  color: var(--text-faint);
+  margin: 0;
+}
+
 .action-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
