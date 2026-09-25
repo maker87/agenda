@@ -511,15 +511,17 @@
       </div>
 
       <!-- Past -->
-      <section class="events-section" *ngIf="pastEvents.length > 0">
+      <section class="events-section" *ngIf="pastRows.length > 0">
         <h3 class="section-label muted">{{ i18n.t('past') }}</h3>
         <div class="events-list">
-          <div class="event-card past" *ngFor="let event of pastEvents">
+          <ng-container *ngFor="let row of pastRows">
+          <div class="event-card past" *ngIf="row.event as event">
             <div class="event-color-bar" [style.background]="eventColor(event)"></div>
             <div class="event-body">
               <div class="event-header">
                 <div class="event-title-group">
                   <span class="event-title">{{ event.title | translateTitle }}</span>
+                  <span class="event-repeat-count" *ngIf="row.occurrences.length > 1">{{ row.occurrences.length }}×</span>
                   <span class="event-cat-badge" *ngIf="event.category">{{ event.category | translateTitle }}</span>
                 </div>
                 <div class="event-actions">
@@ -528,17 +530,25 @@
                     📎<span class="upload-badge" *ngIf="getEventAttachments(event.id).length > 0">{{ getEventAttachments(event.id).length }}</span>
                   </button>
                   <button class="share-btn" (click)="openShareModal(event)" [title]="i18n.t('shareEvent')">↗</button>
-                  <button class="delete-btn" (click)="deleteEvent(event.id)" [title]="i18n.t('deleteEvent')">✕</button>
+                  <button class="delete-btn" *ngIf="row.occurrences.length === 1" (click)="deleteEvent(event.id)" [title]="i18n.t('deleteEvent')">✕</button>
                 </div>
               </div>
-              <div class="event-time">
+              <div class="event-time" *ngIf="row.occurrences.length === 1">
                 📅 {{ formatDate(event.date) }} · {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
+              </div>
+              <div class="event-time event-repeat-days" *ngIf="row.occurrences.length > 1">
+                📅
+                <span class="repeat-day" *ngFor="let o of row.occurrences">
+                  {{ formatDate(o.date) }}<button class="repeat-day-delete" (click)="deleteEvent(o.id)" [title]="i18n.t('deleteEvent')">✕</button>
+                </span>
+                · {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
               </div>
               <div class="event-shared" *ngIf="event.sharedWith.length > 0">
                 👥 {{ i18n.t('sharedWith') }} {{ event.sharedWith.join(', ') }}
               </div>
             </div>
           </div>
+          </ng-container>
         </div>
       </section>
 
@@ -579,15 +589,17 @@
       </section>
 
       <!-- Upcoming -->
-      <section class="events-section" *ngIf="upcomingEvents.length > 0">
+      <section class="events-section" *ngIf="upcomingRows.length > 0">
         <h3 class="section-label">{{ i18n.t('upcoming') }}</h3>
         <div class="events-list">
-          <div class="event-card" *ngFor="let event of upcomingEvents">
+          <ng-container *ngFor="let row of upcomingRows">
+          <div class="event-card" *ngIf="row.event as event">
             <div class="event-color-bar" [style.background]="eventColor(event)"></div>
             <div class="event-body">
               <div class="event-header">
                 <div class="event-title-group">
                   <span class="event-title">{{ event.title | translateTitle }}</span>
+                  <span class="event-repeat-count" *ngIf="row.occurrences.length > 1">{{ row.occurrences.length }}×</span>
                   <span class="event-cat-badge" *ngIf="event.category">{{ event.category | translateTitle }}</span>
                 </div>
                 <div class="event-actions">
@@ -596,11 +608,18 @@
                     📎<span class="upload-badge" *ngIf="getEventAttachments(event.id).length > 0">{{ getEventAttachments(event.id).length }}</span>
                   </button>
                   <button class="share-btn" (click)="openShareModal(event)" [title]="i18n.t('shareEvent')">↗</button>
-                  <button class="delete-btn" (click)="deleteEvent(event.id)" [title]="i18n.t('deleteEvent')">✕</button>
+                  <button class="delete-btn" *ngIf="row.occurrences.length === 1" (click)="deleteEvent(event.id)" [title]="i18n.t('deleteEvent')">✕</button>
                 </div>
               </div>
-              <div class="event-time">
+              <div class="event-time" *ngIf="row.occurrences.length === 1">
                 📅 {{ formatDate(event.date) }} · {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
+              </div>
+              <div class="event-time event-repeat-days" *ngIf="row.occurrences.length > 1">
+                📅
+                <span class="repeat-day" *ngFor="let o of row.occurrences">
+                  {{ formatDate(o.date) }}<button class="repeat-day-delete" (click)="deleteEvent(o.id)" [title]="i18n.t('deleteEvent')">✕</button>
+                </span>
+                · {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
               </div>
               <div class="event-desc" *ngIf="event.description">{{ event.description }}</div>
               <a class="event-location-link" *ngIf="event.location" [href]="'https://www.google.com/maps/search/' + encodeLocation(event.location)" target="_blank" rel="noopener">
@@ -611,6 +630,7 @@
               </div>
             </div>
           </div>
+          </ng-container>
         </div>
       </section>
     </div>

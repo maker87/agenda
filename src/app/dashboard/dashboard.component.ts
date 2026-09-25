@@ -38,6 +38,12 @@ interface CalendarEvent {
   sharedWith: string[];
 }
 
+/** One line of the agenda list: an event, and every day it recurs in that list. */
+interface AgendaRow {
+  event: CalendarEvent;
+  occurrences: CalendarEvent[];
+}
+
 interface EventAttachment {
   name: string;
   dataUrl: string;
@@ -5311,6 +5317,33 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       // Event is fully in the past (end date < today)
       return effectiveEnd < this.today && e.date >= weekAgoStr;
     });
+  }
+
+  get pastRows(): AgendaRow[] { return this.groupRepeats(this.pastEvents); }
+  get upcomingRows(): AgendaRow[] { return this.groupRepeats(this.upcomingEvents); }
+
+  /**
+   * Folds repeats of one event into a single agenda row, so a class that meets
+   * Monday, Wednesday and Friday reads as one line with three days rather than
+   * three near-identical cards. "The same event" means the same title, times
+   * and category; a multi-day event always keeps a row of its own, since its
+   * days are already one event. Rows keep the order of their first occurrence.
+   */
+  private groupRepeats(events: CalendarEvent[]): AgendaRow[] {
+    const rows = new Map<string, AgendaRow>();
+    for (const e of events) {
+      const key = e.endDate && e.endDate !== e.date
+        ? `id:${e.id}`
+        : [e.title.trim().toLowerCase(), e.startTime, e.endTime, e.category ?? ''].join('\u0000');
+      const row = rows.get(key);
+      if (row) row.occurrences.push(e);
+      else rows.set(key, { event: e, occurrences: [e] });
+    }
+    for (const row of rows.values()) {
+      row.occurrences.sort((a, b) => a.date.localeCompare(b.date));
+      row.event = row.occurrences[0];
+    }
+    return [...rows.values()];
   }
 
   // ── Category helpers ──
