@@ -1538,6 +1538,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         .map(p => this.isUnderCategory(p, from) ? to + p.slice(from.length) : p)
         .sort();
       this.persistCategories();
+      this.followCategoryRename(from, to);
       if (this.isUnderCategory(this.activeCategoryFilter, from)) {
         this.activeCategoryFilter = to + this.activeCategoryFilter.slice(from.length);
       }
@@ -3678,17 +3679,67 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.expandedSidebarCats.has(path);
   }
 
-  /** Clicking a category in the sidebar shows its events: the agenda, filtered
-   *  to that path. Clicking the one already showing clears the filter again. */
   /** The logo goes home: the Schedule page, where the app opens. */
   goHome() {
     this.switchTab('schedule');
   }
 
-  openCategoryInAgenda(path: string) {
-    const alreadyShowing = this.activeTab === 'agenda' && this.activeCategoryFilter === path;
-    this.switchTab('agenda');
-    this.activeCategoryFilter = alreadyShowing ? '' : path;
+  // ── Category page (opened from the sidebar) ──
+
+  /** The category whose page is open on the Categories tab; '' shows the overview. */
+  categoryDetailPath = '';
+
+  /** Clicking a category in the sidebar opens its page: the category itself,
+   *  editable in one place, above every event filed under it. */
+  openCategoryDetail(path: string) {
+    this.switchTab('categories');
+    this.categoryDetailPath = path;
+    // Its subcategories are part of what the page is for, so show them.
+    this.expandedCatNodes.add(path);
+    this.cancelRenameCategory();
+    this.cancelDeleteCategory();
+    this.catColorPickerPath = '';
+  }
+
+  closeCategoryDetail() {
+    this.categoryDetailPath = '';
+  }
+
+  /** The open category's node, or null once it has been deleted, which drops
+   *  the page back to the overview without any bookkeeping of its own. */
+  get categoryDetailNode(): CategoryNode | null {
+    const path = this.categoryDetailPath;
+    if (!path) return null;
+    const find = (nodes: CategoryNode[]): CategoryNode | null => {
+      for (const n of nodes) {
+        if (n.fullPath === path) return n;
+        if (this.categoryTreeService.isUnderPath(path, n.fullPath)) return find(n.children);
+      }
+      return null;
+    };
+    return find(this.categoryTabTree);
+  }
+
+  /** Every event filed under the open category, subcategories included, by date. */
+  get categoryDetailEvents(): CalendarEvent[] {
+    const path = this.categoryDetailPath;
+    return this.events
+      .filter(e => this.categoryTreeService.isUnderPath(e.category, path))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+  }
+
+  /** The part of an event's category below the open one, e.g. "Meetings" in
+   *  Work, so events filed in a subcategory say which. */
+  categoryDetailSubpath(event: CalendarEvent): string {
+    const path = this.categoryDetailPath;
+    return event.category.length > path.length ? event.category.slice(path.length + CATEGORY_SEP.length) : '';
+  }
+
+  /** Keep the open page on the category through a rename of it or an ancestor. */
+  private followCategoryRename(from: string, to: string) {
+    if (this.categoryTreeService.isUnderPath(this.categoryDetailPath, from)) {
+      this.categoryDetailPath = to + this.categoryDetailPath.slice(from.length);
+    }
   }
 
   // ── Category color picker (in categories tab) ──
@@ -3833,6 +3884,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.expandedSidebarCats.delete(oldPath);
       this.expandedSidebarCats.add(newPath);
     }
+    this.followCategoryRename(oldPath, newPath);
     if (this.categoryTreeService.isUnderPath(this.activeCategoryFilter, oldPath)) {
       this.activeCategoryFilter = newPath + this.activeCategoryFilter.slice(oldPath.length);
     }
@@ -4179,6 +4231,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.historyRestoreMsg = '';
       this.historySearch = '';
     }
+    // The Categories button always opens the overview; a category's own page
+    // is reached from the sidebar list.
+    if (tab === 'categories') this.categoryDetailPath = '';
     if (tab === 'notifications') {
       this.notifSearch = '';
     }

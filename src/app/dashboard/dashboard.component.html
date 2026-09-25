@@ -236,8 +236,8 @@
 
           <button
             class="nav-cat-item"
-            [class.active]="activeTab === 'agenda' && activeCategoryFilter === node.fullPath"
-            (click)="openCategoryInAgenda(node.fullPath)"
+            [class.active]="activeTab === 'categories' && categoryDetailPath === node.fullPath"
+            (click)="openCategoryDetail(node.fullPath)"
             [title]="node.fullPath"
           >
             <span class="nav-cat-dot" [style.background]="getCategoryColor(node.fullPath)"></span>
@@ -1402,6 +1402,71 @@
 
     <!-- ── CATEGORIES TAB ── -->
     <div *ngIf="activeTab === 'categories'" class="tab-content">
+
+      <!-- ── Category page: one category, editable, above its events ── -->
+      <ng-container *ngIf="categoryDetailNode as cat">
+        <button type="button" class="cat-detail-back" (click)="closeCategoryDetail()">← {{ i18n.t('allCategories') }}</button>
+
+        <header class="page-header cat-detail-header">
+          <div class="cat-detail-heading">
+            <span class="cat-detail-dot" [style.background]="getCategoryColor(cat.fullPath)"></span>
+            <div>
+              <h2 class="page-title">{{ cat.name | translateTitle }}</h2>
+              <p class="page-subtitle" *ngIf="cat.fullPath !== cat.name">{{ cat.fullPath }}</p>
+            </div>
+          </div>
+        </header>
+
+        <div class="cat-success-msg" *ngIf="catFormSuccess">✓ {{ catFormSuccess }}</div>
+
+        <!-- Rename, colour, subcategories and delete: the same controls as the overview -->
+        <div class="cat-tree-section">
+          <div class="cat-tree-header">
+            <h3 class="cat-tree-title">{{ i18n.t('category') }}</h3>
+          </div>
+          <div class="cat-tree">
+            <ng-container *ngTemplateOutlet="catNodeTpl; context: { node: cat, depth: 0 }"></ng-container>
+          </div>
+        </div>
+
+        <!-- Its events -->
+        <div class="cat-tree-section">
+          <div class="cat-tree-header">
+            <h3 class="cat-tree-title">Events</h3>
+            <span class="cat-tree-count">{{ categoryDetailEvents.length }} event{{ categoryDetailEvents.length !== 1 ? 's' : '' }}</span>
+          </div>
+
+          <div *ngIf="categoryDetailEvents.length === 0" class="empty-state">
+            <span class="empty-icon">📭</span>
+            <p>No events in this category yet.</p>
+          </div>
+
+          <div class="events-list" *ngIf="categoryDetailEvents.length > 0">
+            <div class="event-card" *ngFor="let event of categoryDetailEvents" [class.cat-detail-past]="event.date < today">
+              <div class="event-color-bar" [style.background]="eventColor(event)"></div>
+              <div class="event-body">
+                <div class="event-header">
+                  <div class="event-title-group">
+                    <span class="event-title">{{ event.title | translateTitle }}</span>
+                    <span class="cat-detail-sub" *ngIf="categoryDetailSubpath(event)">{{ categoryDetailSubpath(event) }}</span>
+                  </div>
+                  <div class="event-actions">
+                    <button class="share-btn" (click)="editEventFromPanel(event)" [title]="i18n.t('editEvent')">✏️</button>
+                    <button class="delete-btn" (click)="deleteEvent(event.id)" [title]="i18n.t('deleteEvent')">✕</button>
+                  </div>
+                </div>
+                <div class="event-time">
+                  📅 {{ formatDate(event.date) }} · {{ formatTime(event.startTime) }} – {{ formatTime(event.endTime) }}
+                </div>
+                <div class="event-desc" *ngIf="event.description">{{ event.description }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- ── Overview: create form, the whole tree, unassigned events ── -->
+      <ng-container *ngIf="!categoryDetailNode">
       <header class="page-header">
         <div>
           <h2 class="page-title">{{ i18n.t('categories') }}</h2>
@@ -1491,6 +1556,7 @@
           </div>
         </div>
       </div>
+      </ng-container>
     </div>
 
     <!-- ── FRIENDS TAB (messaging) ── -->

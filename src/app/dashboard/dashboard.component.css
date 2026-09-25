@@ -4880,6 +4880,57 @@
   padding: 8px 12px;
 }
 
+/* ── Category page (opened from the sidebar) ── */
+.cat-detail-back {
+  margin-bottom: 14px;
+  padding: 6px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.cat-detail-back:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.cat-detail-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.cat-detail-heading .page-title { overflow-wrap: anywhere; }
+
+.cat-detail-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Which subcategory an event sits in, when it isn't the open one itself. */
+.cat-detail-sub {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Past events stay listed, just quieter than what's coming up. */
+.event-card.cat-detail-past { opacity: 0.6; }
+
 /* Tree section */
 .cat-tree-section {
   background: var(--bg-surface);
