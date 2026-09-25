@@ -255,18 +255,21 @@ export function claimRootColor(
  * way, including after a reload. Hand-picked colours are placed first, so
  * probing never displaces one.
  *
- * The rest are placed in order of the slot they want, and only then by name.
- * Sorting by name alone was stable across reloads but not across edits: a new
- * category that sorted early could take a slot an existing one was already
- * using and push it along, so adding "Volunteering" re-coloured Work and
- * everything under it. Ordering by preferred slot means a category can only
- * ever displace one that wants a *later* slot than it does, and the categories
- * already on screen keep their colours.
+ * `remembered` is what this returned for these roots last time, and is what
+ * makes the result stable as categories come and go. Probing cannot be stable
+ * on its own: whichever order it runs in, a new category that lands on an
+ * occupied slot pushes its occupant along, and that push cascades — adding one
+ * category re-coloured five others and everything filed under them. Handing a
+ * root back the colour it already had stops the cascade at the source.
+ *
+ * Anything left over is placed in order of the slot it wants, then by name, so
+ * a first run is deterministic too.
  */
 export function seedRootColors(
   roots: readonly string[],
   explicit: Readonly<Record<string, string>>,
   palette: readonly string[] = CATEGORY_PALETTE,
+  remembered: Readonly<Record<string, string>> = {},
 ): Map<string, string> {
   const assigned = new Map<string, string>();
   const unique = [...new Set(roots.filter(Boolean))].sort();
@@ -275,10 +278,29 @@ export function seedRootColors(
     return assigned;
   }
 
+  // Hand-picked colours go down first, so nothing else can take one.
+  const taken = new Set<number>();
+  for (const root of unique) {
+    const chosen = explicit[root];
+    if (!chosen) continue;
+    assigned.set(root, chosen);
+    const slot = palette.indexOf(chosen);
+    if (slot >= 0) taken.add(slot);
+  }
+
+  // Then colours these roots already had. A remembered colour that is no
+  // longer in the palette is dropped rather than honoured, so changing the
+  // palette re-colours the tree instead of stranding it half in the old one.
   const pending: { name: string; pref: number }[] = [];
   for (const root of unique) {
-    if (explicit[root]) assigned.set(root, explicit[root]);
-    else pending.push({ name: root, pref: hashString(root) % palette.length });
+    if (assigned.has(root)) continue;
+    const slot = palette.indexOf(remembered[root] ?? '');
+    if (slot >= 0 && !taken.has(slot)) {
+      assigned.set(root, palette[slot]);
+      taken.add(slot);
+    } else {
+      pending.push({ name: root, pref: hashString(root) % palette.length });
+    }
   }
 
   pending.sort((a, b) => a.pref - b.pref || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -328,13 +350,16 @@ export function buildCategoryColorMap(
   paths: readonly string[],
   explicit: Readonly<Record<string, string>>,
   palette: readonly string[] = CATEGORY_PALETTE,
+  /** Root colours already settled by `seedRootColors`; seeded here if absent. */
+  rootColors?: ReadonlyMap<string, string>,
 ): Record<string, string> {
   const children = indexByParent(paths);
   const roots = children.get('') ?? [];
   const out: Record<string, string> = {};
 
-  for (const [root, color] of seedRootColors(roots, explicit, palette)) {
-    out[root] = color;
+  const seeded = rootColors ?? seedRootColors(roots, explicit, palette);
+  for (const root of roots) {
+    out[root] = seeded.get(root) ?? claimRootColor(root, new Map(seeded), palette);
   }
 
   const walk = (parent: string, parentColor: string, rootColor: string, depth: number) => {
