@@ -8,6 +8,13 @@ const bedrockChatHandler = defineFunction({
   memoryMB: 256,
 });
 
+// Who may see what. Every rule below is enforced by AppSync, not the app: the
+// app used to be trusted to filter by email in the browser, which let any
+// signed-in account read every other account's events, notifications and
+// messages.
+//
+// Rules that match on 'email' need the ID token (the access token carries no
+// email claim), so src/main.ts sends the ID token with every request.
 const schema = a.schema({
   CalendarEvent: a
     .model({
@@ -24,8 +31,11 @@ const schema = a.schema({
       reminderMinutes: a.integer(),
     })
     .authorization((allow) => [
+      // The creator, plus anyone it was explicitly shared with. `ownerEmail`
+      // is only a label the client writes and grants nothing, so an event
+      // labelled with someone else's email no longer lands in their calendar.
       allow.owner().identityClaim('sub'),
-      allow.authenticated().to(['read']),
+      allow.ownersDefinedIn('sharedWith').identityClaim('email').to(['read']),
     ]),
 
   Notification: a
@@ -42,12 +52,10 @@ const schema = a.schema({
     })
     .authorization((allow) => [
       allow.owner().identityClaim('sub'),
-      // Notifications are created by the sender but acted on (read/accepted/
-      // rejected/deleted) by the recipient, who is never the owner — without
-      // this, updateStatus()/markRead()/delete() from the recipient silently
-      // fail auth and the notification (e.g. a friend request) reverts to
-      // pending every time the app reloads.
-      allow.authenticated().to(['create', 'read', 'update', 'delete']),
+      // Created by the sender but acted on (read/accepted/rejected/deleted) by
+      // the recipient, who is never the owner. That used to be granted to
+      // every signed-in account; now it is only the person it is addressed to.
+      allow.ownerDefinedIn('recipientEmail').identityClaim('email').to(['read', 'update', 'delete']),
     ]),
 
   Friend: a
@@ -111,8 +119,9 @@ const schema = a.schema({
       eventCategory:    a.string(),
     })
     .authorization((allow) => [
+      // The sender, and the one person it was sent to.
       allow.owner().identityClaim('sub'),
-      allow.authenticated().to(['create', 'read']),
+      allow.ownerDefinedIn('toEmail').identityClaim('email').to(['read']),
     ]),
 
   chat: a

@@ -9,38 +9,34 @@ import { TermsComponent } from './terms/terms.component';
 import { PrivacyComponent } from './privacy/privacy.component';
 import { MockAuthService } from './services/mock-auth.service';
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { environment } from '../environments/environment';
 
 async function authGuard() {
   const auth = inject(MockAuthService);
   const router = inject(Router);
 
-  // Check if session exists
-  if (auth.isLoggedIn()) {
-    // Validate the Cognito session is still active
-    try {
-      const session = await fetchAuthSession();
-      if (session.tokens?.idToken) {
-        return true;
-      }
-    } catch { /* Cognito session invalid or not present */ }
-
-    // Allow mock/demo sessions in non-production environments
-    return true;
-  }
-
-  // No session — check if Cognito has a cached session (e.g. refreshed page)
+  // Who you are comes from the signed-in Cognito session, never from the
+  // email the tab has stored. That stored value is what the app loads data
+  // for, and it used to be accepted on its own — so editing it in the browser
+  // was enough to open someone else's calendar.
   try {
     const session = await fetchAuthSession();
-    if (session.tokens?.idToken) {
-      // Re-establish the local session from Cognito token
-      const email = session.tokens.idToken.payload?.['email'] as string;
-      if (email) {
-        sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email }));
-        return true;
-      }
+    const verified = session.tokens?.idToken?.payload?.['email'];
+    if (typeof verified === 'string' && verified) {
+      // Keep the stored spelling when it is the same address in another case:
+      // events were saved under the email as typed at sign-in, and swapping
+      // it for the token's casing would hide them.
+      const stored = auth.getCurrentUser()?.email;
+      const email = stored && stored.toLowerCase() === verified.toLowerCase() ? stored : verified;
+      sessionStorage.setItem('agenda_mock_session', JSON.stringify({ email }));
+      return true;
     }
-  } catch { /* no session */ }
+  } catch { /* no Cognito session */ }
 
+  // Demo accounts have no Cognito session; they exist only outside production.
+  if (!environment.production && auth.isLoggedIn()) return true;
+
+  auth.logout();
   return router.createUrlTree(['/auth']);
 }
 

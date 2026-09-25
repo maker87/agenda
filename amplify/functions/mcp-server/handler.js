@@ -20,7 +20,7 @@ const PROTOCOL_VERSION = '2024-11-05';
 
 /**
  * Resolves the bearer token in the Authorization header to the owning
- * account's email. The token table is expected to stay small (one row per
+ * account: its Cognito sub and email. The token table is expected to stay small (one row per
  * user who's generated a personal access token), so a full scan+filter is
  * simpler and safer here than depending on Amplify's internally-generated
  * GSI names for a hand-rolled DynamoDB query.
@@ -32,13 +32,31 @@ async function resolveOwner(headers) {
   const token = match[1].trim();
   if (!token) return null;
 
-  const { Items } = await ddb.send(new ScanCommand({
-    TableName: TABLES.apiToken,
-    FilterExpression: '#t = :token',
-    ExpressionAttributeNames: { '#t': 'token' },
-    ExpressionAttributeValues: { ':token': token },
-  }));
-  return Items?.[0]?.ownerEmail ?? null;
+  const [row] = await scanAll(TABLES.apiToken, '#t = :token', { '#t': 'token' }, { ':token': token });
+  // `owner` is the account's Cognito sub, written by AppSync when the token
+  // was created, so the browser can't forge it. `ownerEmail` is only what the
+  // client sent, so it names new records but never decides whose data is
+  // read or changed.
+  if (!row?.owner) return null;
+  return { sub: row.owner, email: row.ownerEmail ?? '' };
+}
+
+/** Scan with a filter, following pages: one Scan call stops at 1 MB. */
+async function scanAll(table, filter, names, values) {
+  const items = [];
+  let ExclusiveStartKey;
+  do {
+    const page = await ddb.send(new ScanCommand({
+      TableName: table,
+      FilterExpression: filter,
+      ExpressionAttributeNames: names,
+      ExpressionAttributeValues: values,
+      ExclusiveStartKey,
+    }));
+    items.push(...(page.Items ?? []));
+    ExclusiveStartKey = page.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+  return items;
 }
 
 // ── Tool definitions ─────────────────────────────────────────────────────
@@ -137,18 +155,18 @@ const TOOLS = [
 
 // ── Tool implementations ─────────────────────────────────────────────────
 
-async function scanOwned(table, ownerField, ownerEmail, extraFilter) {
-  const { Items } = await ddb.send(new ScanCommand({
-    TableName: table,
-    FilterExpression: extraFilter ? `#o = :owner AND ${extraFilter.expr}` : '#o = :owner',
-    ExpressionAttributeNames: { '#o': ownerField, ...(extraFilter?.names ?? {}) },
-    ExpressionAttributeValues: { ':owner': ownerEmail, ...(extraFilter?.values ?? {}) },
-  }));
-  return Items ?? [];
+/** Records this account owns, by the same `owner` field AppSync checks. */
+async function scanOwned(table, who, extraFilter) {
+  return scanAll(
+    table,
+    extraFilter ? `#o = :owner AND ${extraFilter.expr}` : '#o = :owner',
+    { '#o': 'owner', ...(extraFilter?.names ?? {}) },
+    { ':owner': who.sub, ...(extraFilter?.values ?? {}) },
+  );
 }
 
-async function toolListEvents(ownerEmail, args) {
-  let events = await scanOwned(TABLES.event, 'ownerEmail', ownerEmail);
+async function toolListEvents(who, args) {
+  let events = await scanOwned(TABLES.event, who);
   if (args.startDate) events = events.filter(e => e.date >= args.startDate);
   if (args.endDate) events = events.filter(e => e.date <= args.endDate);
   events.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
@@ -158,12 +176,14 @@ async function toolListEvents(ownerEmail, args) {
   }));
 }
 
-async function toolCreateEvent(ownerEmail, args) {
+async function toolCreateEvent(who, args) {
   const now = new Date().toISOString();
   const item = {
     id: randomUUID(),
     __typename: 'CalendarEvent',
-    ownerEmail,
+    // Without an owner the app can't show it: only the owner may read it.
+    owner: who.sub,
+    ownerEmail: who.email,
     title: args.title,
     date: args.date,
     startTime: args.startTime,
@@ -192,8 +212,8 @@ function findEventMatch(events, title, date) {
   return null;
 }
 
-async function toolDeleteEvent(ownerEmail, args) {
-  const events = await scanOwned(TABLES.event, 'ownerEmail', ownerEmail);
+async function toolDeleteEvent(who, args) {
+  const events = await scanOwned(TABLES.event, who);
   const match = findEventMatch(events, args.title, args.date);
   if (!match) {
     const onDate = events.filter(e => e.date === args.date).map(e => e.title);
@@ -203,8 +223,8 @@ async function toolDeleteEvent(ownerEmail, args) {
   return { deleted: true, title: match.title, date: match.date };
 }
 
-async function toolRescheduleEvent(ownerEmail, args) {
-  const events = await scanOwned(TABLES.event, 'ownerEmail', ownerEmail);
+async function toolRescheduleEvent(who, args) {
+  const events = await scanOwned(TABLES.event, who);
   const match = findEventMatch(events, args.title, args.date);
   if (!match) {
     const onDate = events.filter(e => e.date === args.date).map(e => e.title);
@@ -220,19 +240,21 @@ async function toolRescheduleEvent(ownerEmail, args) {
   return { rescheduled: true, title: match.title, newDate: args.newDate, newStartTime: args.newStartTime, newEndTime: args.newEndTime };
 }
 
-async function toolListReminders(ownerEmail) {
-  const notifs = await scanOwned(TABLES.notification, 'recipientEmail', ownerEmail, {
+async function toolListReminders(who) {
+  // Reminders are ones you set for yourself, so you are also their owner.
+  const notifs = await scanOwned(TABLES.notification, who, {
     expr: '#type = :type', names: { '#type': 'type' }, values: { ':type': 'reminder' },
   });
   return notifs.map(n => ({ title: n.title, body: n.body, read: !!n.read, createdAt: n.createdAt }));
 }
 
-async function toolCreateReminder(ownerEmail, args) {
+async function toolCreateReminder(who, args) {
   const now = new Date().toISOString();
   const item = {
     id: randomUUID(),
     __typename: 'Notification',
-    recipientEmail: ownerEmail,
+    owner: who.sub,
+    recipientEmail: who.email,
     type: 'reminder',
     title: args.title,
     body: args.body ?? '',
@@ -245,19 +267,19 @@ async function toolCreateReminder(ownerEmail, args) {
   return { created: true, title: item.title };
 }
 
-async function toolListStreaks(ownerEmail) {
-  const streaks = await scanOwned(TABLES.streak, 'ownerEmail', ownerEmail);
+async function toolListStreaks(who) {
+  const streaks = await scanOwned(TABLES.streak, who);
   return streaks.filter(s => !s.deletedAt).map(s => ({
     name: s.name, target: s.target, unit: s.unit,
     checkedDays: s.checkedDays ?? [], loggedValues: s.loggedValues ?? {},
   }));
 }
 
-async function toolLogStreak(ownerEmail, args) {
+async function toolLogStreak(who, args) {
   if (args.date > new Date().toISOString().split('T')[0]) {
     return { logged: false, reason: 'Date cannot be in the future.' };
   }
-  const streaks = await scanOwned(TABLES.streak, 'ownerEmail', ownerEmail);
+  const streaks = await scanOwned(TABLES.streak, who);
   const match = streaks.find(s => !s.deletedAt && (s.name || '').trim().toLowerCase() === args.name.trim().toLowerCase());
   if (!match) return { logged: false, reason: `No streak named "${args.name}" found.` };
 
@@ -295,7 +317,7 @@ function jsonRpcError(id, code, message) {
   return { jsonrpc: '2.0', id, error: { code, message } };
 }
 
-async function handleRpc(message, ownerEmail) {
+async function handleRpc(message, who) {
   const { id, method, params } = message;
 
   if (method === 'initialize') {
@@ -321,7 +343,7 @@ async function handleRpc(message, ownerEmail) {
       return jsonRpcResult(id, { content: [{ type: 'text', text: `Unknown tool: ${toolName}` }], isError: true });
     }
     try {
-      const result = await toolHandler(ownerEmail, params?.arguments ?? {});
+      const result = await toolHandler(who, params?.arguments ?? {});
       return jsonRpcResult(id, { content: [{ type: 'text', text: JSON.stringify(result) }] });
     } catch (err) {
       console.error('Tool call error:', toolName, err);
@@ -345,8 +367,8 @@ export const handler = async (event) => {
   }
 
   const headers = event.headers ?? {};
-  const ownerEmail = await resolveOwner(headers);
-  if (!ownerEmail) {
+  const who = await resolveOwner(headers);
+  if (!who) {
     return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized — missing or invalid bearer token.' }) };
   }
 
@@ -360,7 +382,7 @@ export const handler = async (event) => {
   const messages = Array.isArray(body) ? body : [body];
   const responses = [];
   for (const msg of messages) {
-    const res = await handleRpc(msg, ownerEmail);
+    const res = await handleRpc(msg, who);
     if (res) responses.push(res);
   }
 
