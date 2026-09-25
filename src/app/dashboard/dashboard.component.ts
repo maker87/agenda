@@ -2050,27 +2050,19 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           return;
         }
         this.chatEventDraft = { ...draft, step: 'category', startTime: times.start, endTime: times.end };
-        this.addAssistantMsg(`🕐 ${this.formatTime(times.start)} – ${this.formatTime(times.end)}.\n\nNow a few optional questions to make this event perfect. You can **skip** any of them.\n\n🏷️ What category? (Work, Personal, Fitness, School, Social, Health) or **skip**`);
+        // Suggest only categories the user already has; a stock list here got
+        // typed back and became categories nobody had asked for.
+        const ownCategories = [...new Set(this.allCategoryPaths.map(p => this.categoryTreeService.splitPath(p)[0]).filter(Boolean))];
+        const categoryHint = ownCategories.length ? ` (${ownCategories.slice(0, 6).join(', ')})` : '';
+        this.addAssistantMsg(`🕐 ${this.formatTime(times.start)} – ${this.formatTime(times.end)}.\n\nNow a few optional questions to make this event perfect. You can **skip** any of them.\n\n🏷️ What category?${categoryHint} or **skip**`);
         break;
 
       case 'category':
-        let category = text.trim();
-        if (/skip|auto|none|no/i.test(lower)) {
-          // Auto-detect from title
-          const cats: Record<string, RegExp> = {
-            'Work': /meeting|work|call|sync|interview|presentation/i,
-            'School': /exam|test|class|study|homework|lecture/i,
-            'Fitness': /gym|workout|run|yoga|swim|sport|practice|game|basketball|soccer|tennis|track/i,
-            'Health': /doctor|dentist|therapy|appointment|checkup/i,
-            'Social': /lunch|dinner|party|drinks|hangout|date/i,
-          };
-          category = 'Personal';
-          for (const [cat, regex] of Object.entries(cats)) {
-            if (regex.test(draft.title || '')) { category = cat; break; }
-          }
-        }
+        // Skipping leaves the event uncategorized rather than guessing one from
+        // the title. Matched whole, so a category like "Piano" isn't a "no".
+        const category = /^(skip|none|no|nope)$/i.test(lower.trim()) ? '' : text.trim();
         this.chatEventDraft = { ...draft, step: 'location', category };
-        this.addAssistantMsg(`🏷️ ${category}.\n\n📍 Where is it? (e.g. "Room 204", "Zoom", "Central Park") or **skip**`);
+        this.addAssistantMsg(`🏷️ ${category ? category + '.' : 'No category.'}\n\n📍 Where is it? (e.g. "Room 204", "Zoom", "Central Park") or **skip**`);
         break;
 
       case 'location':
@@ -2105,7 +2097,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           `📌 **${draft.title}**`,
           `📅 ${this.formatDate(draft.date!)}`,
           `🕐 ${this.formatTime(draft.startTime!)} – ${this.formatTime(draft.endTime!)}`,
-          `🏷️ ${draft.category || 'Personal'}`,
+          `🏷️ ${draft.category || 'No category'}`,
         ];
         if (loc) summaryLines.push(`📍 ${loc}`);
         if (desc) summaryLines.push(`📝 ${desc}`);
@@ -2119,7 +2111,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
           date: draft.date,
           startTime: draft.startTime,
           endTime: draft.endTime,
-          category: draft.category || 'Personal',
+          category: draft.category || '',
           color: '#6c63ff',
           description: [desc, loc ? `Location: ${loc}` : ''].filter(Boolean).join('\n'),
           sharedWith,
@@ -4179,13 +4171,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       const existingIds = new Set(this.events.map(e => e.id));
       const allNewEvents: CalendarEvent[] = [];
 
-      // Fetch per-calendar so we can assign categories based on calendar name
+      // Imported events arrive uncategorized. Filing them under categories the
+      // user never made ("Google Calendar > Work > Meetings" and the like) left
+      // a tree of inventions behind; AI Organize is how they get sorted.
       for (const cal of selectedCalendars) {
         const gcalEvents = await this.googleCalendarService.fetchEventsFromCalendars([cal.id], this.gcalFutureOnly);
         const toAdd = gcalEvents.filter(g => !existingIds.has(g.id));
 
         for (const g of toAdd) {
-          const category = this.categorizeGCalEvent(g.title, g.description, cal.name);
           const ev: CalendarEvent = {
             id:          `local_${Date.now()}_${Math.random().toString(36).slice(2)}`,
             title:       g.title,
@@ -4194,7 +4187,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
             endTime:     g.endTime,
             description: g.description,
             color:       g.color,
-            category,
+            category:    '',
             sharedWith:  [],
           };
           allNewEvents.push(ev);
@@ -4215,59 +4208,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         (a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime)
       );
 
-      // Auto-save any new categories that were created
-      const newCategories = [...new Set(allNewEvents.map(e => e.category).filter(c => !!c))];
-      const existingCategories = new Set(this.savedCategories);
-      const categoriesToAdd = newCategories.filter(c => !existingCategories.has(c));
-      if (categoriesToAdd.length > 0) {
-        this.savedCategories = [...this.savedCategories, ...categoriesToAdd];
-        this.persistCategories();
-      }
-
       this.googleCalendarLinked = true;
       this.showGcalPicker = false;
       this.googleSyncError = '';
-      console.log(`[Google Calendar] Imported ${allNewEvents.length} events across ${newCategories.length} categories.`);
+      console.log(`[Google Calendar] Imported ${allNewEvents.length} events.`);
     } catch (err: any) {
       console.error('[Google Calendar] Fetch failed:', err);
       this.googleSyncError = 'Could not fetch events. Please try again.';
     } finally {
       this.gcalImporting = false;
     }
-  }
-
-  /**
-   * Auto-categorize a Google Calendar event based on its title, description,
-   * and the source calendar name.
-   * Returns a category path like "Google Calendar > Work > Meetings".
-   */
-  private categorizeGCalEvent(title: string, description: string, calendarName: string): string {
-    const text = `${title} ${description}`.toLowerCase();
-    const calBase = `Google Calendar > ${calendarName}`;
-
-    // Keyword-based subcategory detection
-    const rules: { keywords: string[]; subcategory: string }[] = [
-      { keywords: ['meeting', 'standup', 'stand-up', 'sync', '1:1', 'one-on-one', 'huddle', 'retro', 'sprint'], subcategory: 'Meetings' },
-      { keywords: ['deadline', 'due', 'submit', 'delivery', 'milestone'], subcategory: 'Deadlines' },
-      { keywords: ['birthday', 'anniversary', 'celebration', 'party'], subcategory: 'Celebrations' },
-      { keywords: ['doctor', 'dentist', 'appointment', 'checkup', 'therapy', 'medical', 'health'], subcategory: 'Health' },
-      { keywords: ['gym', 'workout', 'run', 'yoga', 'fitness', 'exercise', 'training', 'swim'], subcategory: 'Fitness' },
-      { keywords: ['flight', 'hotel', 'travel', 'trip', 'vacation', 'airport', 'booking'], subcategory: 'Travel' },
-      { keywords: ['class', 'lecture', 'exam', 'homework', 'study', 'tutorial', 'school', 'university', 'course'], subcategory: 'Education' },
-      { keywords: ['lunch', 'dinner', 'breakfast', 'coffee', 'brunch', 'restaurant'], subcategory: 'Social' },
-      { keywords: ['interview', 'review', 'performance', 'onboarding'], subcategory: 'Work' },
-      { keywords: ['bill', 'payment', 'invoice', 'tax', 'rent', 'mortgage'], subcategory: 'Finance' },
-      { keywords: ['reminder', 'todo', 'task', 'errand', 'pickup', 'drop off'], subcategory: 'Reminders' },
-    ];
-
-    for (const rule of rules) {
-      if (rule.keywords.some(kw => text.includes(kw))) {
-        return `${calBase} > ${rule.subcategory}`;
-      }
-    }
-
-    // Default: just use the calendar name as the category
-    return calBase;
   }
 
   closeGcalPicker() {

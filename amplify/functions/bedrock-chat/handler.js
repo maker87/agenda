@@ -70,7 +70,7 @@ CRITICAL EVENT/REMINDER CREATION RULES — follow this process, do not skip step
 1. GATHER REQUIRED INFO FIRST. An event needs a title, a date, and a start time before it can be created (an end time too, though that can be defaulted per step 2). If the user's request is missing any of title/date/start time, do NOT create or propose anything yet — ask a short, friendly follow-up question for exactly what's missing. Never invent or guess a date ("I'll assume tomorrow") or a time ("I'll pick something reasonable") on your own.
    Exception: if the user explicitly grants you freedom for a specific missing piece — phrases like "you pick", "surprise me", "whatever works", "doesn't matter", "your choice" — you may choose a reasonable value for THAT piece only, and must clearly state what you chose in your reply.
 
-2. OPTIONAL DETAILS ARE OFFERED, NOT FABRICATED. End time/duration, category, location, and description are optional "event details". If the user didn't specify one, OFFER to fill it in rather than silently making it up — e.g. "Want me to default this to 1 hour and file it under Personal, or would you like to specify?" Only fill it in once the user agrees or grants you freedom (see exception above), and state what you picked.
+2. OPTIONAL DETAILS ARE OFFERED, NOT FABRICATED. End time/duration, category, location, and description are optional "event details". If the user didn't specify one, OFFER to fill it in rather than silently making it up — e.g. "Want me to default this to 1 hour, or would you like to specify? And should it go in one of your categories?" — only ever suggest categories already on their calendar. With no category given or agreed, leave the category field empty; an uncategorized event is fine. Only fill it in once the user agrees or grants you freedom (see exception above), and state what you picked.
 
 3. CONFIRM BEFORE CREATING — NEVER CREATE ON THE FIRST TURN. Once you have title, date, start time, and an end time (given or agreed/defaulted), do NOT emit EVENT_CREATE / EVENT_RECURRING / REMINDER_CREATE yet. Instead, reply in plain text with a full summary of exactly what you're about to add (Title, Date, Start–End time, Category, Location, Description if any) and explicitly ask "Shall I add this to your calendar?" Then wait.
 
@@ -294,7 +294,7 @@ Rules:
 - Before CATEGORY_DELETE_ALL, name the categories being cleared and say the events themselves are kept, so the user knows exactly what they are agreeing to
 - NEVER invent a title, date, or start time the user didn't provide or explicitly delegate to you ("you pick" etc. — and only for the specific field they delegated); for delete/reschedule, copy the title character-for-character from the calendar summary, never a retranslated or paraphrased version of it
 - Use the conversation history to remember what the user already told you — don't re-ask for info you already have, and don't lose track of a proposal you already summarized
-- Categories: Work, Personal, Fitness, School, Social, Health, Entertainment, Travel
+- Categories: only one the user named or one already on their calendar (see the summary). There is no default category — when none applies, leave the category field empty (e.g. EVENT_CREATE|Dentist|2026-07-14|09:00|10:00|)
 - When you DO emit the structured line (after confirmation), it must be the FIRST line of that reply, followed by ONE short friendly confirmation
 - For non-creation questions about the calendar, just respond normally
 - For planning/advice questions, give personalized tips based on the user's actual events
@@ -310,16 +310,18 @@ function parseAIResponse(text, today) {
     const trimmed = line.trim();
 
     // EVENT_CREATE|title|date|startTime|endTime|category
+    // The category is optional, so a line that leaves it off entirely (no
+    // trailing pipe) still creates the event, uncategorized.
     if (trimmed.startsWith('EVENT_CREATE|')) {
       const parts = trimmed.split('|');
-      if (parts.length >= 6) {
+      if (parts.length >= 5) {
         actions.push({
           type: 'create_event',
           title: parts[1],
           date: parts[2],
           startTime: parts[3],
           endTime: parts[4],
-          category: parts[5] || 'Personal',
+          category: parts[5] || '',
         });
       }
       continue;
@@ -342,7 +344,7 @@ function parseAIResponse(text, today) {
             title: parts[1],
             startTime: parts[2],
             endTime: parts[3],
-            category: parts[4] || 'Personal',
+            category: parts[4] || '',
             daysOfWeek,
             // Kept so an older frontend still finds a day to work with.
             dayOfWeek: daysOfWeek[0],

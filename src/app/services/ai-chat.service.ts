@@ -1612,15 +1612,7 @@ export class AiChatService {
     _t: string,
   ): { message: ChatMessage; draft: EventDraft | null } {
     // Go directly to final confirm — category/description/sharing are optional
-    const inferred = inferCategory(draft.title ?? '');
-    const updated: EventDraft = {
-      ...draft,
-      date,
-      startTime,
-      endTime,
-      category: draft.category || inferred.category,
-      color: draft.color || inferred.color,
-    };
+    const updated: EventDraft = { ...draft, date, startTime, endTime };
     return this.buildFinalConfirm(updated);
   }
 
@@ -1634,9 +1626,10 @@ export class AiChatService {
   private buildFinalConfirm(
     draft: EventDraft,
   ): { message: ChatMessage; draft: EventDraft | null } {
-    const inferred = inferCategory(draft.title ?? '');
-    const category = draft.category || inferred.category;
-    const color    = draft.color    || inferred.color;
+    // Only a category the user gave; guessing one from the title filed events
+    // under categories they never made.
+    const category = draft.category || '';
+    const color    = draft.color    || '#6c63ff';
 
     const updated: EventDraft = { ...draft, step: 'confirm', category, color };
     const descLine = draft.description ? `\n📝 ${draft.description}` : '';
@@ -1662,7 +1655,7 @@ export class AiChatService {
       message: {
         id: `msg_${Date.now()}_w`,
         role: 'assistant',
-        text: `Here's the event I'll create:\n\n📌 **${draft.title}**\n📅 ${formatDate(draft.date!)}\n🕐 ${formatTime(draft.startTime!)} – ${formatTime(draft.endTime!)}\n🏷️ ${category}${descLine}${shareLine}\n\nSay **yes** to add it, or you can optionally:\n• Say **"category: ___"** to change the category\n• Say **"description: ___"** to add a note\n• Say **"share: email@example.com"** to share it with someone\n• Say **"change"** to pick a different date/time`,
+        text: `Here's the event I'll create:\n\n📌 **${draft.title}**\n📅 ${formatDate(draft.date!)}\n🕐 ${formatTime(draft.startTime!)} – ${formatTime(draft.endTime!)}\n🏷️ ${category || 'No category'}${descLine}${shareLine}\n\nSay **yes** to add it, or you can optionally:\n• Say **"category: ___"** to set a category\n• Say **"description: ___"** to add a note\n• Say **"share: email@example.com"** to share it with someone\n• Say **"change"** to pick a different date/time`,
         timestamp: new Date(),
         actions,
       },
