@@ -595,11 +595,25 @@
   align-items: center;
   gap: 10px;
   background: var(--bg-hover);
-  border-radius: 9px;
-  padding: 10px 14px;
-  margin-bottom: 16px;
-  font-size: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  font-size: 15px;
   color: var(--text-primary);
+}
+
+/* Long titles wrap inside the card instead of running past its edge. */
+.change-event-preview strong {
+  min-width: 0;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+/* Same height as the time fields below it in the event forms. */
+.field input[type="date"] {
+  min-height: 44px;
+  border-radius: 10px;
 }
 
 .gcal-card.linked {
@@ -1340,6 +1354,9 @@
 
 .category-picker-value {
   flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
   font-weight: 500;
   color: var(--text, #222);
 }

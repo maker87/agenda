@@ -6,10 +6,13 @@
 :host {
   --tp-surface: #ffffff;
   --tp-surface-hover: #f4f5f9;
+  --tp-field: #ffffff;
   --tp-text: #1a1a2e;
   --tp-text-soft: #6b7280;
-  --tp-border: #e3e5ec;
+  --tp-border: #e0e0e0;
   --tp-accent: #6c63ff;
+  --tp-accent-soft: rgba(108, 99, 255, 0.1);
+  --tp-ring: rgba(108, 99, 255, 0.12);
   --tp-shadow: 0 12px 32px rgba(26, 26, 46, 0.16);
 
   display: block;
@@ -18,22 +21,62 @@
 :host-context([data-theme='dark']) {
   --tp-surface: #1a1a2e;
   --tp-surface-hover: #24243d;
-  --tp-text: #e8e8f0;
-  --tp-text-soft: #9ca3af;
-  --tp-border: #2f2f4a;
+  --tp-field: #1e1e34;
+  --tp-text: #f0f0f8;
+  --tp-text-soft: #8080a8;
+  --tp-border: #4a4a70;
+  --tp-accent: #7c74ff;
+  --tp-accent-soft: rgba(124, 116, 255, 0.18);
+  --tp-ring: rgba(124, 116, 255, 0.2);
   --tp-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
+/* One bordered box holding the typed time, the AM/PM switch and the list
+   button, so it reads as a single field like the date input above it. The
+   dashboard's .field input styles are scoped to that component and never reach
+   this input, which is why it is styled here. */
 .time-input {
   position: relative;
   display: flex;
-  align-items: stretch;
-  gap: 6px;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding-right: 5px;
+  border: 1.5px solid var(--tp-border);
+  border-radius: 10px;
+  background: var(--tp-field);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.time-input:hover {
+  border-color: var(--tp-accent);
+}
+
+.time-input:focus-within {
+  border-color: var(--tp-accent);
+  box-shadow: 0 0 0 3px var(--tp-ring);
 }
 
 .time-input input {
   flex: 1;
   min-width: 0;
+  align-self: stretch;
+  padding: 0 4px 0 13px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--tp-text);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+}
+
+.time-input input::placeholder {
+  color: var(--tp-text-soft);
+  font-weight: 400;
+  opacity: 1;
 }
 
 /* ── Buttons ── */
@@ -41,46 +84,52 @@
 .meridiem-toggle,
 .time-open-btn {
   flex: 0 0 auto;
-  border: 1.5px solid var(--tp-border);
-  border-radius: 9px;
-  background: var(--tp-surface);
-  color: var(--tp-text);
+  height: 32px;
+  border: none;
+  border-radius: 7px;
   font-family: inherit;
   cursor: pointer;
-  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  transition: color 0.2s, background 0.2s, box-shadow 0.2s;
 }
 
 .meridiem-toggle {
-  padding: 0 12px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
+  min-width: 42px;
+  padding: 0 9px;
+  background: var(--tp-accent-soft);
+  color: var(--tp-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
 }
 
 .time-open-btn {
-  width: 34px;
-  font-size: 14px;
+  width: 32px;
+  background: transparent;
+  color: var(--tp-text-soft);
+  font-size: 15px;
   line-height: 1;
 }
 
-.meridiem-toggle:hover,
+.meridiem-toggle:hover {
+  background: var(--tp-accent);
+  color: #fff;
+}
+
 .time-open-btn:hover {
-  border-color: var(--tp-accent);
-  color: var(--tp-accent);
+  background: var(--tp-surface-hover);
 }
 
 .meridiem-toggle:focus-visible,
 .time-open-btn:focus-visible {
   outline: none;
-  border-color: var(--tp-accent);
-  box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.1);
+  box-shadow: 0 0 0 2px var(--tp-accent);
 }
 
 /* ── Dropdown ── */
 
 .time-options {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   left: 0;
   right: 0;
   z-index: 40;

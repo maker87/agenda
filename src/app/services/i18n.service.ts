@@ -234,8 +234,8 @@ const TRANSLATIONS: Record<LangCode, Translations> = {
     // Time placeholders are digits only, so they read the same in every
     // language and advertise that the colon is optional — typing "930" is
     // enough. The 12-hour one has no AM/PM in it; that is a toggle.
-    timePlaceholder12: '9:30 or 930',
-    timePlaceholder24: '09:30 or 0930',
+    timePlaceholder12: '9:30',
+    timePlaceholder24: '09:30',
     toggleMeridiem: 'Switch between AM and PM',
     pickATime: 'Pick a time from the list',
     description: 'Description',
