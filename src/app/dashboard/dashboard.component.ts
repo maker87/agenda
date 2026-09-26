@@ -3651,6 +3651,16 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.categoryTreeService.buildTree(this.allCategoryPaths);
   }
 
+  /**
+   * The tree above is rebuilt as new objects on every change-detection pass,
+   * and each mouse movement triggers one. Keyed by object, the lists threw
+   * away and redrew every row each time, so the row under the pointer lost
+   * its hover state and flickered. Keying by path keeps the rows in place.
+   */
+  trackByCategoryPath(_: number, node: CategoryNode): string {
+    return node.fullPath;
+  }
+
   /** Events that have no category assigned. */
   get unassignedEvents(): CalendarEvent[] {
     return this.events.filter(e => !e.category);

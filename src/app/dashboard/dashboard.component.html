@@ -193,7 +193,7 @@
           (click)="toggleAllSidebarCats()"
           [attr.aria-expanded]="allSidebarCatsExpanded"
         >{{ allSidebarCatsExpanded ? '▾ ' + i18n.t('collapseAllCategories') : '▸ ' + i18n.t('showAllCategories') }}</button>
-        <ng-container *ngFor="let node of categoryTabTree">
+        <ng-container *ngFor="let node of categoryTabTree; trackBy: trackByCategoryPath">
           <ng-container *ngTemplateOutlet="navCatTpl; context: { node: node, depth: 0 }"></ng-container>
         </ng-container>
       </div>
@@ -247,7 +247,7 @@
         </div>
 
         <ng-container *ngIf="isSidebarCatExpanded(node.fullPath) && node.children.length > 0">
-          <ng-container *ngFor="let child of node.children">
+          <ng-container *ngFor="let child of node.children; trackBy: trackByCategoryPath">
             <ng-container *ngTemplateOutlet="navCatTpl; context: { node: child, depth: depth + 1 }"></ng-container>
           </ng-container>
         </ng-container>
@@ -1538,7 +1538,7 @@
         </div>
 
         <div class="cat-tree" *ngIf="categoryTabTree.length > 0">
-          <ng-container *ngFor="let node of categoryTabTree">
+          <ng-container *ngFor="let node of categoryTabTree; trackBy: trackByCategoryPath">
             <ng-container *ngTemplateOutlet="catNodeTpl; context: { node: node, depth: 0 }"></ng-container>
           </ng-container>
         </div>
@@ -2253,7 +2253,7 @@
 
       <!-- Children -->
       <ng-container *ngIf="isCatNodeExpanded(node.fullPath) && node.children.length > 0">
-        <ng-container *ngFor="let child of node.children">
+        <ng-container *ngFor="let child of node.children; trackBy: trackByCategoryPath">
           <ng-container *ngTemplateOutlet="catNodeTpl; context: { node: child, depth: depth + 1 }"></ng-container>
         </ng-container>
       </ng-container>
