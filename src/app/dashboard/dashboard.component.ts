@@ -1635,18 +1635,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     if (action.type === 'delete_categories_bulk') {
-      const cleared = this.allCategoryPaths.length;
-      const moved = this.applyCategoryMapping(c => c ? '' : null);
-      this.savedCategories = [];
-      this.persistCategories();
-      // Drop the saved colours too — otherwise a category recreated later
-      // silently comes back wearing its old colour. That goes for the ones
-      // assigned automatically as much as the ones picked by hand.
-      this.categoryColors = {};
-      this.autoRootColors = {};
-      this.saveAutoRootColors();
-      this.saveCategoryColors();
-      this.activeCategoryFilter = '';
+      const { cleared, moved } = this.clearAllCategories();
       this.addAssistantMsg(
         cleared === 0
           ? '⚠️ There were no categories to clear.'
@@ -3743,6 +3732,42 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   /** The logo goes home: the Schedule page, where the app opens. */
   goHome() {
     this.switchTab('schedule');
+  }
+
+  // ── Remove every category ──
+
+  /** Showing the "Remove all categories?" confirmation on the Categories tab. */
+  confirmingClearCategories = false;
+
+  /**
+   * Take every category off every event and forget them all. The events stay,
+   * uncategorized. Shared by the Categories tab and the assistant, so the two
+   * can't drift apart.
+   */
+  private clearAllCategories(): { cleared: number; moved: number } {
+    const cleared = this.allCategoryPaths.length;
+    const moved = this.applyCategoryMapping(c => c ? '' : null);
+    this.savedCategories = [];
+    this.persistCategories();
+    // Drop the saved colours too — otherwise a category recreated later
+    // silently comes back wearing its old colour. That goes for the ones
+    // assigned automatically as much as the ones picked by hand.
+    this.categoryColors = {};
+    this.autoRootColors = {};
+    this.saveAutoRootColors();
+    this.saveCategoryColors();
+    this.activeCategoryFilter = '';
+    this.categoryDetailPath = '';
+    return { cleared, moved };
+  }
+
+  /** The Categories tab's "Remove all" — for the many accounts whose
+   *  categories were made by older versions of the app, not by them. */
+  clearCategoriesFromTab() {
+    const { cleared, moved } = this.clearAllCategories();
+    this.confirmingClearCategories = false;
+    this.catFormSuccess = `Removed ${cleared} categories. ${this.eventsLabel(moved)} kept on your calendar, now uncategorized.`;
+    setTimeout(() => { this.catFormSuccess = ''; }, 5000);
   }
 
   // ── Category page (opened from the sidebar) ──

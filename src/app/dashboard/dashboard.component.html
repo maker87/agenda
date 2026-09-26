@@ -1510,7 +1510,26 @@
       <div class="cat-tree-section">
         <div class="cat-tree-header">
           <h3 class="cat-tree-title">{{ i18n.t('allCategories') }}</h3>
-          <span class="cat-tree-count">{{ allCategoryPaths.length }} total</span>
+          <div class="cat-tree-header-right">
+            <span class="cat-tree-count">{{ allCategoryPaths.length }} total</span>
+            <button
+              type="button"
+              class="cat-clear-all-btn"
+              *ngIf="allCategoryPaths.length > 0 && !confirmingClearCategories"
+              (click)="confirmingClearCategories = true"
+            >Remove all</button>
+          </div>
+        </div>
+
+        <!-- Removing every category keeps the events; they just become uncategorized. -->
+        <div class="cat-delete-confirm cat-clear-all-confirm" *ngIf="confirmingClearCategories">
+          <div class="cat-delete-msg">
+            Remove all {{ allCategoryPaths.length }} categories? Your {{ events.length }} events stay on your calendar, just without a category.
+          </div>
+          <div class="cat-delete-actions">
+            <button class="btn-danger cat-delete-yes" (click)="clearCategoriesFromTab()">Remove all categories</button>
+            <button class="btn-secondary cat-delete-no" (click)="confirmingClearCategories = false">{{ i18n.t('cancel') }}</button>
+          </div>
         </div>
 
         <div *ngIf="categoryTabTree.length === 0" class="empty-state large">
