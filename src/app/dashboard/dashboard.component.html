@@ -687,7 +687,9 @@
         </div>
         <div class="cal-input-group" *ngIf="calendarView === 'year'">
           <label class="cal-input-label">{{ i18n.t('jumpTo') }}</label>
-          <select class="cal-text-input" (change)="scrollToYearMonth(+$any($event.target).value)" name="yearJump">
+          <!-- Reset to the placeholder after each jump: a select ignores picking the
+               option it already shows, so the same month could only be chosen once. -->
+          <select #yearJump class="cal-text-input" (change)="jumpToYearMonth(+yearJump.value); yearJump.value = ''" name="yearJump">
             <option value="" disabled selected>{{ i18n.t('monthEllipsis') }}</option>
             <option *ngFor="let m of calendarMonths; let i = index" [value]="i">{{ m.name }}</option>
           </select>
@@ -732,6 +734,7 @@
           class="month-block"
           *ngFor="let month of calendarMonths"
           [class.current-month]="month.isCurrent"
+          [class.month-jump-highlight]="highlightedMonthIdx === month.monthIdx"
           [attr.id]="'year-month-' + month.monthIdx"
         >
           <!-- The header opens the month on its own; the day cells below keep
@@ -798,7 +801,7 @@
               (ngModelChange)="goToSlideMonth($event)"
               name="slideJump"
             >
-              <option *ngFor="let m of calendarMonths; let i = index" [value]="i">
+              <option *ngFor="let m of calendarMonths; let i = index" [ngValue]="i">
                 {{ m.name }}
               </option>
             </select>

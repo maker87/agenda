@@ -4305,6 +4305,23 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loginBannerTimer = setTimeout(() => { this.showLoginBanner = false; }, 15000);
   }
 
+  /** Month the year view briefly highlights after a jump, or null. */
+  highlightedMonthIdx: number | null = null;
+  private highlightTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * "Jump to" in the year view. Scrolls to the month and highlights it for a
+   * moment, so the jump shows even when the month is already on screen, as
+   * the current month is when the calendar opens.
+   */
+  jumpToYearMonth(idx: number) {
+    if (!(idx >= 0 && idx < 12)) return;
+    this.scrollToYearMonth(idx);
+    this.highlightedMonthIdx = idx;
+    if (this.highlightTimer) clearTimeout(this.highlightTimer);
+    this.highlightTimer = setTimeout(() => { this.highlightedMonthIdx = null; }, 1400);
+  }
+
   scrollToYearMonth(idx: number) {
     setTimeout(() => {
       const el = document.getElementById('year-month-' + idx);

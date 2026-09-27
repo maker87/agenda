@@ -2085,6 +2085,16 @@
   box-shadow: 0 0 0 3px rgba(108,99,255,0.12);
 }
 
+/* Brief pulse on the month "Jump to" landed on. */
+.month-block.month-jump-highlight {
+  animation: month-jump-pulse 1.4s ease-out;
+}
+
+@keyframes month-jump-pulse {
+  0%, 30% { border-color: var(--accent); box-shadow: 0 0 0 6px rgba(108,99,255,0.35); }
+  100% { box-shadow: 0 0 0 3px rgba(108,99,255,0); }
+}
+
 .month-header {
   display: flex;
   align-items: center;
