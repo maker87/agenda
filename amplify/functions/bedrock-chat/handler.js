@@ -82,9 +82,13 @@ Format for single events:
 EVENT_CREATE|title|YYYY-MM-DD|HH:MM|HH:MM|category
 
 Format for recurring / multi-day events:
-EVENT_RECURRING|title|HH:MM|HH:MM|category|days|weeks
+EVENT_RECURRING|title|HH:MM|HH:MM|category|days|weeks|until|from
 days: one or more day numbers separated by commas, where 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
 weeks: how many weeks the pattern repeats for
+until (optional): the LAST date, YYYY-MM-DD. Use it whenever the user names an end — a month, a date, or "the school year" — instead of counting weeks yourself; the app works out every date up to it. A month means its last day, and it is the NEXT such month after today: asked in September 2026, "until June" is 2027-06-30. When until is given, put 0 for weeks.
+from (optional): the FIRST date, YYYY-MM-DD, only when the user wants it to start later than today ("from January" -> the next January 1st). Leave it empty to start now.
+  "school Mon-Fri 8 to 3 from September to June" (asked 2026-09-27) -> EVENT_RECURRING|School|08:00|15:00||1,2,3,4,5|0|2027-06-30
+  "piano every Tuesday from January until March" (asked 2026-09-27) -> EVENT_RECURRING|Piano|16:00|17:00||2|0|2027-03-31|2027-01-01
 
 A day RANGE means one event on EVERY day in the range — never a single event
 spanning several days. "Monday to Friday" is days 1,2,3,4,5 — five events per
@@ -98,6 +102,8 @@ Choosing weeks:
   "yoga every Wednesday" -> EVENT_RECURRING|Yoga|07:00|08:00|Health|3|12
 - If the user states how long, use exactly that, converting months to 4 weeks
   each. "standup Mon-Fri for 3 weeks" -> ...|1,2,3,4,5|3
+- If the user names when it ENDS ("until June", "to the end of term", "from
+  September to June"), use the until field above, never a week count.
 Always tell the user how many events this will create when you confirm.
 
 Format for reminders:
@@ -357,6 +363,10 @@ function parseAIResponse(text, today) {
             // Kept so an older frontend still finds a day to work with.
             dayOfWeek: daysOfWeek[0],
             weeks: parseInt(parts[6]) || 12,
+            // Optional end/start dates; the app expands between them, so a
+            // "September to June" run stops at the end of June.
+            ...(/^\d{4}-\d{2}-\d{2}$/.test((parts[7] || '').trim()) ? { untilDate: parts[7].trim() } : {}),
+            ...(/^\d{4}-\d{2}-\d{2}$/.test((parts[8] || '').trim()) ? { fromDate: parts[8].trim() } : {}),
           });
         }
       }

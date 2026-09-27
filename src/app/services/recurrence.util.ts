@@ -205,6 +205,44 @@ export function expandRecurrence(
   return dates;
 }
 
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The dates a recurring request covers. With `untilDate` ("until June" →
+ * the last day of June) the run is every selected weekday from the start up
+ * to and including that date, so a school year ends when it says, rather
+ * than after however many weeks the assistant worked out. Without one,
+ * `weeks` decides, as before. `fromDate` starts the run later than today;
+ * a date already past is ignored. Still capped at MAX_WEEKS from the start.
+ */
+export function recurringDates(
+  daysOfWeek: readonly number[],
+  opts: { weeks?: number; fromDate?: string; untilDate?: string },
+  today: Date = new Date(),
+): string[] {
+  const todayKey = toLocalDateKey(today);
+  const startKey = opts.fromDate && DATE_KEY.test(opts.fromDate) && opts.fromDate > todayKey ? opts.fromDate : todayKey;
+  const [y, m, d] = startKey.split('-').map(Number);
+  const start = new Date(y, m - 1, d);
+
+  if (!(opts.untilDate && DATE_KEY.test(opts.untilDate))) {
+    return expandRecurrence(daysOfWeek, Math.min(opts.weeks || 12, MAX_WEEKS), start);
+  }
+  if (opts.untilDate < startKey) return [];
+
+  const wanted = new Set(daysOfWeek);
+  const last = new Date(start);
+  last.setDate(last.getDate() + MAX_WEEKS * 7 - 1);
+  const endKey = opts.untilDate < toLocalDateKey(last) ? opts.untilDate : toLocalDateKey(last);
+  const dates: string[] = [];
+  for (const day = new Date(start); toLocalDateKey(day) <= endKey; day.setDate(day.getDate() + 1)) {
+    if (!wanted.has(day.getDay())) continue;
+    if (dates.length >= MAX_OCCURRENCES) break;
+    dates.push(toLocalDateKey(day));
+  }
+  return dates;
+}
+
 /** "Monday", or "Monday–Friday" / "Monday, Wednesday and Friday" for a set. */
 export function describeDays(daysOfWeek: readonly number[]): string {
   if (!daysOfWeek.length) return '';

@@ -10,7 +10,7 @@ import { NotificationsService, AppNotification } from '../services/notifications
 import { FriendsService, Friend, FriendMessage } from '../services/friends.service';
 import { CategoryTreeService, CategoryNode, CATEGORY_SEP } from '../services/category-tree.service';
 import { GoogleCalendarService, GCalEvent, GCalCalendar } from '../services/google-calendar.service';
-import { expandRecurrence, describeDays, MAX_WEEKS } from '../services/recurrence.util';
+import { describeDays, recurringDates, MAX_WEEKS } from '../services/recurrence.util';
 import { buildCategoryColorMap, claimRootColor, resolveCategoryColor, seedRootColors, CATEGORY_PALETTE, UNCATEGORIZED_COLOR } from '../services/category-color.util';
 import { TimePickerComponent } from '../shared/time-picker/time-picker.component';
 import { emptyTimeField, parseTimeField, toTimeField, isTwelveHourLocale, meridiemLabelFor, type TimeField } from '../services/time-field.util';
@@ -1496,7 +1496,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       ? action.daysOfWeek
       : (action.dayOfWeek !== undefined ? [action.dayOfWeek] : []);
     if (!days.length) return 0;
-    return expandRecurrence(days, Math.min(action.weeks || 12, MAX_WEEKS), new Date()).length;
+    return recurringDates(days, { weeks: action.weeks, fromDate: action.fromDate, untilDate: action.untilDate }).length;
   }
 
   /**
@@ -1595,7 +1595,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         // notice it means 60 events.
         const count = this.recurringOccurrenceCount(action);
         const total = count ? ` — **${count} ${count === 1 ? 'event' : 'events'}**` : '';
-        return `**${action.title}** — ${days}, ${this.formatTime(action.startTime ?? '')}–${this.formatTime(action.endTime ?? '')}${category}${total}`;
+        // Name the span too, so "until June" can be checked before saying yes.
+        const from = action.fromDate ? ` from ${this.formatDate(action.fromDate)}` : '';
+        const until = action.untilDate ? ` until ${this.formatDate(action.untilDate)}` : '';
+        return `**${action.title}** — ${days}, ${this.formatTime(action.startTime ?? '')}–${this.formatTime(action.endTime ?? '')}${from}${until}${category}${total}`;
       }
       case 'create_streak':
         return `habit **${action.name}** — ${action.target} ${action.unit} a day`;
@@ -1679,7 +1682,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         color: '#6c63ff',
         description: '',
         sharedWith: [],
-        _recurring: { daysOfWeek: recurringDays, weeks: action.weeks || 12 },
+        _recurring: { daysOfWeek: recurringDays, weeks: action.weeks || 12, fromDate: action.fromDate, untilDate: action.untilDate },
       } as any);
     }
     if (action.type === 'create_reminder' && action.title) {
@@ -2038,7 +2041,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     try {
       // Check if this is a recurring event
       if (payload._recurring) {
-        const { dayOfWeek, daysOfWeek, weeks: requestedWeeks } = payload._recurring;
+        const { dayOfWeek, daysOfWeek, weeks: requestedWeeks, fromDate, untilDate } = payload._recurring;
         // daysOfWeek is the current shape; dayOfWeek is still accepted so a
         // reply produced before the multi-day protocol landed keeps working.
         const days: number[] = Array.isArray(daysOfWeek) && daysOfWeek.length
@@ -2047,8 +2050,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         const weeks = Math.min(requestedWeeks || 12, MAX_WEEKS);
 
         // One date per selected day, per week — "Monday to Friday" is five
-        // events a week, not one event spanning five days.
-        const dates = expandRecurrence(days, weeks, new Date());
+        // events a week, not one event spanning five days. An end date
+        // ("until June") wins over the week count.
+        const dates = recurringDates(days, { weeks, fromDate, untilDate });
         if (!dates.length) {
           this.chatEventDraft = null;
           this.chatMessages = [...this.chatMessages, {
@@ -2091,7 +2095,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         // Report what was actually created — the count of events and the days
         // they land on — rather than a week count and a single day name.
         const dayLabel = describeDays(days);
-        const spanNote = weeks > 1 ? ` over ${weeks} weeks` : '';
+        const spanNote = untilDate
+          ? ` until ${this.formatDate(dates[dates.length - 1])}`
+          : weeks > 1 ? ` over ${weeks} weeks` : '';
         this.chatMessages = [...this.chatMessages, {
           id: `msg_${Date.now()}_created`,
           role: 'assistant',

@@ -68,6 +68,9 @@ export interface ChatAction {
   /** Days a recurring event lands on, e.g. [1,2,3,4,5] for Monday to Friday. */
   daysOfWeek?: number[];
   weeks?: number;
+  /** Recurring: last date (YYYY-MM-DD). When set, it decides the span instead of
+   *  weeks. A recurring action's start, when later than today, is fromDate below. */
+  untilDate?: string;
   body?: string;
   tab?: string;
   label?: string;
