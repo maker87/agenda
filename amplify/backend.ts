@@ -2,6 +2,7 @@ import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { mcpServerFunction } from './functions/mcp-server/resource';
+import { bedrockChatFunction } from './functions/bedrock-chat/resource';
 import { Effect, PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { Stack } from 'aws-cdk-lib';
 import { Function as LambdaFunction } from 'aws-cdk-lib/aws-lambda';
@@ -12,6 +13,7 @@ const backend = defineBackend({
   auth,
   data,
   mcpServerFunction,
+  bedrockChatFunction,
 });
 
 // ── MCP server: exposes calendar events/reminders/streaks as tools for
@@ -76,12 +78,17 @@ mcpLambda.addEnvironment('NOTIFICATION_TABLE', 'Notification-mvjyhqvbi5hajc6rcdn
 mcpLambda.addEnvironment('STREAK_TABLE', 'Streak-mvjyhqvbi5hajc6rcdnhqwva24-NONE');
 mcpLambda.addEnvironment('API_TOKEN_TABLE', 'ApiToken-mvjyhqvbi5hajc6rcdnhqwva24-NONE');
 
-// Find the bedrock-chat Lambda in the CDK construct tree and grant Bedrock permissions.
-// (Deliberately NOT adding an environment variable here referencing anything
-// from the mcp-server stack — bedrock-chat's Lambda lives inside the data
-// stack, and mcp-server's grants above already make the function stack
-// depend on the data stack, so a reverse reference here would create a
-// circular dependency between the two nested stacks.)
+// Bedrock access for the chat Lambda, granted to it directly.
+//
+// This used to search Stack.of(backend.data) for a Lambda whose id contained
+// 'bedrock-chat'. The function actually lives in the shared function stack, so
+// the search matched nothing, no policy was ever attached, and every call was
+// refused with AccessDeniedException ("I'm having trouble connecting right
+// now") whatever ARNs the policy listed. Confirmed by synthesising the backend:
+// no template contained bedrock:InvokeModel.
+//
+// The resource ARNs are plain strings, not stack tokens, so this adds no
+// cross-stack reference and can't create the circular dependency noted above.
 //
 // TEMPORARY: resources target Nova Lite, matching the temporary MODEL_ID
 // revert in bedrock-chat/handler.js (this account hasn't completed Bedrock's
@@ -93,26 +100,19 @@ mcpLambda.addEnvironment('API_TOKEN_TABLE', 'ApiToken-mvjyhqvbi5hajc6rcdnhqwva24
 // every region the profile may route to (us-east-1, us-east-2, us-west-2). The
 // foundation model's ARN carries no "us." prefix: the old entry,
 // foundation-model/us.amazon.nova-lite-v1:0, matched no model at all, so
-// Bedrock refused the call and the chat answered "I'm having trouble
-// connecting right now".
-const dataStack = Stack.of(backend.data);
-const allConstructs = dataStack.node.findAll();
-for (const construct of allConstructs) {
-  if (construct instanceof LambdaFunction && construct.node.id.includes('bedrock-chat')) {
-    construct.addToRolePolicy(
-      new PolicyStatement({
-        effect: Effect.ALLOW,
-        actions: ['bedrock:InvokeModel'],
-        resources: [
-          'arn:aws:bedrock:us-east-1:*:inference-profile/us.amazon.nova-lite-v1:0',
-          'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0',
-          'arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-lite-v1:0',
-          'arn:aws:bedrock:us-west-2::foundation-model/amazon.nova-lite-v1:0',
-        ],
-      })
-    );
-  }
-}
+// Bedrock refused the call.
+backend.bedrockChatFunction.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: ['bedrock:InvokeModel'],
+    resources: [
+      'arn:aws:bedrock:us-east-1:*:inference-profile/us.amazon.nova-lite-v1:0',
+      'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0',
+      'arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-lite-v1:0',
+      'arn:aws:bedrock:us-west-2::foundation-model/amazon.nova-lite-v1:0',
+    ],
+  })
+);
 
 // NOTE: deliberately not calling backend.addOutput() here — it still
 // attaches the resulting CfnOutput to the data stack under the hood, which

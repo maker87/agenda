@@ -1,12 +1,5 @@
 import { type ClientSchema, a, defineData } from '@aws-amplify/backend';
-import { defineFunction } from '@aws-amplify/backend';
-
-const bedrockChatHandler = defineFunction({
-  name: 'bedrock-chat',
-  entry: '../functions/bedrock-chat/handler.js',
-  timeoutSeconds: 30,
-  memoryMB: 256,
-});
+import { bedrockChatFunction as bedrockChatHandler } from '../functions/bedrock-chat/resource';
 
 // Who may see what. Every rule below is enforced by AppSync, not the app: the
 // app used to be trusted to filter by email in the browser, which let any
