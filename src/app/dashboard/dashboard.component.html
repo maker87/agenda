@@ -672,7 +672,7 @@
 
       <!-- View controls -->
       <div class="cal-controls">
-        <select class="cal-view-select" [(ngModel)]="calendarView" name="calendarView">
+        <select class="cal-view-select" [ngModel]="calendarView" (ngModelChange)="setCalendarView($event)" name="calendarView">
           <option value="year">{{ i18n.t('yearView') }}</option>
           <option value="month">{{ i18n.t('monthView') }}</option>
           <option value="week">{{ i18n.t('weekView') }}</option>

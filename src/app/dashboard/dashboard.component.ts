@@ -3007,7 +3007,19 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   openMonthView(monthIdx: number) {
     this.slideMonthIndex = monthIdx;
     this.slideAnimating = false;
-    this.calendarView = 'month';
+    this.setCalendarView('month');
+  }
+
+  /**
+   * Switch calendar views from the top of the page. The year view is long and
+   * opens smoothly scrolling down to the current month; switching kept that
+   * scroll (or let it finish on the new view), so a month opened from there
+   * landed part-way down with its header off screen. An instant scroll also
+   * cancels a smooth one still under way.
+   */
+  setCalendarView(view: 'year' | 'month' | 'week' | 'day') {
+    this.calendarView = view;
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
   }
   slideAnimating = false;
   slideDirection: 'left' | 'right' = 'left';
