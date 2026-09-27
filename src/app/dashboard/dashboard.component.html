@@ -410,11 +410,14 @@
           </button>
         </div>
         <div class="streaks-list" *ngIf="streaks.length > 0">
-          <div class="streak-card" *ngFor="let streak of streaks">
+          <div class="streak-card" *ngFor="let streak of streaks" [class.has-color]="!!streak.color" [style.--streak-color]="streak.color || null">
             <div class="streak-header">
+              <span class="streak-emoji" *ngIf="streak.emoji">{{ streak.emoji }}</span>
               <span class="streak-name">{{ streak.name }}</span>
-              <span class="streak-target-badge">{{ streak.target }} {{ streak.unit }}{{ i18n.t('perDay') }}</span>
+              <span class="streak-target-badge">{{ streakTargetLabel(streak) }}</span>
+              <span class="streak-schedule-badge" *ngIf="streakScheduleLabel(streak) as sched">📅 {{ sched }}</span>
               <span class="streak-count">{{ getStreakCount(streak) }} {{ i18n.t('days') }}</span>
+              <button class="streak-edit" (click)="openEditStreak(streak)" [title]="i18n.t('editStreakTitle')">✎</button>
               <button class="streak-delete" (click)="deleteStreak(streak.id)" [title]="i18n.t('deleteStreakTitle')">✕</button>
             </div>
             <p class="streak-ai-plan" *ngIf="streak.aiPlan">💡 {{ streak.aiPlan }}</p>
@@ -433,6 +436,7 @@
                 *ngFor="let day of getStreakWeek(streak)"
                 [class.checked]="day.checked"
                 [class.partial]="!day.checked && day.value > 0"
+                [class.rest]="day.rest && !day.checked"
                 [class.today]="day.isToday"
                 [class.future]="day.isFuture"
                 [class.log-selected]="getSelectedLogDate(streak) === day.date"
@@ -441,7 +445,7 @@
               >
                 <span class="streak-day-label">{{ day.label }}</span>
                 <span class="streak-day-value" *ngIf="day.value > 0">{{ day.value }}</span>
-                <span class="streak-day-check">{{ day.checked ? '✓' : (day.value > 0 ? '▲' : '·') }}</span>
+                <span class="streak-day-check">{{ streakDayGlyph(streak, day) }}</span>
               </div>
             </div>
             <!-- Log input for the selected day (defaults to today; click a day above to log/edit it instead) -->
@@ -459,8 +463,8 @@
                 type="number"
                 min="0"
                 placeholder="0"
-                [ngModel]="streak.loggedValues[getSelectedLogDate(streak)] || ''"
-                (ngModelChange)="logStreakValue(streak, getSelectedLogDate(streak), +$event)"
+                [ngModel]="isStreakLogged(streak, getSelectedLogDate(streak)) ? streak.loggedValues[getSelectedLogDate(streak)] : ''"
+                (ngModelChange)="onStreakLogInput(streak, $event)"
                 [attr.name]="'streakLog_' + streak.id"
               />
               <button
@@ -470,6 +474,12 @@
                 title="+1"
               >+</button>
               <span class="streak-log-unit">{{ streak.unit }}</span>
+              <button
+                class="streak-log-zero"
+                type="button"
+                *ngIf="streak.goalType === 'atMost' && !isStreakLogged(streak, getSelectedLogDate(streak))"
+                (click)="logStreakZero(streak)"
+              >{{ i18n.t('streakLogNone') }}</button>
               <span class="streak-log-done" *ngIf="streak.checkedDays.includes(getSelectedLogDate(streak))" [title]="i18n.t('todayGoalMet')">✅</span>
             </div>
           </div>
@@ -3507,7 +3517,7 @@
 <div class="modal-overlay" *ngIf="showStreakModal">
   <div class="modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h3>🔥 {{ i18n.t('newStreakModalTitle') }}</h3>
+      <h3>{{ editingStreakId ? '✎ ' + i18n.t('editStreakTitle') : '🔥 ' + i18n.t('newStreakModalTitle') }}</h3>
       <button class="modal-close" (click)="closeStreakModal()">✕</button>
     </div>
     <div class="modal-form">
@@ -3560,22 +3570,98 @@
         <p class="repeat-hint" style="margin:-12px 0 16px" *ngIf="streakGoalTotal">
           🧮 {{ i18n.t('streakAutoCalcLabel') }} {{ streakGoalTotal }} {{ streakGoalUnit }} {{ i18n.t('streakByLabel') }} {{ streakDeadline }} ≈ {{ streakFormTarget }} {{ streakFormUnit }}{{ i18n.t('perDay') }}. {{ i18n.t('streakFeelFreeAdjust') }}
         </p>
-        <div class="field-row">
-          <div class="field">
-            <label>{{ i18n.t('dailyTarget') }}</label>
-            <input type="number" [(ngModel)]="streakFormTarget" name="streakTarget" min="1" />
-          </div>
-          <div class="field">
-            <label>{{ i18n.t('unitLabel') }}</label>
-            <input type="text" [(ngModel)]="streakFormUnit" name="streakUnit" [placeholder]="i18n.t('unitPlaceholder')" />
-          </div>
-        </div>
+        <ng-container *ngTemplateOutlet="streakOptionsTpl"></ng-container>
         <div class="error-msg" *ngIf="streakFormError">{{ streakFormError }}</div>
         <div class="modal-actions">
           <button class="btn-secondary" (click)="streakStep = streakGoalTotal ? 'deadline' : 'name'">{{ i18n.t('backBtn') }}</button>
           <button class="btn-primary" (click)="streakAskAi()">{{ i18n.t('letAiPlan') }}</button>
         </div>
       </ng-container>
+
+      <!-- Edit: every setting on one page. Logged history is kept. -->
+      <ng-container *ngIf="streakStep === 'edit'">
+        <div class="field">
+          <label>{{ i18n.t('streakNameLabel') }}</label>
+          <input type="text" [(ngModel)]="streakFormName" name="streakEditName" maxlength="80" />
+        </div>
+        <ng-container *ngTemplateOutlet="streakOptionsTpl"></ng-container>
+        <div class="field" *ngIf="streakGoalTotal && streakFormGoalType === 'atLeast'">
+          <label>🎯 {{ i18n.t('streakFinishBy') }} ({{ streakGoalTotal }} {{ streakFormUnit }})</label>
+          <input type="date" [(ngModel)]="streakDeadline" name="streakEditDeadline" [min]="today" />
+        </div>
+        <p class="repeat-hint">{{ i18n.t('streakEditKeepsHistory') }}</p>
+        <div class="error-msg" *ngIf="streakFormError">{{ streakFormError }}</div>
+        <div class="modal-actions">
+          <button class="btn-secondary" (click)="closeStreakModal()">{{ i18n.t('cancel') }}</button>
+          <button class="btn-primary" (click)="saveStreakEdit()">{{ i18n.t('save') }}</button>
+        </div>
+      </ng-container>
+
+      <!-- Settings shared by the create and edit forms -->
+      <ng-template #streakOptionsTpl>
+        <div class="field">
+          <label>{{ i18n.t('streakGoalTypeLabel') }}</label>
+          <div class="streak-seg">
+            <button type="button" [class.active]="streakFormGoalType === 'atLeast'" (click)="streakFormGoalType = 'atLeast'">{{ i18n.t('streakAtLeast') }}</button>
+            <button type="button" [class.active]="streakFormGoalType === 'atMost'" (click)="streakFormGoalType = 'atMost'">{{ i18n.t('streakAtMost') }}</button>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>{{ streakFormGoalType === 'atMost' ? i18n.t('streakDailyLimit') : i18n.t('dailyTarget') }}</label>
+            <input type="number" [(ngModel)]="streakFormTarget" name="streakTarget" [min]="streakFormGoalType === 'atMost' ? 0 : 1" />
+          </div>
+          <div class="field">
+            <label>{{ i18n.t('unitLabel') }}</label>
+            <input type="text" [(ngModel)]="streakFormUnit" name="streakUnit" [placeholder]="i18n.t('unitPlaceholder')" />
+          </div>
+        </div>
+        <div class="field">
+          <label>{{ i18n.t('streakDaysLabel') }}</label>
+          <div class="streak-seg streak-seg-small">
+            <button type="button" [class.active]="isStreakDaysPreset('every')" (click)="setStreakDaysPreset('every')">{{ i18n.t('streakEveryDay') }}</button>
+            <button type="button" [class.active]="isStreakDaysPreset('weekdays')" (click)="setStreakDaysPreset('weekdays')">{{ i18n.t('streakWeekdays') }}</button>
+            <button type="button" [class.active]="isStreakDaysPreset('weekends')" (click)="setStreakDaysPreset('weekends')">{{ i18n.t('streakWeekends') }}</button>
+          </div>
+          <div class="streak-weekday-chips">
+            <button
+              type="button"
+              class="streak-weekday-chip"
+              *ngFor="let d of streakWeekdayOrder"
+              [class.active]="streakFormActiveDays.includes(d)"
+              [attr.aria-pressed]="streakFormActiveDays.includes(d)"
+              (click)="toggleStreakDay(d)"
+            >{{ streakWeekdayLabel(d) }}</button>
+          </div>
+          <p class="repeat-hint" style="margin-top:6px">{{ i18n.t('streakDaysHint') }}</p>
+        </div>
+        <div class="field">
+          <label>{{ i18n.t('streakIconLabel') }}</label>
+          <div class="streak-emoji-grid">
+            <button
+              type="button"
+              class="streak-emoji-opt"
+              *ngFor="let e of streakEmojiOptions"
+              [class.active]="streakFormEmoji === e"
+              (click)="streakFormEmoji = e"
+            >{{ e }}</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>{{ i18n.t('streakColorLabel') }}</label>
+          <div class="color-picker">
+            <button type="button" class="color-swatch streak-color-none" [class.selected]="!streakFormColor" (click)="streakFormColor = ''" [title]="i18n.t('streakColorDefault')"></button>
+            <button
+              type="button"
+              class="color-swatch"
+              *ngFor="let c of streakColorOptions"
+              [style.background]="c"
+              [class.selected]="streakFormColor === c"
+              (click)="streakFormColor = c"
+            ></button>
+          </div>
+        </div>
+      </ng-template>
 
       <!-- Step 3: AI Planning -->
       <ng-container *ngIf="streakStep === 'planning'">
@@ -3589,10 +3675,10 @@
       <ng-container *ngIf="streakStep === 'ready'">
         <div class="streak-plan-preview">
           <div class="streak-plan-header">
-            <span class="streak-plan-icon">🔥</span>
+            <span class="streak-plan-icon">{{ streakFormEmoji || '🔥' }}</span>
             <div>
               <strong>{{ streakFormName }}</strong>
-              <span class="streak-plan-goal">{{ streakFormTarget }} {{ streakFormUnit }}{{ i18n.t('perDay') }}</span>
+              <span class="streak-plan-goal">{{ streakTargetLabel({ target: streakFormTarget, unit: streakFormUnit, goalType: streakFormGoalType }) }}</span>
             </div>
           </div>
           <p class="streak-plan-text" *ngIf="streakAiPlan">{{ i18n.t('aiPlanLabel') }} {{ streakAiPlan }}</p>

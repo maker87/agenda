@@ -1,6 +1,23 @@
 import { Injectable } from '@angular/core';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../../amplify/data/resource';
+import type { StreakGoalType } from './streak-rules.util';
+
+/**
+ * The customisable fields, in the shape the model takes them. null clears a
+ * field on update (undefined would leave the old value in place), which is
+ * what lets an edit remove a finish date or go back to every day.
+ */
+function customFields(s: Omit<Streak, 'id'>) {
+  return {
+    goalTotal:    s.goalTotal ?? null,
+    goalDeadline: s.goalDeadline || null,
+    goalType:     s.goalType ?? null,
+    activeDays:   s.activeDays?.length ? s.activeDays : null,
+    emoji:        s.emoji || null,
+    color:        s.color || null,
+  };
+}
 
 export interface Streak {
   id: string;
@@ -13,6 +30,12 @@ export interface Streak {
   createdAt: string;
   goalTotal?: number;
   goalDeadline?: string;
+  /** Reach the target, or stay at or under it. Absent means 'atLeast'. */
+  goalType?: StreakGoalType;
+  /** Weekdays that count, 0 = Sunday. Absent or empty means every day. */
+  activeDays?: number[];
+  emoji?: string;
+  color?: string;
   /** Set when the streak has been soft-deleted (kept around for the history/restore view). */
   deletedAt?: string;
 }
@@ -100,8 +123,7 @@ export class StreaksService {
         loggedValues: streak.loggedValues,
         aiPlan:       streak.aiPlan || undefined,
         startedOn:    streak.createdAt || undefined,
-        goalTotal:    streak.goalTotal ?? undefined,
-        goalDeadline: streak.goalDeadline ?? undefined,
+        ...customFields(streak),
         ownerEmail,
       } as any);
       if (errors?.length) throw new Error(errors[0].message);
@@ -140,8 +162,7 @@ export class StreaksService {
         checkedDays:  streak.checkedDays,
         loggedValues: streak.loggedValues,
         aiPlan:       streak.aiPlan || undefined,
-        goalTotal:    streak.goalTotal ?? undefined,
-        goalDeadline: streak.goalDeadline ?? undefined,
+        ...customFields(streak),
         // Explicit null (not undefined) so restoring a streak actually clears
         // deletedAt server-side instead of leaving the field untouched.
         deletedAt:    streak.deletedAt ?? null,
@@ -234,8 +255,7 @@ export class StreaksService {
             loggedValues: entry.streak.loggedValues,
             aiPlan:       entry.streak.aiPlan || undefined,
             startedOn:    entry.streak.createdAt || undefined,
-            goalTotal:    entry.streak.goalTotal ?? undefined,
-            goalDeadline: entry.streak.goalDeadline ?? undefined,
+            ...customFields(entry.streak),
             ownerEmail:   entry.ownerEmail,
           } as any);
           if (errors?.length) throw new Error(errors[0].message);
@@ -251,8 +271,7 @@ export class StreaksService {
             checkedDays:  entry.streak.checkedDays,
             loggedValues: entry.streak.loggedValues,
             aiPlan:       entry.streak.aiPlan || undefined,
-            goalTotal:    entry.streak.goalTotal ?? undefined,
-            goalDeadline: entry.streak.goalDeadline ?? undefined,
+            ...customFields(entry.streak),
             deletedAt:    entry.streak.deletedAt ?? null,
           } as any);
           if (errors?.length) throw new Error(errors[0].message);
@@ -282,6 +301,10 @@ export class StreaksService {
       createdAt:    (record as any).startedOn ?? '',
       ...(record.goalTotal != null ? { goalTotal: record.goalTotal } : {}),
       ...(record.goalDeadline ? { goalDeadline: record.goalDeadline } : {}),
+      ...(record.goalType === 'atMost' || record.goalType === 'atLeast' ? { goalType: record.goalType as StreakGoalType } : {}),
+      ...(record.activeDays?.length ? { activeDays: record.activeDays.filter((d): d is number => d !== null) } : {}),
+      ...(record.emoji ? { emoji: record.emoji } : {}),
+      ...(record.color ? { color: record.color } : {}),
       ...((record as any).deletedAt ? { deletedAt: (record as any).deletedAt } : {}),
     };
   }

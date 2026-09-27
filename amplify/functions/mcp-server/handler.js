@@ -271,6 +271,9 @@ async function toolListStreaks(who) {
   const streaks = await scanOwned(TABLES.streak, who);
   return streaks.filter(s => !s.deletedAt).map(s => ({
     name: s.name, target: s.target, unit: s.unit,
+    // 'atMost': the target is a limit to stay under. activeDays: scheduled
+    // weekdays, 0 = Sunday; absent means every day.
+    goalType: s.goalType ?? 'atLeast', activeDays: s.activeDays ?? [],
     checkedDays: s.checkedDays ?? [], loggedValues: s.loggedValues ?? {},
   }));
 }
@@ -285,7 +288,9 @@ async function toolLogStreak(who, args) {
 
   const loggedValues = { ...(match.loggedValues ?? {}), [args.date]: args.value };
   const checkedDays = new Set(match.checkedDays ?? []);
-  if (args.value >= match.target) checkedDays.add(args.date); else checkedDays.delete(args.date);
+  // Same rule as the app (src/app/services/streak-rules.util.ts isDayMet).
+  const met = match.goalType === 'atMost' ? args.value <= match.target : args.value >= match.target;
+  if (met) checkedDays.add(args.date); else checkedDays.delete(args.date);
 
   await ddb.send(new UpdateCommand({
     TableName: TABLES.streak,

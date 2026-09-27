@@ -85,6 +85,13 @@ const schema = a.schema({
       // Soft-delete marker so a deleted streak can still be shown/restored
       // from the history view instead of being gone the moment it's removed.
       deletedAt:    a.string(),
+      // 'atLeast' (default: reach the target) or 'atMost' (stay under it).
+      goalType:     a.string(),
+      // Weekdays the habit is scheduled on, 0 = Sunday. Empty means every day;
+      // days off don't break the streak.
+      activeDays:   a.integer().array(),
+      emoji:        a.string(),
+      color:        a.string(),
     })
     .authorization((allow) => [
       allow.owner().identityClaim('sub'),

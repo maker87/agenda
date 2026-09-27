@@ -14,6 +14,10 @@ export interface AssistantStreak {
   count?: number;
   goalTotal?: number;
   goalDeadline?: string;
+  /** 'atMost' means the target is a limit to stay under. */
+  goalType?: 'atLeast' | 'atMost';
+  /** Scheduled weekdays, 0 = Sunday; absent means every day. */
+  activeDays?: number[];
 }
 
 /**
@@ -146,6 +150,8 @@ export class BedrockChatService {
         unit: s.unit,
         count: s.count ?? 0,
         ...(s.goalTotal ? { goalTotal: s.goalTotal, goalDeadline: s.goalDeadline } : {}),
+        ...(s.goalType === 'atMost' ? { goalType: s.goalType } : {}),
+        ...(s.activeDays?.length ? { activeDays: s.activeDays } : {}),
       }));
       const { data, errors } = await getClient().queries.chat({
         message: langInstruction + message,

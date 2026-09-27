@@ -7757,6 +7757,78 @@
 
 .streak-delete:hover { color: #ef4444; background: var(--error-bg); }
 
+/* ── Streak customisation ── */
+.streak-header { flex-wrap: wrap; }
+.streak-card.has-color { border-left: 4px solid var(--streak-color); }
+.streak-emoji { font-size: 18px; line-height: 1; }
+.streak-schedule-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.streak-edit {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.streak-edit:hover { color: var(--accent); background: var(--bg-hover); }
+
+.streak-day.rest { opacity: 0.45; border-style: dashed; }
+
+.streak-log-zero {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.streak-log-zero:hover { border-color: var(--accent); color: var(--accent); }
+
+.streak-seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.streak-seg button,
+.streak-weekday-chip {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.streak-seg-small button { font-size: 12px; padding: 4px 10px; }
+.streak-seg button.active,
+.streak-weekday-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+}
+.streak-weekday-chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+.streak-weekday-chip { min-width: 44px; padding: 6px 4px; text-align: center; }
+
+.streak-emoji-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+.streak-emoji-opt {
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  border-radius: 8px;
+  border: 1.5px solid transparent;
+  background: var(--bg-hover);
+  cursor: pointer;
+}
+.streak-emoji-opt.active { border-color: var(--accent); background: var(--accent-light); }
+
+/* "No colour": the card's default look. */
+.streak-color-none { background: repeating-linear-gradient(45deg, var(--border) 0 3px, transparent 3px 6px); }
+
 .streak-days {
   display: flex;
   gap: 6px;
