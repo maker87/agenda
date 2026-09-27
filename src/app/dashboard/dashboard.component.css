@@ -2076,6 +2076,10 @@
   border: 1.5px solid var(--border);
   overflow: hidden;
   transition: box-shadow 0.15s;
+  /* Scrolling to a month (on opening the calendar, or "Jump to") stops below
+     the fixed 56px top bar. Stopping at 0 put the month's header underneath
+     it, so clicking the header hit the bar and never opened the month. */
+  scroll-margin-top: 72px;
 }
 
 .month-block:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
