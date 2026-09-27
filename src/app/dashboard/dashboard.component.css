@@ -1017,14 +1017,6 @@
   box-shadow: 0 0 0 3px rgba(124, 116, 255, 0.4);
 }
 
-.app-shell[data-theme="dark"] .category-color-text {
-  color: #c0c0d8;
-}
-
-.app-shell[data-theme="dark"] .category-color-hint {
-  color: #9090b0;
-}
-
 .app-shell[data-theme="dark"] .page-title {
   color: #f0f0f8;
 }
@@ -5135,52 +5127,6 @@
 .cat-node-color-picker .color-swatch {
   width: 22px;
   height: 22px;
-}
-
-/* Category color info row in schedule modal */
-.category-color-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--bg-hover);
-  border-radius: 8px;
-  margin-bottom: 8px;
-}
-.category-color-dot {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  border: 2px solid rgba(0,0,0,0.1);
-}
-.category-color-text {
-  font-size: 13px;
-  color: var(--text-secondary);
-  flex: 1;
-}
-.category-color-text.muted {
-  font-style: italic;
-}
-.category-color-change-btn {
-  font-size: 12px;
-  padding: 3px 10px;
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-card);
-  color: var(--accent);
-  cursor: pointer;
-  font-weight: 600;
-  transition: background 0.15s;
-}
-.category-color-change-btn:hover {
-  background: var(--accent-light);
-}
-.category-color-hint {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-top: 6px;
-  font-style: italic;
 }
 
 /* Rename button */

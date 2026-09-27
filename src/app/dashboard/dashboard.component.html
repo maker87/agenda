@@ -3178,37 +3178,6 @@
         </div>
       </div>
 
-      <!-- Colour belongs to the category, not the event: an event is drawn in
-           its category's colour, so the only thing to set here is that
-           category's colour. With no category chosen there is nothing to pick. -->
-      <div class="field">
-        <label>{{ i18n.t('eventColor') }}</label>
-        <div class="category-color-info" *ngIf="form.category">
-          <span class="category-color-dot" [style.background]="getCategoryColor(form.category)"></span>
-          <span class="category-color-text">
-            {{ i18n.t('usingCategoryColor') }} <strong>{{ form.category | translateTitle }}</strong> {{ i18n.t('categoryColorSuffix') }}
-          </span>
-          <button type="button" class="category-color-change-btn" (click)="showCategoryColorPicker = !showCategoryColorPicker">{{ i18n.t('change') }}</button>
-        </div>
-        <div class="category-color-info" *ngIf="!form.category">
-          <span class="category-color-dot" [style.background]="UNCATEGORIZED_COLOR"></span>
-          <span class="category-color-text muted">{{ i18n.t('selectCategoryForColor') }}</span>
-        </div>
-        <div class="color-picker" *ngIf="showCategoryColorPicker && form.category">
-          <button
-            type="button"
-            class="color-swatch"
-            *ngFor="let c of eventColors"
-            [style.background]="c"
-            [class.selected]="getCategoryColor(form.category) === c"
-            (click)="pickCategoryColor(c)"
-          ></button>
-        </div>
-        <p class="category-color-hint" *ngIf="showCategoryColorPicker && form.category">
-          {{ i18n.t('changingColorWarning') }} "{{ form.category | translateTitle }}"{{ isSubcategory(form.category) ? i18n.t('subcategoryColorNote') : '' }}
-        </p>
-      </div>
-
       <div class="error-msg" *ngIf="scheduleError">{{ scheduleError }}</div>
 
       <!-- AI scheduling handled by the floating chat -->

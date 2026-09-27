@@ -3575,28 +3575,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.getCategoryColor(ev.category);
   }
 
-  /** Exposed for the template's "no category yet" swatch. */
-  readonly UNCATEGORIZED_COLOR = UNCATEGORIZED_COLOR;
-
-  /** True when the path is nested under another category. */
-  isSubcategory(path: string): boolean {
-    return !!path && path.includes(CATEGORY_SEP);
-  }
-
-  /** Change a category's color and update all events using that category. */
-  /**
-   * Recolour the category the event is being filed under.
-   *
-   * There is no per-event colour to set any more — an event takes its
-   * category's colour — so with no category chosen there is nothing to do.
-   */
-  pickCategoryColor(color: string) {
-    if (!this.form.category) return;
-    this.categoryColors[this.form.category] = color;
-    this.showCategoryColorPicker = false;
-    this.saveCategoryColors();
-  }
-
   /** Save category colors to localStorage for persistence. */
   // Colours used to live under one flat key shared by every account on the
   // browser, so signing in as someone else overwrote the previous account's
@@ -3767,7 +3745,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   showCategoryPicker = false;
-  showCategoryColorPicker = false;
 
   closeCategoryPicker() {
     this.showCategoryPicker = false;
@@ -4799,7 +4776,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.formShareSuggestions = [];
     this.scheduleError = '';
     this.scheduleSuccess = false;
-    this.showCategoryColorPicker = false;
     // Reset AI panel state
     this.showAiPanel = false;
     this.aiSuggestions = [];
