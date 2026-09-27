@@ -2999,12 +2999,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   slideMonthIndex = new Date().getMonth();
 
   /**
-   * Year view: clicking a month's header opens that month on its own. Set
+   * Year view: clicking a month's card, or picking it in "Jump to", opens
+   * that month on its own. Set
    * directly rather than through goToSlideMonth(), which animates between
    * months and bails when the target is the one already selected — neither
    * makes sense when the month is arriving from a different view.
    */
   openMonthView(monthIdx: number) {
+    if (!(monthIdx >= 0 && monthIdx < 12)) return;
     this.slideMonthIndex = monthIdx;
     this.slideAnimating = false;
     this.setCalendarView('month');
@@ -3019,7 +3021,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
    */
   setCalendarView(view: 'year' | 'month' | 'week' | 'day') {
     this.calendarView = view;
-    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    const toTop = () => window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    toTop();
+    // Again once the new view has rendered: a smooth scroll that was mid-way
+    // kept stepping for a frame or two and left the month ~50px down.
+    requestAnimationFrame(() => requestAnimationFrame(toTop));
   }
   slideAnimating = false;
   slideDirection: 'left' | 'right' = 'left';
@@ -3054,6 +3060,27 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // All 12 months (used by jump dropdown)
+  /**
+   * calendarMonths and the week grids are rebuilt as new objects on every
+   * change-detection pass. Without these, their lists threw away and redrew
+   * every month card and day square each pass, and a pass runs inside a
+   * click: clicking a blank square destroyed its month card (and the card's
+   * click handler) before the click bubbled up to it, so the month didn't
+   * open. Tracking by position keeps the elements, and their handlers, alive.
+   */
+  trackByMonth(_: number, month: { monthIdx: number }): number {
+    return month.monthIdx;
+  }
+
+  trackByIndex(index: number): number {
+    return index;
+  }
+
+  /** Event dots in the grids: buildWeeks copies each event, so key by id. */
+  trackByEventId(_: number, ev: { id: string }): string {
+    return ev.id;
+  }
+
   get calendarMonths() {
     const realYear = new Date().getFullYear();
     return this.monthNames.map((name, monthIdx) => ({
@@ -4315,23 +4342,6 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     // Auto-dismiss after 15 seconds (a bit longer since there's more useful info)
     if (this.loginBannerTimer) clearTimeout(this.loginBannerTimer);
     this.loginBannerTimer = setTimeout(() => { this.showLoginBanner = false; }, 15000);
-  }
-
-  /** Month the year view briefly highlights after a jump, or null. */
-  highlightedMonthIdx: number | null = null;
-  private highlightTimer: ReturnType<typeof setTimeout> | null = null;
-
-  /**
-   * "Jump to" in the year view. Scrolls to the month and highlights it for a
-   * moment, so the jump shows even when the month is already on screen, as
-   * the current month is when the calendar opens.
-   */
-  jumpToYearMonth(idx: number) {
-    if (!(idx >= 0 && idx < 12)) return;
-    this.scrollToYearMonth(idx);
-    this.highlightedMonthIdx = idx;
-    if (this.highlightTimer) clearTimeout(this.highlightTimer);
-    this.highlightTimer = setTimeout(() => { this.highlightedMonthIdx = null; }, 1400);
   }
 
   scrollToYearMonth(idx: number) {

@@ -2080,6 +2080,7 @@
      the fixed 56px top bar. Stopping at 0 put the month's header underneath
      it, so clicking the header hit the bar and never opened the month. */
   scroll-margin-top: 72px;
+  cursor: pointer; /* the whole card opens its month */
 }
 
 .month-block:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
@@ -2087,16 +2088,6 @@
 .month-block.current-month {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(108,99,255,0.12);
-}
-
-/* Brief pulse on the month "Jump to" landed on. */
-.month-block.month-jump-highlight {
-  animation: month-jump-pulse 1.4s ease-out;
-}
-
-@keyframes month-jump-pulse {
-  0%, 30% { border-color: var(--accent); box-shadow: 0 0 0 6px rgba(108,99,255,0.35); }
-  100% { box-shadow: 0 0 0 3px rgba(108,99,255,0); }
 }
 
 .month-header {

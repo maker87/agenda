@@ -687,11 +687,11 @@
         </div>
         <div class="cal-input-group" *ngIf="calendarView === 'year'">
           <label class="cal-input-label">{{ i18n.t('jumpTo') }}</label>
-          <!-- Reset to the placeholder after each jump: a select ignores picking the
-               option it already shows, so the same month could only be chosen once. -->
-          <select #yearJump class="cal-text-input" (change)="jumpToYearMonth(+yearJump.value); yearJump.value = ''" name="yearJump">
+          <!-- Opens the chosen month. Reset to the placeholder afterwards: a select
+               ignores picking the option it already shows. -->
+          <select #yearJump class="cal-text-input" (change)="openMonthView(+yearJump.value); yearJump.value = ''" name="yearJump">
             <option value="" disabled selected>{{ i18n.t('monthEllipsis') }}</option>
-            <option *ngFor="let m of calendarMonths; let i = index" [value]="i">{{ m.name }}</option>
+            <option *ngFor="let m of calendarMonths; let i = index; trackBy: trackByMonth" [value]="i">{{ m.name }}</option>
           </select>
         </div>
 
@@ -732,20 +732,21 @@
       <div *ngIf="calendarView === 'year'" class="all-months-scroll">
         <div
           class="month-block"
-          *ngFor="let month of calendarMonths"
+          *ngFor="let month of calendarMonths; trackBy: trackByMonth"
           [class.current-month]="month.isCurrent"
-          [class.month-jump-highlight]="highlightedMonthIdx === month.monthIdx"
           [attr.id]="'year-month-' + month.monthIdx"
+          (click)="openMonthView(month.monthIdx)"
         >
-          <!-- The header opens the month on its own; the day cells below keep
-               their own click, so this does not swallow them. -->
+          <!-- Clicking anywhere on the card opens its month: the name, the
+               weekday row, empty squares. Days and event dots stop their own
+               clicks, so they still open the day and the event. The header
+               stays a focusable button for the keyboard. -->
           <div
             class="month-header month-header-clickable"
             role="button"
             tabindex="0"
             [attr.aria-label]="i18n.t('openMonthView') + ' ' + month.name"
             [title]="i18n.t('openMonthView')"
-            (click)="openMonthView(month.monthIdx)"
             (keydown.enter)="openMonthView(month.monthIdx)"
             (keydown.space)="openMonthView(month.monthIdx); $event.preventDefault()"
           >
@@ -754,8 +755,8 @@
           </div>
           <div class="cal-grid">
             <div class="cal-day-label" *ngFor="let d of dayLabels">{{ d }}</div>
-            <ng-container *ngFor="let week of month.weeks">
-              <ng-container *ngFor="let cell of week">
+            <ng-container *ngFor="let week of month.weeks; trackBy: trackByIndex">
+              <ng-container *ngFor="let cell of week; trackBy: trackByIndex">
                 <div
                   class="cal-cell"
                   [class.empty]="!cell"
@@ -770,7 +771,7 @@
                   <div class="cal-dots" *ngIf="cell && cell.events.length > 0">
                     <span
                       class="cal-dot"
-                      *ngFor="let ev of cell.events.slice(0, 3)"
+                      *ngFor="let ev of cell.events.slice(0, 3); trackBy: trackByEventId"
                       [style.background]="eventColor(ev)"
                       [title]="ev.title"
                       (click)="openEventPopup(ev, $event)"
@@ -801,7 +802,7 @@
               (ngModelChange)="goToSlideMonth($event)"
               name="slideJump"
             >
-              <option *ngFor="let m of calendarMonths; let i = index" [ngValue]="i">
+              <option *ngFor="let m of calendarMonths; let i = index; trackBy: trackByMonth" [ngValue]="i">
                 {{ m.name }}
               </option>
             </select>
@@ -817,8 +818,8 @@
             <div class="slide-day-label" *ngFor="let d of dayLabels">{{ d }}</div>
 
             <!-- Day cells -->
-            <ng-container *ngFor="let week of slideMonthWeeks">
-              <ng-container *ngFor="let cell of week">
+            <ng-container *ngFor="let week of slideMonthWeeks; trackBy: trackByIndex">
+              <ng-container *ngFor="let cell of week; trackBy: trackByIndex">
                 <div
                   class="slide-cell"
                   [class.empty]="!cell"
@@ -833,7 +834,7 @@
                   <div class="slide-cell-events" *ngIf="cell && cell.events.length > 0">
                     <div
                       class="slide-event-pill"
-                      *ngFor="let ev of cell.events.slice(0, 3)"
+                      *ngFor="let ev of cell.events.slice(0, 3); trackBy: trackByEventId"
                       [style.background]="eventColor(ev)"
                       [title]="ev.title"
                     >{{ ev.title | translateTitle }}</div>
@@ -849,7 +850,7 @@
         <div class="slide-dots">
           <button
             class="slide-dot"
-            *ngFor="let m of calendarMonths; let i = index"
+            *ngFor="let m of calendarMonths; let i = index; trackBy: trackByMonth"
             [class.active]="i === slideMonthIndex"
             (click)="goToSlideMonth(i)"
             [title]="m.name"
@@ -2312,8 +2313,8 @@
           </div>
           <div class="browse-cal-grid">
             <div class="browse-cal-day-label" *ngFor="let d of dayLabels">{{ d }}</div>
-            <ng-container *ngFor="let week of browseWeeks">
-              <ng-container *ngFor="let cell of week">
+            <ng-container *ngFor="let week of browseWeeks; trackBy: trackByIndex">
+              <ng-container *ngFor="let cell of week; trackBy: trackByIndex">
                 <div
                   class="browse-cal-cell"
                   [class.empty]="!cell"
@@ -2324,7 +2325,7 @@
                 >
                   <span class="browse-cal-day-num" *ngIf="cell">{{ cell.day }}</span>
                   <div class="browse-cal-dots" *ngIf="cell && cell.events.length > 0">
-                    <span class="browse-cal-dot" *ngFor="let ev of cell.events.slice(0, 3)" [style.background]="eventColor(ev)" [title]="ev.title"></span>
+                    <span class="browse-cal-dot" *ngFor="let ev of cell.events.slice(0, 3); trackBy: trackByEventId" [style.background]="eventColor(ev)" [title]="ev.title"></span>
                   </div>
                 </div>
               </ng-container>
@@ -2417,8 +2418,8 @@
             </div>
             <div class="browse-cal-grid">
               <div class="browse-cal-day-label" *ngFor="let d of dayLabels">{{ d }}</div>
-              <ng-container *ngFor="let week of browseWeeks">
-                <ng-container *ngFor="let cell of week">
+              <ng-container *ngFor="let week of browseWeeks; trackBy: trackByIndex">
+                <ng-container *ngFor="let cell of week; trackBy: trackByIndex">
                   <div
                     class="browse-cal-cell"
                     [class.empty]="!cell"
@@ -2429,7 +2430,7 @@
                   >
                     <span class="browse-cal-day-num" *ngIf="cell">{{ cell.day }}</span>
                     <div class="browse-cal-dots" *ngIf="cell && cell.events.length > 0">
-                      <span class="browse-cal-dot" *ngFor="let ev of cell.events.slice(0, 3)" [style.background]="eventColor(ev)" [title]="ev.title"></span>
+                      <span class="browse-cal-dot" *ngFor="let ev of cell.events.slice(0, 3); trackBy: trackByEventId" [style.background]="eventColor(ev)" [title]="ev.title"></span>
                     </div>
                   </div>
                 </ng-container>
@@ -2972,10 +2973,10 @@
             <span *ngFor="let d of dayNames">{{ d }}</span>
           </div>
           <div class="mini-cal-grid">
-            <ng-container *ngFor="let week of multiDayPickerWeeks">
+            <ng-container *ngFor="let week of multiDayPickerWeeks; trackBy: trackByIndex">
               <button
                 type="button"
-                *ngFor="let cell of week"
+                *ngFor="let cell of week; trackBy: trackByIndex"
                 class="mini-cal-day"
                 [class.empty]="!cell"
                 [class.past]="cell && cell.isPast"
