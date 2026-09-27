@@ -567,7 +567,7 @@ async function translateTexts(event) {
       messages: [{ role: 'user', content: [{ text: prompt }] }],
       inferenceConfig: { maxTokens: 8192, temperature: 0 },
     });
-    const response = await client.send(command);
+    const response = await sendWithRetry(client, command);
     const rawText = response.output?.message?.content?.[0]?.text || '[]';
     const jsonMatch = rawText.match(/\[[\s\S]*\]/);
     const translated = jsonMatch ? JSON.parse(jsonMatch[0]) : null;
@@ -727,7 +727,7 @@ Upcoming events (next 50):\n` +
       },
     });
 
-    const response = await client.send(command);
+    const response = await sendWithRetry(client, command);
     const rawText = response.output?.message?.content?.[0]?.text || 'Sorry, I could not generate a response.';
 
     // Parse and convert to structured format
@@ -736,6 +736,29 @@ Upcoming events (next 50):\n` +
     return finalResponse;
   } catch (error) {
     console.error('Bedrock invocation error:', error);
-    return 'I\'m having trouble connecting right now. Please try again in a moment.';
+    // Name the error, the way the app does for its own failures, so a report
+    // of this message says which failure it was without needing the logs.
+    const name = error?.name || error?.Code || 'Unknown';
+    return `I'm having trouble connecting right now. Please try again in a moment.\n\n_Error: ${name}_`;
   }
 };
+
+/** Bedrock errors that mean "busy right now", worth another try. */
+const RETRYABLE = new Set(['ThrottlingException', 'ServiceUnavailableException', 'ModelNotReadyException', 'InternalServerException']);
+
+/**
+ * Send a Converse call, retrying twice on a busy/unavailable answer with a
+ * short backoff. On-demand model quotas are low on a young account, so a
+ * burst of messages (or the chat plus a translation at once) can be turned
+ * away for a second or two; everything else fails straight away.
+ */
+async function sendWithRetry(client, command) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await client.send(command);
+    } catch (error) {
+      if (attempt >= 2 || !RETRYABLE.has(error?.name)) throw error;
+      await new Promise((r) => setTimeout(r, 400 * 2 ** attempt + Math.random() * 200));
+    }
+  }
+}

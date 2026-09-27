@@ -87,6 +87,14 @@ mcpLambda.addEnvironment('API_TOKEN_TABLE', 'ApiToken-mvjyhqvbi5hajc6rcdnhqwva24
 // revert in bedrock-chat/handler.js (this account hasn't completed Bedrock's
 // Anthropic use-case-details form yet). Restore the claude-sonnet-4-5
 // foundation-model/inference-profile ARNs here when switching back.
+//
+// MODEL_ID is a cross-region inference profile ("us." prefix). A call through
+// it needs permission on the profile AND on the underlying foundation model in
+// every region the profile may route to (us-east-1, us-east-2, us-west-2). The
+// foundation model's ARN carries no "us." prefix: the old entry,
+// foundation-model/us.amazon.nova-lite-v1:0, matched no model at all, so
+// Bedrock refused the call and the chat answered "I'm having trouble
+// connecting right now".
 const dataStack = Stack.of(backend.data);
 const allConstructs = dataStack.node.findAll();
 for (const construct of allConstructs) {
@@ -96,8 +104,10 @@ for (const construct of allConstructs) {
         effect: Effect.ALLOW,
         actions: ['bedrock:InvokeModel'],
         resources: [
-          'arn:aws:bedrock:us-east-1::foundation-model/us.amazon.nova-lite-v1:0',
           'arn:aws:bedrock:us-east-1:*:inference-profile/us.amazon.nova-lite-v1:0',
+          'arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0',
+          'arn:aws:bedrock:us-east-2::foundation-model/amazon.nova-lite-v1:0',
+          'arn:aws:bedrock:us-west-2::foundation-model/amazon.nova-lite-v1:0',
         ],
       })
     );
