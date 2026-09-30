@@ -3176,6 +3176,21 @@
 
           </div>
         </div>
+
+        <!-- Recolour the chosen category right here, rather than only from the
+             Categories tab. It is the category's colour, so every event filed
+             under it changes too. -->
+        <div class="color-picker" *ngIf="form.category.trim() && !showCategoryPicker" style="margin-top:8px">
+          <button
+            type="button"
+            class="color-swatch"
+            *ngFor="let c of eventColors"
+            [style.background]="c"
+            [class.selected]="getCategoryColor(form.category.trim()) === c"
+            [title]="i18n.t('changeColor')"
+            (click)="setCategoryColorFromTree(form.category.trim(), c)"
+          ></button>
+        </div>
       </div>
 
       <div class="error-msg" *ngIf="scheduleError">{{ scheduleError }}</div>
